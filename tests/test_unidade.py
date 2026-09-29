@@ -1,8 +1,10 @@
 # Testes que não precisam de banco
+import asyncio
 from datetime import datetime, timedelta
 
 import pytest
 
+from api.rotas.eventos import eventos
 from api.seguranca import (
     LimitadorTentativas,
     criar_token,
@@ -89,6 +91,24 @@ def test_limitador_bloqueia_depois_do_maximo():
 ])
 def test_gerar_slug(nome, esperado):
     assert gerar_slug(nome) == esperado
+
+
+# -----------------------------------------------
+# EVENTOS AO VIVO
+# -----------------------------------------------
+def test_eventos_comecam_com_pronto():
+    # O painel usa o "pronto" para saber se o fluxo chega ou se precisa consultar a API.
+    # Lê só os dois primeiros blocos: antes deles o gerador não toca no banco.
+    async def primeiros_blocos():
+        resposta = await eventos(request=None, usuario={"organizacao_id": "org1"}, db=None)
+        gerador = resposta.body_iterator
+        blocos = [await anext(gerador), await anext(gerador)]
+        await gerador.aclose()
+        return resposta.media_type, blocos
+
+    media_type, blocos = asyncio.run(primeiros_blocos())
+    assert media_type == "text/event-stream"
+    assert blocos == ["retry: 3000\n\n", "event: pronto\ndata: {}\n\n"]
 
 
 # -----------------------------------------------

@@ -3,6 +3,13 @@ import { Radio } from "lucide-react";
 import type { EstadoConexao } from "@/lib/useJobsAoVivo";
 import type { Sistema } from "@/lib/tipos";
 
+const ROTULOS_CONEXAO: Record<EstadoConexao, string> = {
+  conectando: "conectando",
+  "ao-vivo": "ao vivo",
+  reconectando: "reconectando",
+  consulta: "a cada 3 segundos",
+};
+
 function Indicador({ online, rotulo, detalhe }: { online: boolean; rotulo: string; detalhe: string }) {
   return (
     <div className="flex items-start gap-3">
@@ -30,7 +37,7 @@ export function PainelSistema({ sistema, conexao }: { sistema: Sistema | null; c
       <div className="mt-5 flex flex-col gap-4">
         <div className="flex items-center gap-2 text-sm text-suave">
           <Radio className="size-4" aria-hidden />
-          Atualização ao vivo: {conexao === "ao-vivo" ? "conectada" : conexao === "conectando" ? "conectando" : "reconectando"}
+          Atualização: {ROTULOS_CONEXAO[conexao]}
         </div>
         <Indicador
           online={workersCpu.length > 0}
