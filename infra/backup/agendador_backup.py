@@ -5,8 +5,7 @@
 #   python infra/backup/agendador_backup.py --automatico       (todo dia no --hora)
 #
 # Grava cada coleção em <pasta>/backup_DD-MM-AAAA_HH-MM/<banco>/<colecao>.bson.gz,
-# o mesmo formato do mongodump. Para restaurar:
-#   mongorestore --gzip --db holycut <pasta>/backup_.../holycut
+# o mesmo formato do mongodump. Para restaurar, veja docs/SETUP_NITRO.md, seção 9.
 # -----------------------------------------------
 
 # -----------------------------------------------

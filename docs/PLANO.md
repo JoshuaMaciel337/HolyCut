@@ -336,6 +336,23 @@ As três estão em `brand/fontes/` com licença OFL, o que permite queimar no v�
 - **Revisão de um designer.** O símbolo foi redesenhado a partir de uma imagem gerada por IA. Antes de registrar a marca, vale um designer refinar curvas e proporções.
 - **Templates de Stories.** O template do kit v1 é só um rascunho. Os templates de verdade são feitos na Fase 1, junto com o HolyStories.
 
+### Verificação da marca (29/09/2026)
+
+| Item | Resultado |
+|---|---|
+| INPI, "HOLYCUT" e "HOLY CUT" | Nenhum pedido ou registro, na busca exata nem na radical |
+| INPI, "HOLY" sozinha | 23 processos. Os que tocam o HolyCut: registro em vigor na **classe 42** (Blank Design Studio, 2020) e na **classe 41** (2023) |
+| holycut.com | Registrado desde 10/09/2025 por um revendedor (Gname), sem site no ar |
+| holycut.com.br, holycut.app, holycut.app.br, holycutapp.com | Livres |
+| YouTube @holycut | Ocupado, por um canal "Holy Cut" com cerca de 8 vídeos. @holycutapp está livre |
+| Instagram e TikTok | Não deu para confirmar automaticamente: o Instagram limitou as consultas e o TikTok bloqueia robôs. Conferir no celular |
+
+Próximos passos:
+
+1. Registrar **holycut.com.br** e **holycut.app** logo, porque são baratos e estão livres.
+2. Usar **@holycutapp** nas redes, já que o @holycut do YouTube está ocupado.
+3. Antes do depósito no INPI, pedir a opinião de um especialista em marcas sobre as marcas "HOLY" das classes 41 e 42. As classes do HolyCut são a 9 (software), a 41 (edição de vídeo) e a 42 (software como serviço).
+
 ---
 
 ## 10. Estrutura de pastas
@@ -439,6 +456,8 @@ O próprio túnel divide o tráfego por caminho. Assim site e API ficam no mesmo
 
 Recomendação: use o Quick Tunnel enquanto desenvolve e registre o domínio antes de chamar a primeira igreja piloto.
 
+> O Quick Tunnel não entrega Server-Sent Events e aceita no máximo 200 requisições simultâneas, segundo a própria Cloudflare. Testado em 29/09/2026: por ele, o progresso dos jobs só chega quando a conexão fecha. O painel detecta isso e passa a consultar a API a cada 3 segundos. O túnel fixo não tem essa limitação.
+
 ### Ajustes obrigatórios por causa do túnel
 
 - **Limite de 100 MB por requisição.** O plano grátis da Cloudflare recusa envios maiores que isso. O upload tus resolve, porque manda o arquivo em pedaços de 50 MB. Nenhum outro endpoint pode receber arquivo inteiro.
@@ -501,13 +520,13 @@ As estimativas consideram 1 pessoa desenvolvendo em tempo integral. Com duas, ca
 
 ### Fase 0 — Fundação (1 a 2 semanas)
 
-- [ ] Verificar a marca "HolyCut": busca no INPI, domínios (.com, .com.br, .app) e @ no Instagram, TikTok e YouTube
+- [x] Verificar a marca "HolyCut": busca no INPI, domínios (.com, .com.br, .app) e @ no YouTube. Resultado na seção 9. Instagram e TikTok ficam para conferir no celular
 - [x] Iniciar o repositório Git, o `.gitignore` e o `.env.example`
 - [x] Brand kit recriado em `brand/`, com símbolo redesenhado em vetor
 - [ ] Preparar o Nitro 5: driver NVIDIA atualizado, WSL2, Docker Desktop e ajustes de energia da seção 11
-- [x] Docker Compose com Mongo em replica set, Ollama com GPU e FFmpeg nos containers (validado, ainda não executado)
-- [ ] Confirmar a GPU no Docker via WSL2 com `nvidia-smi` dentro do container
-- [ ] Cloudflare Quick Tunnel para acessar o notebook de fora durante o desenvolvimento
+- [x] Docker Compose com Mongo em replica set, Ollama com GPU e FFmpeg nos containers (rodando na máquina de desenvolvimento; o Ollama sobe só no Nitro)
+- [ ] Confirmar a GPU no Docker via WSL2 com `nvidia-smi` dentro do container. Já funciona na máquina de desenvolvimento (RTX 3050); falta repetir no Nitro
+- [x] Cloudflare Quick Tunnel para acessar o notebook de fora durante o desenvolvimento (testado; o painel consulta a API a cada 3 s, porque esse túnel não entrega eventos ao vivo)
 - [x] Agendador de backup diário do Mongo
 - [x] Pacote `core` com conexão ao Mongo, índices, fila de jobs e storage
 - [x] API com cadastro, login e organização
@@ -516,7 +535,15 @@ As estimativas consideram 1 pessoa desenvolvendo em tempo integral. Com duas, ca
 
 **Pronto quando:** um job de teste sai da API, é pego pelo worker e o progresso aparece no navegador.
 
-**Situação em 29/09/2026:** o critério foi atingido fora do Docker, com API, worker e site de produção rodando contra um Mongo em replica set. Faltam os itens que dependem do Nitro 5 e a verificação de marca.
+**Situação em 29/09/2026:** critério atingido também no Docker da máquina de desenvolvimento, com o site aberto pela internet através do Quick Tunnel. Verificado:
+
+- Cadastro, login, job de teste e progresso ao vivo pelo site, dentro do Docker.
+- Backup gravado na pasta do computador e restaurado num banco separado.
+- Queda do Docker no meio do teste: os containers voltaram sozinhos e nenhum dado se perdeu.
+- Botão "Testar GPU": o worker de GPU achou a RTX 3050 dentro do container.
+- CI do GitHub passando a cada push.
+
+Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 
 ### Fase 1 — MVP: AutoCut + legendas (4 a 6 semanas)
 

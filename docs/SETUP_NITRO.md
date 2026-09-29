@@ -99,6 +99,10 @@ docker compose logs tunel-rapido
 
 Procure no log um endereço terminado em `trycloudflare.com`. Ele muda a cada reinício.
 
+O túnel rápido tem duas limitações da Cloudflare: no máximo 200 requisições simultâneas e nenhum suporte a eventos ao vivo (Server-Sent Events). Por isso, por ele, o painel mostra "Atualização: a cada 3 segundos" e consulta a API sozinho. O túnel fixo abaixo não tem essas limitações.
+
+Se o endereço novo não abrir logo de cara, espere um minuto. O DNS do computador pode ter guardado a resposta de "não existe" da primeira tentativa.
+
 ### Para as igrejas piloto, com domínio próprio
 
 1. Registre o domínio, por exemplo no Registro.br, e aponte os DNS para a Cloudflare.
@@ -134,8 +138,12 @@ Para fazer um backup na hora:
 docker compose run --rm backup python -m backup.agendador_backup --agora
 ```
 
-Para restaurar, use o `mongorestore` com a pasta do backup:
+Para restaurar, copie a pasta do backup para o container do Mongo e rode o `mongorestore` lá dentro. Não é preciso instalar nada no Windows.
 
 ```
-mongorestore --gzip --db holycut <pasta>/backup_DD-MM-AAAA_HH-MM/holycut
+docker compose cp backups/backup_DD-MM-AAAA_HH-MM mongo:/tmp/restaurar
+docker compose exec mongo mongorestore --gzip --drop /tmp/restaurar
+docker compose exec mongo rm -rf /tmp/restaurar
 ```
+
+> O `--drop` apaga cada coleção antes de restaurar, então o banco volta exatamente ao estado do backup. Para conferir um backup sem mexer nos dados atuais, restaure com outro nome: troque o segundo comando por `mongorestore --gzip --nsFrom "holycut.*" --nsTo "holycut_conferencia.*" /tmp/restaurar`.
