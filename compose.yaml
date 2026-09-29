@@ -1,0 +1,145 @@
+# -----------------------------------------------
+# HolyCut — todos os serviços
+#
+# Nesta máquina (sem IA):     docker compose up --build
+# No Nitro 5 (com GPU):       docker compose --profile gpu up --build -d
+# Túnel rápido para testes:   docker compose --profile tunel-rapido up -d
+# Túnel fixo (produção):      docker compose --profile gpu --profile tunel up -d
+#
+# Antes da primeira vez: copie .env.example para .env e defina JWT_SEGREDO.
+# -----------------------------------------------
+name: holycut
+
+x-ambiente-python: &ambiente-python
+  MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+  DATABASE_NAME: ${DATABASE_NAME:-holycut}
+  PASTA_ARMAZENAMENTO: /dados/armazenamento
+  TZ: America/Sao_Paulo
+
+x-gpu: &gpu
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: all
+          capabilities: [gpu]
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    # Só acessível a partir deste computador (MongoDB Compass). Nunca exposto no túnel.
+    ports: ["127.0.0.1:27017:27017"]
+    volumes: [mongo_dados:/data/db]
+    healthcheck:
+      # Inicia o replica set na primeira subida. Ele é necessário para os eventos ao vivo.
+      test: ["CMD", "mongosh", "--quiet", "--eval",
+             "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}).ok }"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build: {context: ., dockerfile: infra/docker/api.Dockerfile}
+    image: holycut/api:local
+    environment:
+      <<: *ambiente-python
+      JWT_SEGREDO: ${JWT_SEGREDO:?Defina JWT_SEGREDO no arquivo .env}
+      SESSAO_DIAS: ${SESSAO_DIAS:-7}
+      COOKIE_SEGURO: ${COOKIE_SEGURO:-false}
+      MODO_IA: ${MODO_IA:-simulado}
+    volumes: [./armazenamento:/dados/armazenamento]
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      mongo: {condition: service_healthy}
+    restart: unless-stopped
+
+  worker-cpu:
+    build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
+    image: holycut/worker:local
+    command: ["python", "-m", "worker.worker_principal", "--automatico", "--recursos", "cpu"]
+    environment:
+      <<: *ambiente-python
+      MODO_IA: ${MODO_IA:-simulado}
+    volumes: [./armazenamento:/dados/armazenamento]
+    depends_on:
+      mongo: {condition: service_healthy}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args: {API_URL_INTERNA: "http://api:8000"}
+    image: holycut/web:local
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [api]
+    restart: unless-stopped
+
+  backup:
+    build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
+    image: holycut/worker:local
+    command: ["python", "-m", "backup.agendador_backup", "--automatico"]
+    environment:
+      <<: *ambiente-python
+      PASTA_BACKUP: /dados/backups
+      BACKUP_HORA: ${BACKUP_HORA:-03:00}
+      BACKUP_RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-14}
+    volumes: ["${PASTA_BACKUP_HOST:-./backups}:/dados/backups"]
+    depends_on:
+      mongo: {condition: service_healthy}
+      worker-cpu: {condition: service_started}
+    restart: unless-stopped
+
+  # ---------- Só no Nitro 5 ----------
+  worker-gpu:
+    profiles: [gpu]
+    build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
+    image: holycut/worker:local
+    command: ["python", "-m", "worker.worker_principal", "--automatico", "--recursos", "gpu"]
+    environment:
+      <<: *ambiente-python
+      MODO_IA: real
+      OLLAMA_URL: http://ollama:11434
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
+    volumes: [./armazenamento:/dados/armazenamento]
+    deploy: *gpu
+    depends_on:
+      mongo: {condition: service_healthy}
+      worker-cpu: {condition: service_started}
+      ollama: {condition: service_started}
+    restart: unless-stopped
+
+  ollama:
+    profiles: [gpu]
+    image: ollama/ollama:latest
+    environment:
+      # Descarrega o modelo da GPU depois de 5 min sem uso, para o Whisper ter espaço
+      OLLAMA_KEEP_ALIVE: 5m
+    volumes: [ollama_modelos:/root/.ollama]
+    deploy: *gpu
+    restart: unless-stopped
+
+  # ---------- Acesso pela internet ----------
+  tunel-rapido:
+    profiles: [tunel-rapido]
+    image: cloudflare/cloudflared:latest
+    # Endereço aleatório *.trycloudflare.com, mostrado no log: docker compose logs tunel-rapido
+    command: ["tunnel", "--no-autoupdate", "--url", "http://web:3000"]
+    depends_on: [web]
+    restart: unless-stopped
+
+  tunel:
+    profiles: [tunel]
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [web, api]
+    restart: unless-stopped
+
+volumes:
+  mongo_dados:
+  ollama_modelos:
