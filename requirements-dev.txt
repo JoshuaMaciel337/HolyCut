@@ -1,0 +1,6 @@
+# Ambiente local para rodar API, worker e testes fora do Docker
+-r apps/api/requirements.txt
+-r apps/worker/requirements.txt
+ruff==0.16.9
+pytest==9.1.1
+httpx2==2.13.1

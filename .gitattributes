@@ -1,0 +1,13 @@
+# Arquivos que rodam dentro de containers Linux precisam de LF. Clonado no
+# Windows com CRLF, um script vira "#!/bin/bash\r" e o Docker responde
+# "no such file or directory", sem citar fim de linha (lição do painel de lives).
+*.sh text eol=lf
+*.Dockerfile text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binários
+*.png binary
+*.ico binary
+*.ttf binary
