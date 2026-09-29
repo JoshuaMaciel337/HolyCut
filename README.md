@@ -30,6 +30,8 @@ docker compose up --build
 
 Abra http://localhost:3000. Crie uma conta e use o **Teste do pipeline** no painel.
 
+Se alguma porta já estiver em uso no seu computador, troque `MONGO_PORTA`, `API_PORTA` ou `WEB_PORTA` no `.env`. Por exemplo, use `MONGO_PORTA=27019` quando já houver um MongoDB local na 27017.
+
 | Onde | Comando |
 |---|---|
 | Máquina de desenvolvimento, sem IA | `docker compose up --build` |
