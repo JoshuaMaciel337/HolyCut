@@ -1,0 +1,42 @@
+{
+  "colors": {
+    "ink": "#08090F",
+    "surface": "#11131A",
+    "surface_2": "#1A1D26",
+    "border": "#2A2E3A",
+    "white": "#FFFFFF",
+    "text": "#F5F7FA",
+    "muted": "#A8AFBD",
+    "yellow": "#FFD24D",
+    "orange": "#FF8A00",
+    "violet": "#7B61FF",
+    "magenta": "#F05BFF",
+    "cyan": "#43D9FF"
+  },
+  "gradients": {
+    "brand": [
+      "#FFD24D",
+      "#FF8A00",
+      "#F05BFF",
+      "#7B61FF"
+    ],
+    "ai": [
+      "#7B61FF",
+      "#F05BFF"
+    ],
+    "warm": [
+      "#FFD24D",
+      "#FF8A00"
+    ]
+  },
+  "typography": {
+    "primary": "Inter",
+    "fallback": "system-ui, sans-serif"
+  },
+  "radius": {
+    "sm": 8,
+    "md": 14,
+    "lg": 22,
+    "pill": 999
+  }
+}

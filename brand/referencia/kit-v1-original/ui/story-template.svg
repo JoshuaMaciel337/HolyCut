@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#FFD24D"/><stop offset=".35" stop-color="#FF8A00"/><stop offset=".7" stop-color="#F05BFF"/><stop offset="1" stop-color="#7B61FF"/></linearGradient></defs>
+<rect width="1080" height="1920" fill="#08090F"/><rect x="40" y="40" width="1000" height="1840" rx="42" fill="#11131A" stroke="#2A2E3A" stroke-width="3"/>
+<rect x="65" y="65" width="950" height="1100" rx="32" fill="#1A1D26"/>
+<text x="100" y="1000" font-family="Inter,Arial,sans-serif" font-size="70" font-weight="700" fill="#FFFFFF">ELE É</text>
+<text x="100" y="1090" font-family="Inter,Arial,sans-serif" font-size="110" font-weight="700" fill="url(#g)">Digno.</text>
+<text x="95" y="1280" font-family="Inter,Arial,sans-serif" font-size="28" font-weight="600" fill="#A8AFBD">HOLYCUT • IA PARA MÍDIA</text>
+<text x="95" y="1345" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="700" fill="#FFFFFF">Transforme momentos em histórias.</text>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 256">
+<g transform="translate(0 0) scale(.65)">
+<rect x="40" y="36" width="48" height="184" rx="20" fill="#fff"/>
+<path d="M88 58h44c23 0 42 19 42 42v10H88z" fill="#fff"/>
+<rect x="132" y="102" width="48" height="118" rx="20" fill="#fff"/>
+<path d="M132 36h18c26 0 48 22 48 48v20l-66-38z" fill="#fff"/>
+<path d="M132 106l48 30-48 30z" fill="#fff"/>
+<path d="M102 164l48-30 14 23-48 30z" fill="#fff"/>
+</g><text x="170" y="147" font-family="Inter,Arial,sans-serif" font-size="90" font-weight="700" fill="#fff">HolyCut</text>
+</svg>
