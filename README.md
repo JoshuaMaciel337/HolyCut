@@ -7,6 +7,7 @@ IA que transforma a gravação do culto em Stories, Reels e cortes da pregação
 - **Plano do projeto:** [docs/PLANO.md](docs/PLANO.md)
 - **Preparar o servidor (Nitro 5):** [docs/SETUP_NITRO.md](docs/SETUP_NITRO.md)
 - **Marca:** [brand/README.md](brand/README.md)
+- **Contexto para o Claude Code** (estado atual, pedidos fixos e decisões): [CLAUDE.md](CLAUDE.md)
 
 ## Estrutura
 
