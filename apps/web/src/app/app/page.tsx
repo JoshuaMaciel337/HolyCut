@@ -142,9 +142,14 @@ export default function PaginaInicio() {
           ) : null}
 
           <section aria-labelledby="titulo-midias">
-            <h2 id="titulo-midias" className="font-display text-xl font-bold">
-              Suas gravações
-            </h2>
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 id="titulo-midias" className="font-display text-xl font-bold">
+                Suas gravações
+              </h2>
+              <Link href="/app/acervo" className="text-sm text-laranja hover:underline">
+                Ver o acervo
+              </Link>
+            </div>
             {midias === null ? (
               <p className="mt-4 text-suave">Carregando...</p>
             ) : midias.length === 0 ? (

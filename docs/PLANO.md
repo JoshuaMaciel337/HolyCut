@@ -618,7 +618,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [x] Fluxo de aprovação: o editor manda e o pastor ou líder aprova pelo celular (por um link de 7 dias, sem conta: aprova ou pede ajuste com comentário, e o editor vê a resposta sozinho)
 - [x] Agente de pasta monitorada: um script no PC da mídia envia sozinho a gravação do OBS quando o culto termina (`apps/agente`, baixado pelo site em .zip; usa uma chave de envio que só serve para enviar e pode ser revogada)
 - [ ] Publicação direta no YouTube, no horário escolhido para cada corte e com aprovação antes se a igreja quiser, e depois Instagram e TikTok
-- [ ] **Acervo da igreja** no estilo de streaming: ficha do culto, capas geradas, fileiras e a página do culto com abas (seção 8)
+- [x] **Acervo da igreja** no estilo de streaming: ficha do culto, capas geradas, fileiras e a página do culto com abas (seção 8). Sem a IA, as abas de versículos, estudo e transcrição explicam o que chega com a transcrição
 - [ ] Importar pelo link do YouTube ou do Google Drive (só vídeos da própria igreja)
 - [ ] Monitorar o canal do YouTube pelo feed RSS público e começar sozinho quando a live do culto termina
 - [ ] Marcar a pregação e exportar o vídeo 16:9 só da mensagem, sem louvor nem avisos (automático quando a separação em blocos existir)

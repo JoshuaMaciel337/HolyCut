@@ -52,6 +52,7 @@ def test_ficha_do_culto_e_capas_na_fila(cliente, db_limpo):
     rota = f"/api/midias/{midia_id}"
     inicial = cliente.get(rota).json()
     assert inicial["ficha"]["pregador"] == "" and len(inicial["ficha"]["data"]) == 10
+    assert jobs_de_capa(db_limpo, midia_id) == 1              # a visita pede as capas das gravações antigas
 
     ficha = {"data": "2026-08-15", "pregador": "  Pr.  Joelson Moura ", "serie": "Romanos", "descricao": "Rm 12"}
     salvo = cliente.patch(rota, json={"nome": "Inconformados no altar", "ficha": ficha})
@@ -60,9 +61,9 @@ def test_ficha_do_culto_e_capas_na_fila(cliente, db_limpo):
     assert corpo["nome"] == "Inconformados no altar"
     assert corpo["ficha"] == {"data": "2026-08-15", "pregador": "Pr. Joelson Moura", "serie": "Romanos",
                               "descricao": "Rm 12"}
-    assert jobs_de_capa(db_limpo, midia_id) == 1
+    assert jobs_de_capa(db_limpo, midia_id) == 1              # já tem um esperando: o patch não enfileira outro
     cliente.patch(rota, json={"nome": "Inconformados no altar!"})
-    assert jobs_de_capa(db_limpo, midia_id) == 1              # já tem um esperando: não enfileira outro
+    assert jobs_de_capa(db_limpo, midia_id) == 1
     assert cliente.patch(rota, json={"ficha": {"data": "15/08/2026"}}).status_code == 422
 
     # Gravação ainda preparando: a ingestão desenha as capas quando terminar

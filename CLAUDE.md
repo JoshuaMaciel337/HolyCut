@@ -33,7 +33,7 @@ O que os concorrentes (Cut.Pro, OpusClip, FeedChurch, Doxus e Bíblia IA) fazem,
 - **Fase 0 (fundação):** pronta.
 - **Fase 1 sem IA:** pronta. Inclui upload retomável (tus), ingestão (proxy 720p, forma de onda, níveis, miniaturas), corte de silêncios, editor de Reel com enquadramento e zoom, render em -14 LUFS, download e compartilhamento.
 - **Fase 2 sem IA:** pronta. Inclui Sua Identidade (logo, cor, @), textos sobre o vídeo, HolyStories com modelos, filtros de cor e biblioteca de músicas com licença e volume que abaixa sob a fala.
-- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio e aprovação pelo celular. Em construção: o **Acervo** no estilo de streaming (seção 8 do PLANO). Depois, sem IA: importar pelo link do YouTube, monitorar o canal pelo RSS, marcar a pregação e exportar em 16:9, exportar para DaVinci. Esperam o dono: publicar no YouTube (credenciais OAuth do Google) e B-roll do Pexels (chave da API).
+- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio, aprovação pelo celular e o **Acervo** no estilo de streaming (ficha do culto, capas geradas, fileiras e a página do culto com abas). Depois, sem IA: importar pelo link do YouTube, monitorar o canal pelo RSS, marcar a pregação e exportar em 16:9, exportar para DaVinci. Esperam o dono: publicar no YouTube (credenciais OAuth do Google) e B-roll do Pexels (chave da API).
 - **Nenhuma IA real foi implementada ainda.** `MODO_IA=simulado`, e o job `teste` só simula as etapas. O job `diagnostico_gpu` confere a GPU no Nitro.
 
 ### O que espera o Nitro 5 (ordem sugerida)

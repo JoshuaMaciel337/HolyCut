@@ -21,6 +21,7 @@ from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
     ARQUIVO_NIVEIS,
+    ARQUIVO_POSTER,
     ARQUIVOS_PUBLICOS,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
@@ -106,7 +107,11 @@ async def listar_midias(limite: int = Query(default=30, ge=1, le=100),
 
 @router.get("/{midia_id}", response_model=MidiaSaida)
 async def ver_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    return (await para_saida(db, [await buscar_midia(db, midia_id, usuario)]))[0]
+    midia = await buscar_midia(db, midia_id, usuario)
+    # Gravações de antes do acervo ganham pôster e banner na primeira visita
+    if ARQUIVO_POSTER not in midia.get("arquivos", []):
+        await pedir_capas(db, midia, usuario)
+    return (await para_saida(db, [midia]))[0]
 
 
 @router.patch("/{midia_id}", response_model=MidiaSaida)

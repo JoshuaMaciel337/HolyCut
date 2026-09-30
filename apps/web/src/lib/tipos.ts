@@ -62,11 +62,44 @@ export type Midia = {
   audio: { codec: string; canais: number; taxa: number } | null;
   miniaturas: Miniaturas | null;
   arquivos: string[];
+  /** A ficha do culto no acervo. O título é o próprio nome. */
+  ficha: FichaCulto;
+  /** Muda quando o pôster e o banner são redesenhados. */
+  capa_versao: number | null;
+  capa_personalizada: boolean;
   erro: string | null;
   processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;
+};
+
+export type FichaCulto = {
+  /** AAAA-MM-DD */
+  data: string;
+  pregador: string;
+  serie: string;
+  descricao: string;
+};
+
+/** Um culto nas fileiras do acervo. */
+export type CultoResumo = FichaCulto & {
+  id: string;
+  titulo: string;
+  duracao: number | null;
+  video: boolean;
+  capa_versao: number | null;
+  cortes: number;
+  em_edicao: number;
+};
+
+export type Acervo = {
+  cultos: CultoResumo[];
+  destaque: string | null;
+  fileiras: { id: string; titulo: string; ids: string[] }[];
+  series: string[];
+  pregadores: string[];
+  preparando: number;
 };
 
 export type Intensidade = "leve" | "media" | "forte";

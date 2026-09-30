@@ -1,199 +1,153 @@
 "use client";
 
-import { ArrowLeft, Check, CircleAlert, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, BookOpen, CircleAlert, Clapperboard, FileText, Quote, ScrollText, Trash2, Video } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { BarraProgresso } from "@/componentes/BarraProgresso";
-import { FaixaDeMiniaturas } from "@/componentes/FaixaDeMiniaturas";
-import { FormaDeOnda } from "@/componentes/FormaDeOnda";
-import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
+import { AbaGravacao } from "@/componentes/culto/AbaGravacao";
+import { CapaDoCulto } from "@/componentes/culto/CapaDoCulto";
+import { EmBreveComIA } from "@/componentes/culto/EmBreveComIA";
+import { FichaDoCulto } from "@/componentes/culto/FichaDoCulto";
+import { ListaExportacoes } from "@/componentes/ListaExportacoes";
 import { ReelsDaMidia } from "@/componentes/ReelsDaMidia";
+import { dataDoCulto, urlBanner } from "@/lib/acervo";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEventosJobs } from "@/lib/eventos";
-import { formatarBytes, formatarData, formatarTempo, porcentagem } from "@/lib/formatar";
-import type { FormaDeOnda as DadosFormaDeOnda, Midia, Silencios } from "@/lib/tipos";
+import { formatarTempo, porcentagem } from "@/lib/formatar";
+import type { Midia } from "@/lib/tipos";
 
-function Informacao({ rotulo, valor }: { rotulo: string; valor: string }) {
+const ABAS = [
+  { id: "visao", rotulo: "Visão geral" },
+  { id: "cortes", rotulo: "Cortes" },
+  { id: "versiculos", rotulo: "Versículos" },
+  { id: "estudo", rotulo: "Estudo" },
+  { id: "transcricao", rotulo: "Transcrição" },
+  { id: "gravacao", rotulo: "Gravação" },
+] as const;
+
+type AbaId = (typeof ABAS)[number]["id"];
+
+function abaValida(valor: string | null): AbaId {
+  return ABAS.some((aba) => aba.id === valor) ? (valor as AbaId) : "visao";
+}
+
+function AbaCortes({ midia }: { midia: Midia }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-borda py-2.5 text-sm last:border-0">
-      <dt className="text-suave">{rotulo}</dt>
-      <dd className="text-right font-medium">{valor}</dd>
+    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <section className="cartao p-6" aria-labelledby="titulo-cortes-prontos">
+        <h2 id="titulo-cortes-prontos" className="font-display text-lg font-bold">
+          Cortes prontos
+        </h2>
+        <div className="mt-4">
+          <ListaExportacoes
+            midiaId={midia.id}
+            vazio="Nenhum corte exportado ainda. Crie um Reel ou um Story e, quando estiver bom, exporte."
+          />
+        </div>
+      </section>
+      <ReelsDaMidia midia={midia} />
     </div>
   );
 }
 
-function TituloEditavel({ midia, aoSalvar }: { midia: Midia; aoSalvar: (nome: string) => Promise<void> }) {
-  const [editando, setEditando] = useState(false);
-  const [salvando, setSalvando] = useState(false);
-
-  async function salvar(evento: FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
-    const nome = String(new FormData(evento.currentTarget).get("nome") ?? "").trim();
-    if (!nome || nome === midia.nome) {
-      setEditando(false);
-      return;
-    }
-    setSalvando(true);
-    await aoSalvar(nome);
-    setSalvando(false);
-    setEditando(false);
+function ConteudoDaAba({ aba, midia, aoMudar }: { aba: AbaId; midia: Midia; aoMudar: (midia: Midia) => void }) {
+  switch (aba) {
+    case "visao":
+      return (
+        <div className="flex flex-col gap-6">
+          <FichaDoCulto midia={midia} aoSalvar={aoMudar} />
+          <CapaDoCulto midia={midia} aoMudar={aoMudar} />
+          <EmBreveComIA
+            idSecao="resumo"
+            icone={BookOpen}
+            titulo="Resumo da pregação"
+            descricao="Quando a transcrição estiver pronta, a IA organiza o que foi pregado: um resumo fiel, os temas e os personagens bíblicos citados."
+            itens={["Resumo da mensagem, só com o que o pastor disse", "Temas e palavras-chave", "Personagens bíblicos citados"]}
+          />
+        </div>
+      );
+    case "cortes":
+      return <AbaCortes midia={midia} />;
+    case "versiculos":
+      return (
+        <EmBreveComIA
+          idSecao="versiculos"
+          icone={Quote}
+          titulo="Versículos da pregação"
+          descricao="Cada versículo citado na mensagem aparece aqui, com o momento exato do vídeo. Um toque leva ao trecho."
+          itens={["Lista dos versículos citados, com a referência", "O instante da gravação em que cada um aparece", "Abrir o trecho no player com um clique"]}
+        />
+      );
+    case "estudo":
+      return (
+        <EmBreveComIA
+          idSecao="estudo"
+          icone={ScrollText}
+          titulo="Guia de estudo"
+          descricao="Da pregação sai um guia para células: perguntas, versículos-chave, aplicação e oração, com PDF para imprimir."
+          itens={["Perguntas para o grupo", "Versículos-chave da mensagem", "Aplicação e oração", "Download em PDF"]}
+        />
+      );
+    case "transcricao":
+      return (
+        <EmBreveComIA
+          idSecao="transcricao"
+          icone={FileText}
+          titulo="Transcrição"
+          descricao="O texto da pregação, sincronizado com o vídeo. Dá para acompanhar, buscar e baixar em SRT e TXT. O português do pregador fica como ele falou."
+          itens={["Texto sincronizado com o player", "Download em SRT (legendas) e TXT", "Edição pelo texto, no editor do Reel"]}
+        />
+      );
+    case "gravacao":
+      return <AbaGravacao key={midia.id} midia={midia} aoMudar={aoMudar} />;
   }
-
-  if (!editando) {
-    return (
-      <div className="flex min-w-0 items-center gap-2">
-        <h1 className="truncate font-display text-2xl font-bold sm:text-3xl">{midia.nome}</h1>
-        <button type="button" onClick={() => setEditando(true)} aria-label="Renomear" title="Renomear" className="shrink-0 text-suave hover:text-texto">
-          <Pencil className="size-4" aria-hidden />
-        </button>
-      </div>
-    );
-  }
-  return (
-    <form onSubmit={salvar} className="flex min-w-0 flex-1 items-center gap-2">
-      <input
-        name="nome"
-        defaultValue={midia.nome}
-        maxLength={120}
-        autoFocus
-        aria-label="Nome da gravação"
-        className="min-w-0 flex-1 rounded-xl border border-borda bg-ink px-3 py-2 font-display text-xl font-bold outline-none focus:border-violeta"
-      />
-      <button type="submit" disabled={salvando} aria-label="Salvar nome" className="botao-cta size-10 p-0">
-        <Check className="size-4" aria-hidden />
-      </button>
-      <button type="button" onClick={() => setEditando(false)} aria-label="Cancelar" className="botao-contorno size-10 p-0">
-        <X className="size-4" aria-hidden />
-      </button>
-    </form>
-  );
 }
 
-export default function PaginaMidia() {
+function PaginaCulto() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const aba = abaValida(useSearchParams().get("aba"));
   const [midia, setMidia] = useState<Midia | null>(null);
-  const [forma, setForma] = useState<DadosFormaDeOnda | null>(null);
   const [erro, setErro] = useState("");
-  const [tempo, setTempo] = useState(0);
-  const [opcaoCorte, setOpcaoCorte] = useState<OpcaoCorte>("media");
-  const [silencios, setSilencios] = useState<Silencios | null>(null);
-  const [pularSilencios, setPularSilencios] = useState(true);
-  const [erroSilencios, setErroSilencios] = useState("");
-  const player = useRef<HTMLVideoElement & HTMLAudioElement>(null);
-  // Lidos a cada quadro da prévia, sem recriar o acompanhamento do player
-  const cortesAtivos = useRef<[number, number][]>([]);
 
   const carregar = useCallback(() => {
     chamarApi<Midia>(`/midias/${id}`)
       .then(setMidia)
-      .catch((e) => setErro(e instanceof ErroApi ? e.message : "Não foi possível carregar a gravação."));
+      .catch((e) => setErro(e instanceof ErroApi ? e.message : "Não foi possível carregar o culto."));
   }, [id]);
 
   useEffect(() => {
     carregar();
   }, [carregar]);
 
-  const temForma = midia?.arquivos.includes("forma_de_onda.json") ?? false;
-  useEffect(() => {
-    if (!temForma) return;
-    let cancelado = false;
-    fetch(`/api/midias/${id}/arquivos/forma_de_onda.json`, { credentials: "same-origin" })
-      .then((resposta) => (resposta.ok ? resposta.json() : null))
-      .then((dados) => {
-        if (!cancelado && dados) setForma(dados);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelado = true;
-    };
-  }, [id, temForma]);
-
-  const pronta = midia?.status === "pronta";
-  useEffect(() => {
-    if (!pronta || opcaoCorte === "desligado") return;
-    let cancelado = false;
-    chamarApi<Silencios>(`/midias/${id}/silencios?intensidade=${opcaoCorte}`)
-      .then((dados) => {
-        if (!cancelado) setSilencios(dados);
-      })
-      .catch((e) => {
-        if (!cancelado) setErroSilencios(e instanceof ErroApi ? e.message : "Não foi possível analisar os silêncios.");
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [id, pronta, opcaoCorte]);
-
-  const cortes = opcaoCorte !== "desligado" && silencios?.intensidade === opcaoCorte ? silencios.silencios : null;
-  useEffect(() => {
-    cortesAtivos.current = cortes && pularSilencios ? cortes : [];
-  }, [cortes, pularSilencios]);
-
   useEventosJobs((job) => {
-    if (job.tipo !== "ingestao" || job.entrada?.midia_id !== id) return;
-    setMidia((atual) =>
-      atual ? { ...atual, processamento: { status: job.status, progresso: job.progresso, mensagem: job.mensagem } } : atual,
-    );
-    if (job.status === "concluido" || job.status === "erro") carregar();
-  });
-
-  // Enquanto toca, acompanha o tempo a cada quadro para a forma de onda andar sem saltos
-  useEffect(() => {
-    const elemento = player.current;
-    if (!elemento) return;
-    let quadro = 0;
-    const acompanhar = () => {
-      // Prévia do corte: ao entrar num silêncio, pula para o fim dele
-      const corte = cortesAtivos.current.find(([inicio, fim]) => elemento.currentTime >= inicio && elemento.currentTime < fim - 0.05);
-      if (corte) elemento.currentTime = corte[1];
-      setTempo(elemento.currentTime);
-      if (!elemento.paused) quadro = requestAnimationFrame(acompanhar);
-    };
-    const tocar = () => {
-      cancelAnimationFrame(quadro);
-      quadro = requestAnimationFrame(acompanhar);
-    };
-    const atualizar = () => setTempo(elemento.currentTime);
-    elemento.addEventListener("play", tocar);
-    elemento.addEventListener("seeked", atualizar);
-    elemento.addEventListener("pause", atualizar);
-    return () => {
-      cancelAnimationFrame(quadro);
-      elemento.removeEventListener("play", tocar);
-      elemento.removeEventListener("seeked", atualizar);
-      elemento.removeEventListener("pause", atualizar);
-    };
-  }, [midia?.status]);
-
-  function buscar(segundos: number) {
-    if (player.current) player.current.currentTime = segundos;
-    setTempo(segundos);
-  }
-
-  async function renomear(nome: string) {
-    try {
-      setMidia(await chamarApi<Midia>(`/midias/${id}`, { metodo: "PATCH", corpo: { nome } }));
-    } catch (e) {
-      setErro(e instanceof ErroApi ? e.message : "Não foi possível renomear.");
+    const midiaId = job.entrada?.midia_id;
+    if (typeof midiaId !== "string" || midiaId !== id) return;
+    if (job.tipo === "ingestao") {
+      setMidia((atual) =>
+        atual ? { ...atual, processamento: { status: job.status, progresso: job.progresso, mensagem: job.mensagem } } : atual,
+      );
+      if (job.status === "concluido" || job.status === "erro") carregar();
     }
-  }
+    if (job.tipo === "capas_culto" && job.status === "concluido") carregar();
+  });
 
   async function excluir() {
     if (!midia || !window.confirm(`Excluir "${midia.nome}"? A gravação e tudo o que foi gerado a partir dela serão apagados.`)) return;
     try {
       await chamarApi(`/midias/${id}`, { metodo: "DELETE" });
-      router.replace("/app");
+      router.replace("/app/acervo");
     } catch (e) {
       setErro(e instanceof ErroApi ? e.message : "Não foi possível excluir.");
     }
   }
 
   const voltar = (
-    <Link href="/app" className="inline-flex items-center gap-2 text-sm text-suave hover:text-texto">
-      <ArrowLeft className="size-4" aria-hidden /> Início
+    <Link href="/app/acervo" className="inline-flex items-center gap-2 text-sm text-suave hover:text-texto">
+      <ArrowLeft className="size-4" aria-hidden /> Acervo
     </Link>
   );
 
@@ -206,44 +160,15 @@ export default function PaginaMidia() {
     );
   }
 
-  const video = midia.video;
-  const emPe = video ? video.altura > video.largura : false;
-  const base = `/api/midias/${midia.id}/arquivos`;
+  const pronta = midia.status === "pronta";
+  const detalhes = [midia.ficha.pregador, dataDoCulto(midia.ficha.data), formatarTempo(midia.duracao)].filter(
+    (parte) => parte && parte !== "--:--",
+  );
 
-  let conteudo: React.ReactNode;
-  if (midia.status === "pronta") {
-    conteudo = (
-      <section className="cartao flex flex-col gap-4 p-4 sm:p-6" aria-label="Prévia">
-        {video ? (
-          <video
-            ref={player}
-            src={`${base}/proxy.mp4`}
-            poster={midia.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
-            controls
-            playsInline
-            preload="metadata"
-            className={`mx-auto w-full rounded-xl bg-black ${emPe ? "max-h-[70vh] w-auto" : ""}`}
-            style={{ aspectRatio: `${video.largura} / ${video.altura}` }}
-          />
-        ) : (
-          <audio ref={player} src={`${base}/proxy.m4a`} controls preload="metadata" className="w-full" />
-        )}
-        {forma && midia.duracao ? (
-          <div>
-            <FormaDeOnda picos={forma.picos} duracao={midia.duracao} tempo={tempo} aoBuscar={buscar} cortes={cortes ?? []} />
-            <p className="mt-2 text-right text-xs tabular-nums text-suave">
-              {formatarTempo(tempo)} / {formatarTempo(midia.duracao)}
-            </p>
-          </div>
-        ) : null}
-        {midia.miniaturas && midia.arquivos.includes("miniaturas.jpg") ? (
-          <FaixaDeMiniaturas midiaId={midia.id} miniaturas={midia.miniaturas} tempo={tempo} aoBuscar={buscar} />
-        ) : null}
-      </section>
-    );
-  } else if (midia.status === "processando") {
+  let preparacao: React.ReactNode = null;
+  if (midia.status === "processando") {
     const progresso = midia.processamento?.progresso ?? 0;
-    conteudo = (
+    preparacao = (
       <section className="cartao flex flex-col gap-3 p-6">
         <h2 className="font-display text-lg font-bold">Preparando a gravação</h2>
         <BarraProgresso valor={progresso} rotulo="Preparação" />
@@ -253,14 +178,14 @@ export default function PaginaMidia() {
       </section>
     );
   } else if (midia.status === "enviando") {
-    conteudo = (
+    preparacao = (
       <section className="cartao p-6 text-suave">
         O envio parou em {porcentagem(midia.bytes_recebidos, midia.tamanho_total)}%. Volte ao Início e escolha o mesmo arquivo
         de novo para continuar de onde parou.
       </section>
     );
-  } else {
-    conteudo = (
+  } else if (midia.status === "erro") {
+    preparacao = (
       <section className="cartao flex gap-2 p-6 text-vermelho">
         <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
         {midia.erro || "Não foi possível preparar esta gravação."}
@@ -269,58 +194,91 @@ export default function PaginaMidia() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       {voltar}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-        <TituloEditavel midia={midia} aoSalvar={renomear} />
-        <button type="button" onClick={excluir} className="botao-contorno px-4 py-2 text-sm">
-          <Trash2 className="size-4" aria-hidden /> Excluir
-        </button>
-      </div>
       {erro ? (
         <p role="alert" className="mt-4 rounded-xl border border-vermelho/40 bg-vermelho/10 px-4 py-3 text-sm text-vermelho">
           {erro}
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="min-w-0">{conteudo}</div>
-        <aside className="flex flex-col gap-6">
-          {pronta && midia.arquivos.includes("forma_de_onda.json") && midia.duracao ? (
-            <PainelSilencios
-              opcao={opcaoCorte}
-              aoMudar={setOpcaoCorte}
-              dados={cortes ? silencios : null}
-              carregando={opcaoCorte !== "desligado" && !cortes}
-              duracao={midia.duracao}
-              pular={pularSilencios}
-              aoMudarPular={setPularSilencios}
-              erro={erroSilencios}
-            />
+      {pronta ? (
+        <div className="mt-4 overflow-hidden rounded-3xl border border-borda bg-surface">
+          <div className="relative aspect-[16/9] w-full">
+            {midia.capa_versao ? (
+              <Image
+                src={urlBanner(midia.id, midia.capa_versao)}
+                alt=""
+                fill
+                unoptimized
+                priority
+                sizes="(min-width: 1152px) 1152px, 100vw"
+                className="object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-violeta/40 via-ink to-laranja/20" />
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          {midia.ficha.serie ? (
+            <p className="text-xs font-semibold uppercase tracking-wider text-laranja">Série: {midia.ficha.serie}</p>
           ) : null}
-          <section className="cartao p-6" aria-labelledby="titulo-info">
-            <h2 id="titulo-info" className="font-display text-lg font-bold">
-              Detalhes
-            </h2>
-            <dl className="mt-3">
-              <Informacao rotulo="Duração" valor={formatarTempo(midia.duracao)} />
-              {video ? (
-                <>
-                  <Informacao rotulo="Resolução" valor={`${video.largura} × ${video.altura}`} />
-                  <Informacao rotulo="Quadros por segundo" valor={video.fps ? String(Math.round(video.fps * 100) / 100) : "—"} />
-                </>
-              ) : null}
-              {midia.audio ? (
-                <Informacao rotulo="Áudio" valor={`${midia.audio.canais === 1 ? "Mono" : "Estéreo"} · ${Math.round(midia.audio.taxa / 1000)} kHz`} />
-              ) : null}
-              <Informacao rotulo="Tamanho" valor={formatarBytes(midia.tamanho_total)} />
-              <Informacao rotulo="Enviada em" valor={midia.enviado_em ? formatarData(midia.enviado_em) : "—"} />
-              <Informacao rotulo="Arquivo" valor={midia.nome_original} />
-            </dl>
-          </section>
-          <ReelsDaMidia midia={midia} tempoAtual={tempo} />
-        </aside>
+          <h1 className="font-display text-2xl font-bold sm:text-3xl">{midia.nome}</h1>
+          {detalhes.length > 0 ? <p className="mt-1 text-sm text-suave">{detalhes.join(" · ")}</p> : null}
+        </div>
+        <button type="button" onClick={excluir} className="botao-contorno px-4 py-2 text-sm">
+          <Trash2 className="size-4" aria-hidden /> Excluir
+        </button>
       </div>
+
+      {preparacao}
+
+      {pronta ? (
+        <>
+          <nav aria-label="Seções do culto" className="mt-6 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <ul className="flex min-w-max gap-1 border-b border-borda">
+              {ABAS.map((item) => {
+                const atual = item.id === aba;
+                return (
+                  <li key={item.id}>
+                    <Link
+                      href={`/app/midias/${id}?aba=${item.id}`}
+                      scroll={false}
+                      aria-current={atual ? "page" : undefined}
+                      className={`inline-flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition sm:px-4 ${
+                        atual ? "border-b-2 border-laranja text-texto" : "border-b-2 border-transparent text-suave hover:text-texto"
+                      }`}
+                    >
+                      {item.id === "visao" ? <BookOpen className="size-4" aria-hidden /> : null}
+                      {item.id === "cortes" ? <Clapperboard className="size-4" aria-hidden /> : null}
+                      {item.id === "versiculos" ? <Quote className="size-4" aria-hidden /> : null}
+                      {item.id === "estudo" ? <ScrollText className="size-4" aria-hidden /> : null}
+                      {item.id === "transcricao" ? <FileText className="size-4" aria-hidden /> : null}
+                      {item.id === "gravacao" ? <Video className="size-4" aria-hidden /> : null}
+                      {item.rotulo}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          <div className="mt-6">
+            <ConteudoDaAba aba={aba} midia={midia} aoMudar={setMidia} />
+          </div>
+        </>
+      ) : null}
     </main>
+  );
+}
+
+export default function PaginaMidia() {
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-6xl px-4 py-10 text-suave sm:px-6">Carregando o culto...</main>}>
+      <PaginaCulto />
+    </Suspense>
   );
 }

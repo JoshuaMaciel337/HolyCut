@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Music, Palette } from "lucide-react";
+import { Library, LogOut, Music, Palette } from "lucide-react";
 import Link from "next/link";
 
 import { Logo } from "@/componentes/Logo";
@@ -15,6 +15,9 @@ export function Cabecalho() {
           <Logo altura={30} prioridade />
         </Link>
         <div className="flex items-center gap-3">
+          <Link href="/app/acervo" className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm text-suave hover:text-texto">
+            <Library className="size-4" aria-hidden /> <span className="hidden sm:inline">Acervo</span>
+          </Link>
           <Link href="/app/musicas" className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm text-suave hover:text-texto">
             <Music className="size-4" aria-hidden /> <span className="hidden sm:inline">Músicas</span>
           </Link>

@@ -35,16 +35,28 @@ function nomeDoArquivo(nome: string, extensao = ".mp4"): string {
 }
 
 /** Vídeos exportados de um projeto, com progresso ao vivo, download e compartilhamento pelo celular. */
-export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova: Exportacao | null }) {
+export function ListaExportacoes({
+  projetoId,
+  midiaId,
+  nova = null,
+  vazio,
+}: {
+  projetoId?: string;
+  midiaId?: string;
+  nova?: Exportacao | null;
+  vazio?: string;
+}) {
   const [exportacoes, setExportacoes] = useState<Exportacao[] | null>(null);
   const [erro, setErro] = useState("");
   const [compartilhar] = useState(podeCompartilharArquivos);
 
   const carregar = useCallback(() => {
-    chamarApi<Exportacao[]>(`/exportacoes?projeto_id=${projetoId}`)
+    // De um projeto (no editor) ou de todos os projetos de um culto (na página do culto)
+    const filtro = projetoId ? `projeto_id=${projetoId}` : `midia_id=${midiaId}`;
+    chamarApi<Exportacao[]>(`/exportacoes?${filtro}&limite=60`)
       .then(setExportacoes)
       .catch(() => setErro("Não foi possível carregar os vídeos exportados."));
-  }, [projetoId]);
+  }, [projetoId, midiaId]);
 
   useEffect(() => {
     carregar();
@@ -108,7 +120,7 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
 
   if (exportacoes === null) return <p className="text-sm text-suave">{erro || "Carregando..."}</p>;
   if (exportacoes.length === 0) {
-    return <p className="text-sm text-suave">Nada exportado ainda. Quando estiver bom, exporte o vídeo ou a imagem.</p>;
+    return <p className="text-sm text-suave">{vazio ?? "Nada exportado ainda. Quando estiver bom, exporte o vídeo ou a imagem."}</p>;
   }
 
   return (

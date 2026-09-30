@@ -12,13 +12,16 @@ from fastapi import APIRouter, Depends
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import AcervoSaida, CultoResumoSaida
-from core.modelos.culto import ficha_do_culto, montar_fileiras
+from api.rotas.midias import pedir_capas
+from core.modelos.culto import ARQUIVO_POSTER, ficha_do_culto, montar_fileiras
 from core.modelos.midia import STATUS_ENVIANDO, STATUS_PROCESSANDO, STATUS_PRONTA
 from core.modelos.projeto import STATUS_EXPORTACAO_PRONTA
 
 router = APIRouter(prefix="/api/acervo", tags=["acervo"])
 LIMITE_CULTOS = 500
 PROJETOS_RECENTES = 40
+# Quantas capas antigas (de antes do acervo) redesenhar por visita, para não encher a fila
+LIMITE_CAPAS_PENDENTES = 8
 
 
 def culto_para_resumo(midia: dict, cortes: int, em_edicao: int) -> CultoResumoSaida:
@@ -41,6 +44,9 @@ async def ver_acervo(usuario=Depends(usuario_atual), db=Depends(obter_db)):
     organizacao_id = usuario["organizacao_id"]
     midias = [m async for m in db.midias.find({"organizacao_id": organizacao_id, "status": STATUS_PRONTA})
               .sort("criado_em", -1).limit(LIMITE_CULTOS)]
+    sem_capa = [m for m in midias if ARQUIVO_POSTER not in m.get("arquivos", [])][:LIMITE_CAPAS_PENDENTES]
+    for midia in sem_capa:
+        await pedir_capas(db, midia, usuario)
     cortes = await contar_por_midia(db.exportacoes, {"organizacao_id": organizacao_id,
                                                      "status": STATUS_EXPORTACAO_PRONTA})
     em_edicao = await contar_por_midia(db.projetos, {"organizacao_id": organizacao_id})
