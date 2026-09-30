@@ -46,6 +46,8 @@ INDICES = {
         ([("projeto_id", 1), ("criado_em", -1)], {}),
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
         ([("midia_id", 1)], {}),
+        # O link de aprovação procura a exportação pelo hash do token
+        ([("aprovacao.token_hash", 1)], {"unique": True, "sparse": True}),
     ],
     "chaves_envio": [
         ([("hash", 1)], {"unique": True}),

@@ -11,13 +11,21 @@ from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import ExportacaoSaida, exportacao_para_saida
+from api.esquemas import (
+    AprovacaoCriadaSaida,
+    AprovacaoCriarEntrada,
+    ExportacaoSaida,
+    aprovacao_para_saida,
+    exportacao_para_saida,
+)
+from core.modelos.aprovacao import montar_aprovacao
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE
 from core.modelos.projeto import (
     ARQUIVO_CAPA_EXPORTADA,
     ARQUIVOS_EXPORTACAO,
     STATUS_EXPORTACAO_PROCESSANDO,
+    STATUS_EXPORTACAO_PRONTA,
     chave_exportacao,
     pasta_da_exportacao,
 )
@@ -113,6 +121,24 @@ async def baixar_arquivo(exportacao_id: str, nome: str, baixar: bool = False,
         content_disposition_type="attachment" if baixar else "inline",
         headers={"Cache-Control": "private, max-age=86400"},
     )
+
+
+@router.post("/{exportacao_id}/aprovacao", response_model=AprovacaoCriadaSaida, status_code=status.HTTP_201_CREATED)
+async def pedir_aprovacao(exportacao_id: str, dados: AprovacaoCriarEntrada | None = None,
+                          usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Gera o link de aprovação. Pedir de novo troca o link: o anterior deixa de valer."""
+    exportacao = await buscar_exportacao(db, exportacao_id, usuario)
+    if exportacao["status"] != STATUS_EXPORTACAO_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Espere o vídeo ficar pronto para pedir a aprovação.")
+    token, aprovacao = montar_aprovacao(usuario["_id"], (dados or AprovacaoCriarEntrada()).para)
+    await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"aprovacao": aprovacao}})
+    return AprovacaoCriadaSaida(token=token, aprovacao=aprovacao_para_saida(aprovacao))
+
+
+@router.delete("/{exportacao_id}/aprovacao", status_code=status.HTTP_204_NO_CONTENT)
+async def cancelar_aprovacao(exportacao_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    exportacao = await buscar_exportacao(db, exportacao_id, usuario)
+    await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$unset": {"aprovacao": ""}})
 
 
 @router.delete("/{exportacao_id}", status_code=status.HTTP_204_NO_CONTENT)

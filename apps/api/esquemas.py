@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from core.modelos.aprovacao import expirada
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
 from core.modelos.projeto import MAXIMO_PARTES, partes_do_projeto
@@ -317,6 +318,50 @@ class ModeloCriarEntrada(BaseModel):
     projeto_id: str
 
 
+class AprovacaoSaida(BaseModel):
+    status: Literal["pendente", "aprovado", "ajustes"]
+    para: str = ""
+    pedido_em: datetime
+    expira_em: datetime
+    expirada: bool = Field(description="Pedido sem resposta que passou da validade")
+    respondido_por: str | None = None
+    comentario: str | None = None
+    respondido_em: datetime | None = None
+
+
+class AprovacaoCriarEntrada(BaseModel):
+    para: str = Field(default="", max_length=60, description="Quem vai aprovar, ex.: Pr. João")
+
+
+class AprovacaoCriadaSaida(BaseModel):
+    token: str = Field(description="Vai no link /aprovar/{token}. Só aparece nesta resposta.")
+    aprovacao: AprovacaoSaida
+
+
+class AprovacaoPublicaSaida(BaseModel):
+    """O que a pessoa que aprova vê pelo link, sem conta."""
+    igreja: str
+    nome: str
+    formato: str
+    duracao: float | None = None
+    largura: int
+    altura: int
+    arquivos: list[str]
+    aprovacao: AprovacaoSaida
+
+
+class AprovacaoRespostaEntrada(BaseModel):
+    decisao: Literal["aprovado", "ajustes"]
+    nome: str = Field(min_length=1, max_length=60)
+    comentario: str = Field(default="", max_length=500)
+
+
+def aprovacao_para_saida(aprovacao: dict | None) -> AprovacaoSaida | None:
+    if not aprovacao:
+        return None
+    return AprovacaoSaida.model_validate({**aprovacao, "expirada": expirada(aprovacao)})
+
+
 class ExportacaoSaida(BaseModel):
     id: str
     projeto_id: str
@@ -334,6 +379,7 @@ class ExportacaoSaida(BaseModel):
     erro: str | None = None
     criado_em: datetime
     concluido_em: datetime | None = None
+    aprovacao: AprovacaoSaida | None = None
 
 
 def projeto_para_saida(doc: dict) -> ProjetoSaida:
@@ -351,6 +397,7 @@ def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida
     return ExportacaoSaida.model_validate({
         **doc, "id": str(doc["_id"]), "projeto_id": str(doc["projeto_id"]), "midia_id": str(doc["midia_id"]),
         "status": status, "erro": erro, "processamento": processamento,
+        "aprovacao": aprovacao_para_saida(doc.get("aprovacao")),
     })
 
 
