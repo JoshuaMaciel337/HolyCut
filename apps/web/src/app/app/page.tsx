@@ -1,6 +1,7 @@
 "use client";
 
-import { CircleAlert, Clapperboard, Film, Mic, ScanFace, Sparkles, X } from "lucide-react";
+import { ChevronRight, CircleAlert, Clapperboard, Film, Mic, ScanFace, Sparkles, X } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CartaoMidia } from "@/componentes/CartaoMidia";
@@ -10,7 +11,8 @@ import { chamarApi, ErroApi } from "@/lib/api";
 import { useEnvios } from "@/lib/envios";
 import { useEventosJobs } from "@/lib/eventos";
 import { useSessao } from "@/lib/sessao";
-import type { Midia } from "@/lib/tipos";
+import { formatarTempo } from "@/lib/formatar";
+import type { Midia, Projeto } from "@/lib/tipos";
 import { useSistema } from "@/lib/useSistema";
 
 const LIMITE_MIDIAS = 30;
@@ -27,7 +29,14 @@ export default function PaginaInicio() {
   const sistema = useSistema();
   const { envios, versao, cancelar, dispensar } = useEnvios();
   const [midias, setMidias] = useState<Midia[] | null>(null);
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    chamarApi<Projeto[]>("/projetos?limite=5")
+      .then(setProjetos)
+      .catch(() => undefined);
+  }, []);
 
   const carregar = useCallback(() => {
     chamarApi<Midia[]>(`/midias?limite=${LIMITE_MIDIAS}`)
@@ -158,6 +167,28 @@ export default function PaginaInicio() {
         </div>
 
         <aside className="flex flex-col gap-6">
+          {projetos.length > 0 ? (
+            <section className="cartao p-6" aria-labelledby="titulo-reels-recentes">
+              <h2 id="titulo-reels-recentes" className="font-display text-lg font-bold">
+                Reels recentes
+              </h2>
+              <ul className="mt-3 flex flex-col">
+                {projetos.map((projeto) => (
+                  <li key={projeto.id} className="border-b border-borda last:border-0">
+                    <Link href={`/app/projetos/${projeto.id}`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-laranja">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{projeto.nome}</span>
+                        <span className="text-xs text-suave">
+                          {projeto.proporcao} · {formatarTempo(projeto.trecho.fim - projeto.trecho.inicio)}
+                        </span>
+                      </span>
+                      <ChevronRight className="size-4 shrink-0" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           <PainelSistema sistema={sistema} comLinkDiagnostico />
         </aside>
       </div>

@@ -6,6 +6,7 @@ import { formatarTempo } from "@/lib/formatar";
 
 const PASSO_BARRA = 3; // px por barra (2 px de barra + 1 de espaço)
 const PASSO_TECLADO_S = 5;
+const ALCANCE_ALCA_PX = 12; // distância para pegar uma alça do trecho
 
 type Props = {
   picos: number[];
@@ -15,11 +16,15 @@ type Props = {
   altura?: number;
   /** Trechos marcados na forma de onda, como os silêncios que vão ser cortados. */
   cortes?: [number, number][];
+  /** Trecho escolhido: o resto fica escurecido. Com aoMudarFaixa, as bordas viram alças arrastáveis. */
+  faixa?: [number, number];
+  aoMudarFaixa?: (faixa: [number, number]) => void;
 };
 
 /** Desenha a forma de onda num canvas. A parte já tocada fica com o gradiente da marca. */
-export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cortes = [] }: Props) {
+export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cortes = [], faixa, aoMudarFaixa }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const arrastando = useRef<"inicio" | "fim" | null>(null);
   const [largura, setLargura] = useState(0);
 
   useEffect(() => {
@@ -78,9 +83,42 @@ export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cort
       contexto.fillStyle = cortado ? "rgba(255, 110, 110, 0.35)" : x < tocado ? gradiente : "rgba(255, 255, 255, 0.2)";
       contexto.fillRect(x, (altura - h) / 2, PASSO_BARRA - 1, h);
     });
+    if (faixa) {
+      const [inicio, fim] = faixa.map(paraX);
+      contexto.fillStyle = "rgba(8, 9, 15, 0.72)";
+      contexto.fillRect(0, 0, inicio, altura);
+      contexto.fillRect(fim, 0, largura - fim, altura);
+      contexto.fillStyle = estilos.getPropertyValue("--hc-orange").trim() || "#FF8A00";
+      for (const x of [inicio, fim]) {
+        contexto.fillRect(Math.min(Math.max(x - 1.5, 0), largura - 3), 0, 3, altura);
+        contexto.fillRect(Math.min(Math.max(x - 5, 0), largura - 10), altura / 2 - 9, 10, 18);
+      }
+    }
     contexto.fillStyle = "#ffffff";
     contexto.fillRect(Math.min(tocado, largura - 2), 0, 2, altura);
-  }, [barras, tempo, duracao, largura, altura, cortes]);
+  }, [barras, tempo, duracao, largura, altura, cortes, faixa]);
+
+  function segundosNaPosicao(clienteX: number): number {
+    const retangulo = canvas.current!.getBoundingClientRect();
+    return Math.min(Math.max((clienteX - retangulo.left) / retangulo.width, 0), 1) * duracao;
+  }
+
+  function alcaPerto(clienteX: number): "inicio" | "fim" | null {
+    if (!faixa || !aoMudarFaixa || !canvas.current || duracao <= 0) return null;
+    const retangulo = canvas.current.getBoundingClientRect();
+    const px = clienteX - retangulo.left;
+    const [inicio, fim] = faixa.map((s) => (s / duracao) * retangulo.width);
+    if (Math.abs(px - inicio) <= ALCANCE_ALCA_PX) return "inicio";
+    if (Math.abs(px - fim) <= ALCANCE_ALCA_PX) return "fim";
+    return null;
+  }
+
+  function moverAlca(clienteX: number) {
+    if (!faixa || !aoMudarFaixa || !arrastando.current) return;
+    const segundos = segundosNaPosicao(clienteX);
+    if (arrastando.current === "inicio") aoMudarFaixa([Math.min(segundos, faixa[1] - 1), faixa[1]]);
+    else aoMudarFaixa([faixa[0], Math.max(segundos, faixa[0] + 1)]);
+  }
 
   function buscarNaPosicao(clienteX: number) {
     if (!aoBuscar || !canvas.current || duracao <= 0) return;
@@ -103,10 +141,19 @@ export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cort
       aria-valuetext={`${formatarTempo(tempo)} de ${formatarTempo(duracao)}`}
       onPointerDown={(evento) => {
         evento.currentTarget.setPointerCapture(evento.pointerId);
-        buscarNaPosicao(evento.clientX);
+        arrastando.current = alcaPerto(evento.clientX);
+        if (!arrastando.current) buscarNaPosicao(evento.clientX);
       }}
       onPointerMove={(evento) => {
-        if (evento.buttons === 1) buscarNaPosicao(evento.clientX);
+        if (evento.buttons !== 1) {
+          evento.currentTarget.style.cursor = alcaPerto(evento.clientX) ? "ew-resize" : "pointer";
+          return;
+        }
+        if (arrastando.current) moverAlca(evento.clientX);
+        else buscarNaPosicao(evento.clientX);
+      }}
+      onPointerUp={() => {
+        arrastando.current = null;
       }}
       onKeyDown={(evento) => {
         if (!aoBuscar) return;

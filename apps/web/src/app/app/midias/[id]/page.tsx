@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CircleAlert, Clapperboard, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -9,6 +9,7 @@ import { BarraProgresso } from "@/componentes/BarraProgresso";
 import { FaixaDeMiniaturas } from "@/componentes/FaixaDeMiniaturas";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
+import { ReelsDaMidia } from "@/componentes/ReelsDaMidia";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEventosJobs } from "@/lib/eventos";
 import { formatarBytes, formatarData, formatarTempo, porcentagem } from "@/lib/formatar";
@@ -317,17 +318,7 @@ export default function PaginaMidia() {
               <Informacao rotulo="Arquivo" valor={midia.nome_original} />
             </dl>
           </section>
-          <section className="cartao p-6" aria-labelledby="titulo-proximos">
-            <h2 id="titulo-proximos" className="font-display text-lg font-bold">
-              Próximos passos
-            </h2>
-            <p className="mt-2 text-sm text-suave">
-              Em breve: escolher o trecho, enquadrar em 9:16 e exportar com o corte de silêncios.
-            </p>
-            <button type="button" disabled className="botao-cta mt-4 w-full">
-              <Clapperboard className="size-4" aria-hidden /> Criar um Reel
-            </button>
-          </section>
+          <ReelsDaMidia midia={midia} />
         </aside>
       </div>
     </main>

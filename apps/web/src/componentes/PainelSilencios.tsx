@@ -23,9 +23,11 @@ type Props = {
   pular: boolean;
   aoMudarPular: (pular: boolean) => void;
   erro?: string;
+  /** No editor a prévia sempre pula os cortes, então a opção fica escondida. */
+  semOpcaoPular?: boolean;
 };
 
-export function PainelSilencios({ opcao, aoMudar, dados, carregando, duracao, pular, aoMudarPular, erro }: Props) {
+export function PainelSilencios({ opcao, aoMudar, dados, carregando, duracao, pular, aoMudarPular, erro, semOpcaoPular = false }: Props) {
   const ativo = opcao !== "desligado" && dados !== null;
   const dica = OPCOES.find((item) => item.valor === opcao)?.dica;
 
@@ -74,7 +76,7 @@ export function PainelSilencios({ opcao, aoMudar, dados, carregando, duracao, pu
         )}
       </div>
 
-      <label className={`mt-4 flex items-center gap-3 text-sm ${ativo ? "" : "opacity-50"}`}>
+      <label className={`mt-4 flex items-center gap-3 text-sm ${ativo ? "" : "opacity-50"} ${semOpcaoPular ? "hidden" : ""}`}>
         <input
           type="checkbox"
           checked={pular}

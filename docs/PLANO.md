@@ -552,11 +552,11 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] Transcrição com WhisperX em português
 - [ ] Limpeza de áudio opcional
 - [ ] Corte automático de silêncios e vícios de fala, com ajuste de intensidade. **Silêncios prontos** (leve, médio e forte, com prévia pulando os cortes); os vícios de fala dependem da transcrição
-- [ ] Editor com prévia, edição pelo texto e linha do tempo simples
+- [ ] Editor com prévia, edição pelo texto e linha do tempo simples. **Prévia enquadrada e linha do tempo com o trecho prontas**; a edição pelo texto depende da transcrição
 - [ ] Legendas animadas com 4 presets
-- [ ] Reenquadramento 9:16 com recorte central e ponto ajustável
+- [x] Reenquadramento 9:16 com recorte central e ponto ajustável (também 4:5, 1:1 e 16:9, com zoom)
 - [ ] HolyStories: 3 templates de story com frase de destaque e logo
-- [ ] Exportação 1080x1920 com download e compartilhamento pelo celular
+- [x] Exportação 1080x1920 com download e compartilhamento pelo celular (27 s escolhidos viraram 22 s de Reel em 17 s de render na CPU de desenvolvimento)
 
 **Pronto quando:** uma pregação de 40 minutos vira um Reel legendado em menos de 15 minutos de trabalho humano. Isso cobre cerca de 70% do uso real de um app como o Captions.
 

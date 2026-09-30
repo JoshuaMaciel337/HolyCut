@@ -81,6 +81,40 @@ export type Silencios = {
   duracao_final: number;
 };
 
+export type Proporcao = "9:16" | "4:5" | "1:1" | "16:9";
+
+export type Projeto = {
+  id: string;
+  midia_id: string;
+  nome: string;
+  tipo: string;
+  proporcao: Proporcao;
+  trecho: { inicio: number; fim: number };
+  silencios: { intensidade: Intensidade | null };
+  enquadramento: { x: number; y: number; zoom: number };
+  audio: { normalizar: boolean };
+  versao: number;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export type Exportacao = {
+  id: string;
+  projeto_id: string;
+  midia_id: string;
+  nome: string;
+  status: "processando" | "pronta" | "erro";
+  processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
+  duracao: number | null;
+  tamanho: number | null;
+  largura: number;
+  altura: number;
+  arquivos: string[];
+  erro: string | null;
+  criado_em: string;
+  concluido_em: string | null;
+};
+
 export type FormaDeOnda = {
   versao: number;
   picos_por_segundo: number;
