@@ -1,17 +1,19 @@
 "use client";
 
-import { Clapperboard, FolderOpen, LogOut, Mic, Plus, ScanFace, Sparkles } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { CircleAlert, Clapperboard, Film, Mic, ScanFace, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { CartaoJob } from "@/componentes/CartaoJob";
-import { Logo } from "@/componentes/Logo";
+import { CartaoMidia } from "@/componentes/CartaoMidia";
 import { PainelSistema } from "@/componentes/PainelSistema";
+import { ZonaDeEnvio } from "@/componentes/ZonaDeEnvio";
 import { chamarApi, ErroApi } from "@/lib/api";
-import type { Job, Sessao, Sistema } from "@/lib/tipos";
-import { useJobsAoVivo } from "@/lib/useJobsAoVivo";
+import { useEnvios } from "@/lib/envios";
+import { useEventosJobs } from "@/lib/eventos";
+import { useSessao } from "@/lib/sessao";
+import type { Midia } from "@/lib/tipos";
+import { useSistema } from "@/lib/useSistema";
 
-const INTERVALO_SISTEMA_MS = 15_000;
+const LIMITE_MIDIAS = 30;
 
 const MODULOS = [
   { icone: Sparkles, nome: "HolyStories", cor: "var(--hc-yellow)" },
@@ -21,151 +23,144 @@ const MODULOS = [
 ];
 
 export default function PaginaInicio() {
-  const router = useRouter();
-  const [sessao, setSessao] = useState<Sessao | null>(null);
-  const [sistema, setSistema] = useState<Sistema | null>(null);
-  const [erroGeral, setErroGeral] = useState("");
-  const [criando, setCriando] = useState(false);
-  const { jobs, conexao, adicionar } = useJobsAoVivo(sessao !== null);
+  const { sessao } = useSessao();
+  const sistema = useSistema();
+  const { envios, versao, cancelar, dispensar } = useEnvios();
+  const [midias, setMidias] = useState<Midia[] | null>(null);
+  const [erro, setErro] = useState("");
 
-  // Sessão: se a API recusar, apaga o cookie e volta para o login
+  const carregar = useCallback(() => {
+    chamarApi<Midia[]>(`/midias?limite=${LIMITE_MIDIAS}`)
+      .then(setMidias)
+      .catch((e) => setErro(e instanceof ErroApi ? e.message : "Não foi possível carregar as gravações."));
+  }, []);
+
+  // Recarrega quando um envio cria uma mídia ou termina
   useEffect(() => {
-    chamarApi<Sessao>("/auth/eu")
-      .then(setSessao)
-      .catch(async (e) => {
-        if (e instanceof ErroApi && e.status === 401) {
-          await chamarApi("/auth/sair", { metodo: "POST" }).catch(() => undefined);
-          router.replace("/entrar?proximo=/app");
-          return;
-        }
-        setErroGeral(e instanceof ErroApi ? e.message : "Não foi possível carregar o painel.");
-      });
-  }, [router]);
+    carregar();
+  }, [carregar, versao]);
 
-  // Workers online, atualizado a cada 15 s
-  useEffect(() => {
-    if (!sessao) return;
-    const atualizar = () => chamarApi<Sistema>("/sistema").then(setSistema).catch(() => setSistema(null));
-    atualizar();
-    const intervalo = setInterval(atualizar, INTERVALO_SISTEMA_MS);
-    return () => clearInterval(intervalo);
-  }, [sessao]);
+  const atualizarMidia = useCallback((id: string) => {
+    chamarApi<Midia>(`/midias/${id}`)
+      .then((nova) => setMidias((lista) => lista?.map((m) => (m.id === id ? nova : m)) ?? lista))
+      .catch(() => undefined);
+  }, []);
 
-  async function criarJob(corpo: { tipo: string; duracao?: number; falhar?: boolean }) {
-    setCriando(true);
-    setErroGeral("");
+  useEventosJobs((job) => {
+    const midiaId = job.entrada?.midia_id;
+    if (job.tipo !== "ingestao" || typeof midiaId !== "string") return;
+    setMidias(
+      (lista) =>
+        lista?.map((m) =>
+          m.id === midiaId && m.status === "processando"
+            ? { ...m, processamento: { status: job.status, progresso: job.progresso, mensagem: job.mensagem } }
+            : m,
+        ) ?? lista,
+    );
+    if (job.status === "concluido" || job.status === "erro") atualizarMidia(midiaId);
+  });
+
+  async function excluir(midia: Midia) {
+    if (!window.confirm(`Excluir "${midia.nome}"? A gravação e tudo o que foi gerado a partir dela serão apagados.`)) return;
+    const envio = envios.find((item) => item.midiaId === midia.id);
+    if (envio) cancelar(envio.chave);
     try {
-      adicionar(await chamarApi<Job>("/jobs", { metodo: "POST", corpo }));
+      await chamarApi(`/midias/${midia.id}`, { metodo: "DELETE" });
+      setMidias((lista) => lista?.filter((m) => m.id !== midia.id) ?? lista);
     } catch (e) {
-      setErroGeral(e instanceof ErroApi ? e.message : "Não foi possível criar o job.");
-    } finally {
-      setCriando(false);
+      setErro(e instanceof ErroApi ? e.message : "Não foi possível excluir.");
     }
   }
 
-  async function sair() {
-    await chamarApi("/auth/sair", { metodo: "POST" }).catch(() => undefined);
-    router.replace("/entrar");
-  }
-
-  if (!sessao) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center px-4 text-center text-suave">
-        {erroGeral || "Carregando..."}
-      </div>
-    );
-  }
-
+  const envioPorMidia = useMemo(
+    () => new Map(envios.filter((envio) => envio.midiaId).map((envio) => [envio.midiaId as string, envio])),
+    [envios],
+  );
+  // Envios que ainda não viraram mídia: começando ou recusados antes de começar
+  const enviosSemMidia = envios.filter((envio) => !envio.midiaId);
   const primeiroNome = sessao.usuario.nome.split(" ")[0];
-  const gpuOnline = sistema?.workers.some((w) => w.recursos.includes("gpu")) ?? false;
 
   return (
-    <div className="min-h-dvh">
-      <header className="border-b border-borda bg-surface/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Logo altura={30} prioridade />
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium">{sessao.organizacao.nome}</p>
-              <p className="text-xs text-suave">{sessao.usuario.nome}</p>
-            </div>
-            <button type="button" onClick={sair} className="botao-contorno px-4 py-2 text-sm">
-              <LogOut className="size-4" aria-hidden /> Sair
-            </button>
-          </div>
-        </div>
-      </header>
+    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <h1 className="font-display text-3xl font-bold">Olá, {primeiroNome}!</h1>
+      <p className="mt-1 text-suave">O que vamos criar para a {sessao.organizacao.nome} hoje?</p>
 
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h1 className="font-display text-3xl font-bold">Olá, {primeiroNome}!</h1>
-        <p className="mt-1 text-suave">O que vamos criar para a {sessao.organizacao.nome} hoje?</p>
+      {erro ? (
+        <p role="alert" className="mt-6 rounded-xl border border-vermelho/40 bg-vermelho/10 px-4 py-3 text-sm text-vermelho">
+          {erro}
+        </p>
+      ) : null}
 
-        {erroGeral ? (
-          <p role="alert" className="mt-6 rounded-xl border border-vermelho/40 bg-vermelho/10 px-4 py-3 text-sm text-vermelho">
-            {erroGeral}
-          </p>
-        ) : null}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="flex min-w-0 flex-col gap-8">
+          <ZonaDeEnvio />
 
-        <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Criar conteúdo">
-          <div className="cartao flex flex-col justify-between gap-4 p-5 lg:col-span-1" style={{ backgroundImage: "var(--hc-gradient-cta)" }}>
-            <Plus className="size-7" aria-hidden />
-            <div>
-              <p className="font-display text-lg font-bold">Criar agora</p>
-              <p className="text-sm text-white/80">Upload de vídeo chega na Fase 1.</p>
-            </div>
-          </div>
-          {MODULOS.map(({ icone: Icone, nome, cor }) => (
-            <div key={nome} className="cartao flex flex-col justify-between gap-4 p-5 opacity-80">
-              <Icone className="size-7" style={{ color: cor }} aria-hidden />
-              <div>
-                <p className="font-display text-lg font-bold">{nome}</p>
-                <p className="text-sm text-suave">Em breve</p>
-              </div>
-            </div>
-          ))}
-        </section>
+          {enviosSemMidia.length > 0 ? (
+            <ul className="flex flex-col gap-2" aria-label="Envios começando">
+              {enviosSemMidia.map((envio) => (
+                <li key={envio.chave} className="flex items-center justify-between gap-3 rounded-2xl border border-borda bg-surface px-4 py-3 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    {envio.estado === "erro" ? (
+                      <CircleAlert className="size-4 shrink-0 text-vermelho" aria-hidden />
+                    ) : (
+                      <Film className="size-4 shrink-0 text-suave" aria-hidden />
+                    )}
+                    <span className="truncate font-medium">{envio.nome}</span>
+                    <span className={envio.estado === "erro" ? "text-vermelho" : "text-suave"}>
+                      {envio.estado === "erro" ? envio.erro : "Começando o envio..."}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Dispensar"
+                    onClick={() => (envio.estado === "erro" ? dispensar(envio.chave) : cancelar(envio.chave))}
+                    className="text-suave hover:text-texto"
+                  >
+                    <X className="size-4" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
-          <section className="cartao p-6" aria-labelledby="titulo-teste">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 id="titulo-teste" className="font-display text-lg font-bold">
-                  Teste do pipeline
-                </h2>
-                <p className="mt-1 max-w-xl text-sm text-suave">
-                  Cria um job na fila. O worker pega, processa e o progresso aparece aqui ao vivo.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="botao-cta px-4 py-2 text-sm" disabled={criando} onClick={() => criarJob({ tipo: "teste", duracao: 10 })}>
-                  Rodar job de teste
-                </button>
-                <button type="button" className="botao-contorno px-4 py-2 text-sm" disabled={criando} onClick={() => criarJob({ tipo: "teste", duracao: 6, falhar: true })}>
-                  Simular falha
-                </button>
-                <button type="button" className="botao-contorno px-4 py-2 text-sm" disabled={criando} onClick={() => criarJob({ tipo: "diagnostico_gpu" })}>
-                  Testar GPU
-                </button>
-              </div>
-            </div>
-
-            {jobs.length === 0 ? (
-              <div className="mt-8 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-borda py-10 text-center text-suave">
-                <FolderOpen className="size-8" aria-hidden />
-                <p>Nenhum job ainda. Rode o job de teste para ver a fila funcionando.</p>
-              </div>
+          <section aria-labelledby="titulo-midias">
+            <h2 id="titulo-midias" className="font-display text-xl font-bold">
+              Suas gravações
+            </h2>
+            {midias === null ? (
+              <p className="mt-4 text-suave">Carregando...</p>
+            ) : midias.length === 0 ? (
+              <p className="mt-4 rounded-2xl border border-dashed border-borda px-6 py-10 text-center text-suave">
+                Nenhuma gravação ainda. Envie a gravação de um culto para começar.
+              </p>
             ) : (
-              <ul className="mt-6 flex flex-col gap-3">
-                {jobs.map((job) => (
-                  <CartaoJob key={job.id} job={job} gpuOnline={gpuOnline} />
+              <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {midias.map((midia) => (
+                  <CartaoMidia key={midia.id} midia={midia} envio={envioPorMidia.get(midia.id)} aoExcluir={excluir} />
                 ))}
               </ul>
             )}
           </section>
 
-          <PainelSistema sistema={sistema} conexao={conexao} />
+          <section aria-labelledby="titulo-modulos">
+            <h2 id="titulo-modulos" className="font-display text-xl font-bold">
+              Em breve
+            </h2>
+            <ul className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {MODULOS.map(({ icone: Icone, nome, cor }) => (
+                <li key={nome} className="cartao flex items-center gap-3 p-4 opacity-80">
+                  <Icone className="size-6 shrink-0" style={{ color: cor }} aria-hidden />
+                  <span className="font-display font-bold">{nome}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
-      </main>
-    </div>
+
+        <aside className="flex flex-col gap-6">
+          <PainelSistema sistema={sistema} comLinkDiagnostico />
+        </aside>
+      </div>
+    </main>
   );
 }

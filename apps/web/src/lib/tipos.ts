@@ -30,12 +30,49 @@ export type Job = {
   tentativas: number;
   max_tentativas: number;
   erro: string | null;
+  entrada: Record<string, unknown>;
   saida: Record<string, unknown> | null;
   criado_em: string;
   atualizado_em: string;
   iniciado_em: string | null;
   concluido_em: string | null;
   disponivel_em: string | null;
+};
+
+export type StatusMidia = "enviando" | "processando" | "pronta" | "erro";
+
+export type Miniaturas = {
+  total: number;
+  colunas: number;
+  linhas: number;
+  intervalo: number;
+  largura: number;
+  altura: number;
+};
+
+export type Midia = {
+  id: string;
+  nome: string;
+  nome_original: string;
+  status: StatusMidia;
+  tamanho_total: number;
+  bytes_recebidos: number;
+  duracao: number | null;
+  video: { codec: string; largura: number; altura: number; fps: number | null; rotacao: number } | null;
+  audio: { codec: string; canais: number; taxa: number } | null;
+  miniaturas: Miniaturas | null;
+  arquivos: string[];
+  erro: string | null;
+  processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
+  criado_em: string;
+  atualizado_em: string;
+  enviado_em: string | null;
+};
+
+export type FormaDeOnda = {
+  versao: number;
+  picos_por_segundo: number;
+  picos: number[];
 };
 
 export type Worker = {

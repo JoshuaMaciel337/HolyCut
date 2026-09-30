@@ -5,6 +5,7 @@ import type { Job, StatusJob } from "@/lib/tipos";
 const NOMES_TIPO: Record<string, string> = {
   teste: "Pipeline de teste",
   diagnostico_gpu: "Diagnóstico da GPU",
+  ingestao: "Preparação da gravação",
 };
 
 const ESTILOS_STATUS: Record<StatusJob, { rotulo: string; classe: string }> = {

@@ -1,6 +1,9 @@
-import { Radio } from "lucide-react";
+"use client";
 
-import type { EstadoConexao } from "@/lib/useJobsAoVivo";
+import { Radio, Stethoscope } from "lucide-react";
+import Link from "next/link";
+
+import { type EstadoConexao, useConexao } from "@/lib/eventos";
 import type { Sistema } from "@/lib/tipos";
 
 const ROTULOS_CONEXAO: Record<EstadoConexao, string> = {
@@ -25,7 +28,8 @@ function Indicador({ online, rotulo, detalhe }: { online: boolean; rotulo: strin
   );
 }
 
-export function PainelSistema({ sistema, conexao }: { sistema: Sistema | null; conexao: EstadoConexao }) {
+export function PainelSistema({ sistema, comLinkDiagnostico = false }: { sistema: Sistema | null; comLinkDiagnostico?: boolean }) {
+  const conexao = useConexao();
   const workersCpu = sistema?.workers.filter((w) => w.recursos.includes("cpu")) ?? [];
   const workersGpu = sistema?.workers.filter((w) => w.recursos.includes("gpu")) ?? [];
 
@@ -50,6 +54,11 @@ export function PainelSistema({ sistema, conexao }: { sistema: Sistema | null; c
           detalhe={workersGpu.length > 0 ? "Notebook com GPU online" : "Notebook com GPU desligado ou fora da rede"}
         />
         <p className="text-xs text-suave">Modo de IA: {sistema?.modo_ia ?? "—"}</p>
+        {comLinkDiagnostico ? (
+          <Link href="/app/diagnostico" className="inline-flex items-center gap-2 text-sm font-medium text-laranja hover:underline">
+            <Stethoscope className="size-4" aria-hidden /> Diagnóstico
+          </Link>
+        ) : null}
       </div>
     </section>
   );
