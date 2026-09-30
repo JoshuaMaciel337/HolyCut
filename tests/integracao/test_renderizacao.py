@@ -1,5 +1,6 @@
 # Renderização de ponta a ponta: ingestão, projeto, exportação e o vídeo final.
 # FFmpeg de verdade e MongoDB de verdade. Pulado quando o FFmpeg não está instalado.
+import io
 import json
 import re
 import shutil
@@ -7,11 +8,14 @@ import subprocess
 
 import pytest
 from bson import ObjectId
+from PIL import Image
 
+from core.modelos.identidade import chave_logo
 from core.modelos.job import montar_job
 from core.modelos.midia import chave_arquivo, montar_midia
 from core.modelos.projeto import chave_exportacao, montar_exportacao, montar_projeto
 from core.utils import storage
+from core.utils.arte import preparar_logo
 from core.utils.fila import enfileirar_job, pegar_proximo_job
 from worker.worker_principal import processar_job
 
@@ -115,3 +119,36 @@ def test_trecho_todo_em_silencio_falha_sem_novas_tentativas(db_limpo):
     salvo = db_limpo.exportacoes.find_one({"_id": exportacao["_id"]})
     assert salvo["status"] == "erro"
     assert "ficou vazio" in salvo["erro"]
+
+
+def test_reel_com_logo_e_texto_da_igreja(db_limpo):
+    midia = midia_pronta(db_limpo, duracao=6)
+    organizacao_id = midia["organizacao_id"]
+    db_limpo.organizacoes.insert_one({"_id": organizacao_id, "nome": "Igreja Teste",
+                                      "identidade": {"cor_destaque": "#00C853", "logo": True}})
+    logo = Image.new("RGBA", (400, 200), (255, 0, 0, 255))   # logo vermelho
+    saida_logo = io.BytesIO()
+    logo.save(saida_logo, format="PNG")
+    storage.salvar_bytes(chave_logo(organizacao_id), preparar_logo(saida_logo.getvalue()))
+
+    exportacao, video = exportar(
+        db_limpo, midia, silencios={"intensidade": None},
+        marca={"logo": True, "posicao": "topo_esquerda", "tamanho": 0.25, "opacidade": 1.0},
+        textos=[{"id": "t", "texto": "Ele é digno", "estilo": "destaque", "posicao": "base", "inicio": 0, "fim": None},
+                {"id": "u", "texto": "Só no começo", "estilo": "limpo", "posicao": "centro", "inicio": 0, "fim": 1}])
+    assert exportacao["status"] == "pronta", exportacao.get("erro")
+
+    def quadro(segundos):
+        bruto = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(segundos), "-i", str(video), "-frames:v", "1",
+                                "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+        return Image.frombytes("RGB", (1080, 1920), bruto)
+
+    depois = quadro(3.0)
+    r, g, b = depois.getpixel((64 + 130, 64 + 60))                  # meio do logo, no canto de cima
+    assert r > 200 and g < 60 and b < 60
+    faixa = [depois.getpixel((x, y)) for x in range(200, 880, 20) for y in range(1450, 1700, 10)]
+    assert any(g > 150 and r < 80 and b < 130 for r, g, b in faixa)  # faixa verde da igreja atrás do texto
+    antes = quadro(0.3)
+    centro_antes = [antes.getpixel((x, 960)) for x in range(300, 780, 5)]
+    centro_depois = [depois.getpixel((x, 960)) for x in range(300, 780, 5)]
+    assert centro_antes != centro_depois                              # o texto do centro só aparece no primeiro segundo

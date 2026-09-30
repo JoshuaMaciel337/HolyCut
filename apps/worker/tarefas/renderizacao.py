@@ -13,7 +13,9 @@ from collections.abc import Callable
 
 import numpy as np
 from bson import ObjectId
+from PIL import Image
 
+from core.modelos.identidade import chave_logo, identidade_padrao
 from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import ARQUIVO_NIVEIS, chave_arquivo
 from core.modelos.projeto import (
@@ -26,6 +28,7 @@ from core.modelos.projeto import (
     chave_exportacao,
 )
 from core.utils import storage
+from core.utils.arte import camada_logo, camada_texto, para_png
 from core.utils.ffmpeg import executar_ffmpeg
 from core.utils.mongo import agora
 from core.utils.render import (
@@ -57,6 +60,31 @@ def marcar_exportacao_com_erro(db, job: dict, mensagem: str):
         db.exportacoes.update_one({"_id": ObjectId(exportacao_id)}, {"$set": {
             "status": STATUS_EXPORTACAO_ERRO, "erro": mensagem, "atualizado_em": agora(),
         }})
+
+
+def desenhar_camadas(db, organizacao_id, config: dict, largura: int, altura: int,
+                     duracao: float) -> list[tuple[Image.Image, float, float]]:
+    """(imagem, início, fim) do logo e de cada texto, no tempo do vídeo final."""
+    organizacao = db.organizacoes.find_one({"_id": organizacao_id}, {"nome": 1, "identidade": 1}) or {}
+    identidade = {**identidade_padrao(organizacao.get("nome", "")), **(organizacao.get("identidade") or {})}
+    camadas = []
+    marca = config.get("marca") or {}
+    if marca.get("logo"):
+        logo = storage.caminho_local(chave_logo(organizacao_id))
+        if logo.is_file():
+            camadas.append((camada_logo(largura, altura, logo.read_bytes(), marca.get("posicao", "topo_direita"),
+                                        marca.get("tamanho", 0.16), marca.get("opacidade", 0.9)), 0.0, duracao))
+        else:
+            logging.warning(f"[{organizacao_id}] O projeto pede o logo, mas a igreja não tem logo enviado.")
+    for texto in config.get("textos") or []:
+        inicio_texto = min(float(texto.get("inicio") or 0), duracao)
+        fim_texto = min(float(texto.get("fim") or duracao), duracao)
+        if not (texto.get("texto") or "").strip() or fim_texto <= inicio_texto:
+            continue
+        imagem = camada_texto(largura, altura, texto["texto"], texto.get("estilo", "destaque"),
+                              texto.get("posicao", "base"), identidade["cor_destaque"], texto.get("referencia", ""))
+        camadas.append((imagem, inicio_texto, fim_texto))
+    return camadas
 
 
 def cortes_de_silencio(midia: dict, intensidade: str | None) -> list[tuple[float, float]]:
@@ -103,16 +131,27 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     enquadramento = config["enquadramento"]
     recorte = calcular_recorte(midia["video"]["largura"], midia["video"]["altura"], config["proporcao"],
                                enquadramento["x"], enquadramento["y"], enquadramento["zoom"])
-    filtro = montar_filtro(trechos, recorte, largura, altura, tem_audio=bool(midia.get("audio")),
-                           normalizar=(config.get("audio") or {}).get("normalizar", True))
 
     def caminho(nome: str):
         return storage.caminho_local(chave_exportacao(organizacao_id, exportacao_id, nome))
 
+    # Logo e textos: uma imagem PNG por camada, sobreposta só no intervalo dela
+    reportar(4, "Desenhando o logo e os textos")
+    camadas = desenhar_camadas(db, organizacao_id, config, largura, altura, duracao)
+    entradas_camadas = []
+    for indice, (imagem, _inicio, _fim) in enumerate(camadas):
+        nome = f"camada_{indice}.png"
+        storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, nome), para_png(imagem))
+        entradas_camadas += ["-loop", "1", "-framerate", str(FPS), "-t", f"{duracao:.3f}", "-i", str(caminho(nome))]
+
+    filtro = montar_filtro(trechos, recorte, largura, altura, tem_audio=bool(midia.get("audio")),
+                           normalizar=(config.get("audio") or {}).get("normalizar", True),
+                           camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas])
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
     saida = caminho(ARQUIVO_VIDEO_EXPORTADO)
     argumentos = [
         "-ss", f"{inicio:.3f}", "-t", f"{fim - inicio:.3f}", "-i", str(original),
+        *entradas_camadas,
         *opcao_filtro_em_arquivo(str(caminho(ARQUIVO_FILTRO))),
         "-map", "[v]", *(["-map", "[a]"] if midia.get("audio") else []),
         "-c:v", "libx264", "-preset", PRESET_X264, "-crf", CRF_X264, "-profile:v", "high",
@@ -125,7 +164,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     executar_ffmpeg(["-ss", f"{min(1.0, duracao / 2):.2f}", "-i", str(saida), "-frames:v", "1",
                      "-vf", f"scale={LARGURA_CAPA}:-2", "-q:v", "3", "-update", "1",
                      str(caminho(ARQUIVO_CAPA_EXPORTADA))])
-    storage.remover(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO))
+    for nome in [ARQUIVO_FILTRO, *(f"camada_{indice}.png" for indice in range(len(camadas)))]:
+        storage.remover(chave_exportacao(organizacao_id, exportacao_id, nome))
 
     momento = agora()
     tamanho = saida.stat().st_size

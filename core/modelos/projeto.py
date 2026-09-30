@@ -7,6 +7,7 @@ import copy
 from datetime import datetime
 
 from core.config import TZ
+from core.modelos.identidade import marca_padrao
 
 PROPORCOES = {
     "9:16": (1080, 1920),   # Reels, Stories, TikTok, Shorts
@@ -27,11 +28,11 @@ ARQUIVOS_EXPORTACAO = {ARQUIVO_VIDEO_EXPORTADO, ARQUIVO_CAPA_EXPORTADA}
 
 # Campos do projeto que definem o vídeo. A exportação guarda uma cópia deles,
 # então editar o projeto depois não muda um vídeo já exportado.
-CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio")
+CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos")
 
 
 def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = None,
-                   proporcao: str = "9:16", momento: datetime | None = None) -> dict:
+                   proporcao: str = "9:16", momento: datetime | None = None, identidade: dict | None = None) -> dict:
     if proporcao not in PROPORCOES:
         raise ValueError(f"Proporção desconhecida: {proporcao}")
     momento = momento or datetime.now(TZ)
@@ -46,6 +47,8 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         "silencios": {"intensidade": "media"},
         "enquadramento": {"x": 0.5, "y": 0.5, "zoom": 1.0},
         "audio": {"normalizar": True},
+        "marca": marca_padrao(identidade),
+        "textos": [],
         "versao": 1,
         "criado_em": momento,
         "atualizado_em": momento,
@@ -61,7 +64,7 @@ def montar_exportacao(projeto: dict, criado_por, momento: datetime | None = None
         "criado_por": criado_por,
         "nome": projeto["nome"],
         "versao_projeto": projeto["versao"],
-        "configuracao": copy.deepcopy({campo: projeto[campo] for campo in CAMPOS_DO_VIDEO}),
+        "configuracao": copy.deepcopy({campo: projeto.get(campo) for campo in CAMPOS_DO_VIDEO}),
         "status": STATUS_EXPORTACAO_PROCESSANDO,
         "arquivos": [],
         "duracao": None,

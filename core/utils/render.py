@@ -71,17 +71,30 @@ def expressao_selecao(trechos: list[tuple[float, float]]) -> str:
 
 
 def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: int, altura: int,
-                  tem_audio: bool, normalizar: bool = True) -> str:
-    """Grafo de filtros completo, com as saídas [v] e [a]."""
+                  tem_audio: bool, normalizar: bool = True,
+                  camadas: list[tuple[float, float]] | None = None) -> str:
+    """
+    Grafo de filtros completo, com as saídas [v] e [a].
+    camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. A camada i é a
+    entrada i + 1 do FFmpeg (a entrada 0 é a gravação).
+    """
     selecao = expressao_selecao(trechos)
+    duracao = duracao_dos_trechos(trechos)
     video = (
         f"[0:v]setpts=PTS-STARTPTS,fps={FPS},select='{selecao}',setpts=N/{FPS}/TB,"
         f"crop={recorte['largura']}:{recorte['altura']}:{recorte['x']}:{recorte['y']},"
-        f"scale={largura}:{altura}:flags=lanczos,setsar=1,format=yuv420p[v]"
+        f"scale={largura}:{altura}:flags=lanczos,setsar=1"
     )
+    anterior = "base0"
+    video += f"[{anterior}]" if camadas else ",format=yuv420p[v]"
+    for indice, (inicio, fim) in enumerate(camadas or [], start=1):
+        saida = "v" if indice == len(camadas) else f"base{indice}"
+        formato = ",format=yuv420p" if saida == "v" else ""
+        video += (f";\n[{anterior}][{indice}:v]overlay=0:0:enable='between(t,{inicio:.3f},{min(fim, duracao):.3f})'"
+                  f"{formato}[{saida}]")
+        anterior = saida
     if not tem_audio:
         return video
-    duracao = duracao_dos_trechos(trechos)
     audio = (
         f"[0:a]asetpts=PTS-STARTPTS,aresample={TAXA_AUDIO},asetnsamples=n={AMOSTRAS_POR_QUADRO}:p=0,"
         f"aselect='{selecao}',asetpts=N/SR/TB"

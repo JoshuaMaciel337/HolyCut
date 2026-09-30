@@ -62,7 +62,9 @@ async def criar_projeto(dados: ProjetoCriarEntrada, usuario=Depends(usuario_atua
         raise HTTPException(status.HTTP_409_CONFLICT, "A gravação ainda está sendo preparada.")
     if not midia.get("video"):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Para criar um Reel, a gravação precisa ter vídeo.")
-    projeto = montar_projeto(usuario["organizacao_id"], midia, usuario["_id"], dados.nome, dados.proporcao)
+    organizacao = await db.organizacoes.find_one({"_id": usuario["organizacao_id"]}, {"identidade": 1})
+    projeto = montar_projeto(usuario["organizacao_id"], midia, usuario["_id"], dados.nome, dados.proporcao,
+                             identidade=(organizacao or {}).get("identidade"))
     projeto["_id"] = (await db.projetos.insert_one(projeto)).inserted_id
     return projeto_para_saida(projeto)
 
@@ -93,6 +95,11 @@ async def atualizar_projeto(projeto_id: str, dados: ProjetoAtualizarEntrada,
         if fim - dados.trecho.inicio < DURACAO_MINIMA_TRECHO:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O trecho precisa ter pelo menos 1 segundo.")
         campos["trecho"] = {"inicio": round(dados.trecho.inicio, 2), "fim": fim}
+    for texto in dados.textos or []:
+        if texto.fim is not None and texto.fim <= texto.inicio:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O texto precisa terminar depois de começar.")
+    if dados.textos is not None and len({texto.id for texto in dados.textos}) != len(dados.textos):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Dois textos com o mesmo identificador.")
     if not campos:
         return projeto_para_saida(projeto)
 

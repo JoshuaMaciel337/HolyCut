@@ -26,6 +26,7 @@ from api.seguranca import (
     verificar_senha,
 )
 from core.config import COOKIE_NOME, COOKIE_SEGURO, SESSAO_DIAS
+from core.modelos.identidade import identidade_padrao
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -66,7 +67,7 @@ async def criar_organizacao(db, nome: str):
             continue
         try:
             resultado = await db.organizacoes.insert_one({
-                "nome": nome, "slug": slug, "plano": "piloto", "identidade": {},
+                "nome": nome, "slug": slug, "plano": "piloto", "identidade": identidade_padrao(nome),
                 "criado_em": momento, "atualizado_em": momento,
             })
             return resultado.inserted_id, slug

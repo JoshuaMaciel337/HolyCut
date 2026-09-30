@@ -107,6 +107,50 @@ class SilenciosSaida(BaseModel):
 
 Proporcao = Literal["9:16", "4:5", "1:1", "16:9"]
 IntensidadeCorte = Literal["leve", "media", "forte"]
+PosicaoLogo = Literal["topo_esquerda", "topo_direita", "base_esquerda", "base_direita"]
+EstiloTexto = Literal["destaque", "limpo", "manuscrito"]
+PosicaoTexto = Literal["topo", "centro", "base"]
+
+
+class IdentidadeSaida(BaseModel):
+    nome_exibicao: str
+    instagram: str
+    cor_destaque: str
+    logo: bool
+    atualizado_em: datetime | None = None
+
+
+class IdentidadeAtualizarEntrada(BaseModel):
+    nome_exibicao: str | None = Field(default=None, min_length=1, max_length=80)
+    instagram: str | None = Field(default=None, max_length=80)
+    cor_destaque: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class MarcaEntrada(BaseModel):
+    logo: bool = False
+    posicao: PosicaoLogo = "topo_direita"
+    tamanho: float = Field(default=0.16, ge=0.06, le=0.4)
+    opacidade: float = Field(default=0.9, ge=0.2, le=1)
+
+
+class TextoEntrada(BaseModel):
+    id: str = Field(min_length=1, max_length=20)
+    tipo: Literal["titulo", "frase", "versiculo"] = "titulo"
+    texto: str = Field(default="", max_length=280)
+    referencia: str = Field(default="", max_length=40)
+    estilo: EstiloTexto = "destaque"
+    posicao: PosicaoTexto = "base"
+    inicio: float = Field(default=0, ge=0, description="Segundos no vídeo final")
+    fim: float | None = Field(default=None, gt=0, description="None: até o fim do vídeo")
+
+
+class CamadaEntrada(BaseModel):
+    """Uma camada para a prévia: o logo da igreja ou um texto, do tamanho da moldura."""
+    largura: int = Field(ge=90, le=1920)
+    altura: int = Field(ge=90, le=1920)
+    tipo: Literal["logo", "texto"]
+    marca: MarcaEntrada | None = None
+    texto: TextoEntrada | None = None
 
 
 class TrechoEntrada(BaseModel):
@@ -142,6 +186,8 @@ class ProjetoAtualizarEntrada(BaseModel):
     silencios: SilenciosProjetoEntrada | None = None
     enquadramento: EnquadramentoEntrada | None = None
     audio: AudioProjetoEntrada | None = None
+    marca: MarcaEntrada | None = None
+    textos: list[TextoEntrada] | None = Field(default=None, max_length=6)
 
 
 class ProjetoSaida(BaseModel):
@@ -154,6 +200,8 @@ class ProjetoSaida(BaseModel):
     silencios: SilenciosProjetoEntrada
     enquadramento: EnquadramentoEntrada
     audio: AudioProjetoEntrada
+    marca: MarcaEntrada = MarcaEntrada()
+    textos: list[TextoEntrada] = []
     versao: int
     criado_em: datetime
     atualizado_em: datetime

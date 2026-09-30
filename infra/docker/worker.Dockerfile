@@ -19,6 +19,8 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 COPY core /app/core
 COPY apps/worker /app/worker
 COPY infra/backup /app/backup
+# Fontes da marca, para desenhar textos e templates (licença OFL)
+COPY brand/fontes /app/brand/fontes
 
 RUN useradd --create-home --uid 1000 holycut && mkdir -p /dados/armazenamento /dados/backups && chown -R holycut /dados
 USER holycut

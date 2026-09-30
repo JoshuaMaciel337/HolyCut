@@ -39,6 +39,12 @@ FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
 
 # -----------------------------------------------
+# ARTE (logo, textos e templates desenhados com Pillow)
+# -----------------------------------------------
+PASTA_FONTES = Path(os.environ.get("PASTA_FONTES", PASTA_RAIZ / "brand" / "fontes"))
+LOGO_MAX_BYTES = 5 * 1024 * 1024
+
+# -----------------------------------------------
 # SESSÃO
 # -----------------------------------------------
 # TODO: .env — o valor padrão só serve para desenvolvimento local

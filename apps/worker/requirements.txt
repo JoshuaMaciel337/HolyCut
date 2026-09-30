@@ -1,4 +1,5 @@
 numpy==2.4.6
+pillow==12.3.0
 pymongo==4.18.2
 requests==2.34.2
 schedule==1.2.2
