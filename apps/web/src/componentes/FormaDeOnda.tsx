@@ -13,10 +13,12 @@ type Props = {
   tempo: number;
   aoBuscar?: (segundos: number) => void;
   altura?: number;
+  /** Trechos marcados na forma de onda, como os silêncios que vão ser cortados. */
+  cortes?: [number, number][];
 };
 
 /** Desenha a forma de onda num canvas. A parte já tocada fica com o gradiente da marca. */
-export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72 }: Props) {
+export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cortes = [] }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [largura, setLargura] = useState(0);
 
@@ -61,16 +63,24 @@ export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72 }: Pr
     gradiente.addColorStop(0, estilos.getPropertyValue("--hc-violet").trim() || "#7B61FF");
     gradiente.addColorStop(1, estilos.getPropertyValue("--hc-orange").trim() || "#FF8A00");
     const tocado = duracao > 0 ? (tempo / duracao) * largura : 0;
+    const paraX = (segundos: number) => (duracao > 0 ? (segundos / duracao) * largura : 0);
+
+    // Trechos cortados: fundo avermelhado atrás das barras
+    contexto.fillStyle = "rgba(255, 77, 77, 0.3)";
+    for (const [inicio, fim] of cortes) contexto.fillRect(paraX(inicio), 0, Math.max(paraX(fim) - paraX(inicio), 1), altura);
+    let corte = 0;
 
     barras.forEach((valor, indice) => {
       const x = indice * PASSO_BARRA;
       const h = Math.max(2, valor * altura * 0.92);
-      contexto.fillStyle = x < tocado ? gradiente : "rgba(255, 255, 255, 0.2)";
+      while (corte < cortes.length && paraX(cortes[corte][1]) < x) corte++;
+      const cortado = corte < cortes.length && paraX(cortes[corte][0]) <= x;
+      contexto.fillStyle = cortado ? "rgba(255, 110, 110, 0.35)" : x < tocado ? gradiente : "rgba(255, 255, 255, 0.2)";
       contexto.fillRect(x, (altura - h) / 2, PASSO_BARRA - 1, h);
     });
     contexto.fillStyle = "#ffffff";
     contexto.fillRect(Math.min(tocado, largura - 2), 0, 2, altura);
-  }, [barras, tempo, duracao, largura, altura]);
+  }, [barras, tempo, duracao, largura, altura, cortes]);
 
   function buscarNaPosicao(clienteX: number) {
     if (!aoBuscar || !canvas.current || duracao <= 0) return;

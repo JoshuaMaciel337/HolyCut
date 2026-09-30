@@ -8,10 +8,11 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { BarraProgresso } from "@/componentes/BarraProgresso";
 import { FaixaDeMiniaturas } from "@/componentes/FaixaDeMiniaturas";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
+import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEventosJobs } from "@/lib/eventos";
 import { formatarBytes, formatarData, formatarTempo, porcentagem } from "@/lib/formatar";
-import type { FormaDeOnda as DadosFormaDeOnda, Midia } from "@/lib/tipos";
+import type { FormaDeOnda as DadosFormaDeOnda, Midia, Silencios } from "@/lib/tipos";
 
 function Informacao({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -76,7 +77,13 @@ export default function PaginaMidia() {
   const [forma, setForma] = useState<DadosFormaDeOnda | null>(null);
   const [erro, setErro] = useState("");
   const [tempo, setTempo] = useState(0);
+  const [opcaoCorte, setOpcaoCorte] = useState<OpcaoCorte>("media");
+  const [silencios, setSilencios] = useState<Silencios | null>(null);
+  const [pularSilencios, setPularSilencios] = useState(true);
+  const [erroSilencios, setErroSilencios] = useState("");
   const player = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  // Lidos a cada quadro da prévia, sem recriar o acompanhamento do player
+  const cortesAtivos = useRef<[number, number][]>([]);
 
   const carregar = useCallback(() => {
     chamarApi<Midia>(`/midias/${id}`)
@@ -103,6 +110,27 @@ export default function PaginaMidia() {
     };
   }, [id, temForma]);
 
+  const pronta = midia?.status === "pronta";
+  useEffect(() => {
+    if (!pronta || opcaoCorte === "desligado") return;
+    let cancelado = false;
+    chamarApi<Silencios>(`/midias/${id}/silencios?intensidade=${opcaoCorte}`)
+      .then((dados) => {
+        if (!cancelado) setSilencios(dados);
+      })
+      .catch((e) => {
+        if (!cancelado) setErroSilencios(e instanceof ErroApi ? e.message : "Não foi possível analisar os silêncios.");
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [id, pronta, opcaoCorte]);
+
+  const cortes = opcaoCorte !== "desligado" && silencios?.intensidade === opcaoCorte ? silencios.silencios : null;
+  useEffect(() => {
+    cortesAtivos.current = cortes && pularSilencios ? cortes : [];
+  }, [cortes, pularSilencios]);
+
   useEventosJobs((job) => {
     if (job.tipo !== "ingestao" || job.entrada?.midia_id !== id) return;
     setMidia((atual) =>
@@ -117,6 +145,9 @@ export default function PaginaMidia() {
     if (!elemento) return;
     let quadro = 0;
     const acompanhar = () => {
+      // Prévia do corte: ao entrar num silêncio, pula para o fim dele
+      const corte = cortesAtivos.current.find(([inicio, fim]) => elemento.currentTime >= inicio && elemento.currentTime < fim - 0.05);
+      if (corte) elemento.currentTime = corte[1];
       setTempo(elemento.currentTime);
       if (!elemento.paused) quadro = requestAnimationFrame(acompanhar);
     };
@@ -198,7 +229,7 @@ export default function PaginaMidia() {
         )}
         {forma && midia.duracao ? (
           <div>
-            <FormaDeOnda picos={forma.picos} duracao={midia.duracao} tempo={tempo} aoBuscar={buscar} />
+            <FormaDeOnda picos={forma.picos} duracao={midia.duracao} tempo={tempo} aoBuscar={buscar} cortes={cortes ?? []} />
             <p className="mt-2 text-right text-xs tabular-nums text-suave">
               {formatarTempo(tempo)} / {formatarTempo(midia.duracao)}
             </p>
@@ -254,6 +285,18 @@ export default function PaginaMidia() {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">{conteudo}</div>
         <aside className="flex flex-col gap-6">
+          {pronta && midia.arquivos.includes("forma_de_onda.json") && midia.duracao ? (
+            <PainelSilencios
+              opcao={opcaoCorte}
+              aoMudar={setOpcaoCorte}
+              dados={cortes ? silencios : null}
+              carregando={opcaoCorte !== "desligado" && !cortes}
+              duracao={midia.duracao}
+              pular={pularSilencios}
+              aoMudarPular={setPularSilencios}
+              erro={erroSilencios}
+            />
+          ) : null}
           <section className="cartao p-6" aria-labelledby="titulo-info">
             <h2 id="titulo-info" className="font-display text-lg font-bold">
               Detalhes
@@ -279,7 +322,7 @@ export default function PaginaMidia() {
               Próximos passos
             </h2>
             <p className="mt-2 text-sm text-suave">
-              Em breve: cortar os silêncios, escolher o trecho e exportar em 9:16 com legenda.
+              Em breve: escolher o trecho, enquadrar em 9:16 e exportar com o corte de silêncios.
             </p>
             <button type="button" disabled className="botao-cta mt-4 w-full">
               <Clapperboard className="size-4" aria-hidden /> Criar um Reel

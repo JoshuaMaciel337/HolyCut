@@ -69,6 +69,18 @@ export type Midia = {
   enviado_em: string | null;
 };
 
+export type Intensidade = "leve" | "media" | "forte";
+
+export type Silencios = {
+  intensidade: Intensidade;
+  limiar_db: number;
+  duracao_minima: number;
+  margem: number;
+  silencios: [number, number][];
+  tempo_cortado: number;
+  duracao_final: number;
+};
+
 export type FormaDeOnda = {
   versao: number;
   picos_por_segundo: number;

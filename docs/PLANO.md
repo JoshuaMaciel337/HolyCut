@@ -551,7 +551,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [x] Ingestão: proxy, waveform e miniaturas (cerca de 21 s para 90 s de vídeo 1080p na CPU da máquina de desenvolvimento)
 - [ ] Transcrição com WhisperX em português
 - [ ] Limpeza de áudio opcional
-- [ ] Corte automático de silêncios e vícios de fala, com ajuste de intensidade
+- [ ] Corte automático de silêncios e vícios de fala, com ajuste de intensidade. **Silêncios prontos** (leve, médio e forte, com prévia pulando os cortes); os vícios de fala dependem da transcrição
 - [ ] Editor com prévia, edição pelo texto e linha do tempo simples
 - [ ] Legendas animadas com 4 presets
 - [ ] Reenquadramento 9:16 com recorte central e ponto ajustável
