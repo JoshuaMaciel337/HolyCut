@@ -25,10 +25,20 @@ O HolyCut recebe o vídeo bruto do culto e devolve conteúdo pronto para postar.
 | **HolySermon** | Transforma uma pregação longa em vários cortes curtos escolhidos pela IA | 2 |
 | **HolyMoments** | Encontra os melhores momentos do culto, inclusive do louvor, sem depender só da fala | 2 |
 | **Sua Identidade** | Kit da igreja: logo, cores, fontes, @ e templates aplicados em tudo | 2 |
+| **Acervo** (nome provisório) | A biblioteca dos cultos da igreja, no estilo de um streaming: capas, fileiras e, dentro de cada culto, os cortes, os versículos, o estudo e a transcrição | 3 (base) e 2 (conteúdo com IA) |
+| **HolyStudy** (nome provisório) | Da pregação saem o resumo, os temas, os versículos citados e um guia de estudo para células, com PDF | 2 |
+
+A referência de mercado (Cut.Pro, OpusClip, FeedChurch, Doxus e Bíblia IA) está em [PESQUISA_MERCADO.md](PESQUISA_MERCADO.md).
 
 ### Fora do escopo (decisão tomada)
 
 Não entram no plano: avatar de IA, dublagem, clonagem de voz, lip-sync e correção de contato visual. São os recursos de dificuldade alta ou muito alta, exigem GPU pesada e têm licenças restritivas. Se um dia fizerem sentido, entram como serviço pago de terceiros, sem mudar a arquitetura.
+
+Também ficam de fora, depois da pesquisa de mercado:
+- chat que responde como pastor ("pastor virtual") e personagens de IA com rosto de gente;
+- cortar pregações de outras igrejas: o HolyCut processa só o conteúdo da própria igreja;
+- a API oficial do WhatsApp, que é paga (o link `wa.me` manual resolve);
+- integração com outros projetos do dono: o HolyCut é independente.
 
 ---
 
@@ -39,7 +49,9 @@ Não entram no plano: avatar de IA, dublagem, clonagem de voz, lip-sync e corre�
 3. **Tudo local, sem custo por uso.** Modelos abertos rodando na própria GPU. Serviço externo só quando for opcional, como o banco de imagens do Pexels.
 4. **Workers puxam trabalho.** Os workers de GPU buscam jobs no MongoDB. Assim um worker pode rodar no servidor, num PC com GPU da igreja ou numa GPU alugada por hora, sem mudar código.
 5. **Multi-igreja desde o primeiro dia.** Todo documento pertence a uma organização. Isso evita reescrever tudo quando virar SaaS.
-6. **Padrões da equipe Polo.** Python com MongoDB via pymongo, funções e variáveis em português no formato `verbo_objeto()`, `logging` em vez de `print`, credenciais via `os.environ.get()`, timezone `America/Sao_Paulo`, upsert com merge e workers que nunca morrem por exceção.
+6. **Fiel ao que foi pregado.** A IA só organiza o que o pastor disse; ela não gera sermão nem "melhora" a mensagem. Títulos, ganchos, resumos, guias e legendas de post saem da fala real. Quando a IA não tem confiança no que extraiu, ela omite em vez de inventar. Todo texto automático aparece marcado como gerado por IA, para a equipe revisar, e a transcrição não corrige o português do pregador.
+7. **A igreja é dona de tudo.** Vídeos, transcrições e estudos saem em formato aberto (MP4, SRT, TXT e PDF). Sair do HolyCut não pode custar o acervo.
+8. **Padrões da equipe Polo.** Python com MongoDB via pymongo, funções e variáveis em português no formato `verbo_objeto()`, `logging` em vez de `print`, credenciais via `os.environ.get()`, timezone `America/Sao_Paulo`, upsert com merge e workers que nunca morrem por exceção.
 
 ---
 
@@ -180,7 +192,8 @@ O padrão da equipe proíbe tecnologias fora da lista sem aprovação. Um app we
 |---|---|---|
 | `organizacoes` | nome, slug, plano, identidade (logo, cores, fontes, @, templates padrão) | `slug` único |
 | `usuarios` | email, senha_hash, organizacao_id, papel (dono, editor, revisor) | `email` único |
-| `midias` | arquivo original, metadados do ffprobe, proxy 720p, waveform, miniaturas, duração, status | `organizacao_id + criado_em` |
+| `midias` | arquivo original, metadados do ffprobe, proxy 720p, waveform, miniaturas, duração, status. Para o acervo, a **ficha do culto** (título, data, pregador, série e descrição) e as capas | `organizacao_id + criado_em` |
+| `analises` | o que a IA tira de cada culto: blocos (louvor, avisos, oração, oferta, pregação), resumo, temas, palavras-chave, personagens, versículos citados com o momento em que aparecem, guia de estudo | `midia_id` único |
 | `transcricoes` | idioma, segmentos e palavras com início, fim, confiança e falante | `midia_id` único |
 | `projetos` | tipo, formato, cortes, enquadramento, legenda, áudio, overlays, template, versão | `organizacao_id + atualizado_em` |
 | `sugestoes` | trechos sugeridos pela IA com início, fim, título, gancho, nota e motivo | `midia_id + nota` |
@@ -266,12 +279,33 @@ Uma transcrição de 2 horas tem cerca de 20 mil palavras e ocupa perto de 1,5 M
 | **Landing** | Baseada no moodboard 1: hero com o celular, fluxo "Grave → IA seleciona → Edita → Compartilha", os módulos e o botão "Comece agora" |
 | **Login e cadastro** | Cadastro cria a organização (igreja) e o primeiro usuário como dono |
 | **Início** | Projetos recentes, uploads em andamento e o botão "Criar agora" |
+| **Acervo** | A biblioteca dos cultos da igreja, no estilo de um streaming (detalhado abaixo) |
+| **Página do culto** | Banner, ficha e as abas do culto: visão geral, cortes, versículos, estudo, transcrição e gravação |
 | **Novo projeto** | Escolha entre HolyStories, HolyReels, HolySermon e HolyMoments, depois o upload |
 | **Sugestões** | Grade de cortes sugeridos pela IA, com prévia, nota e motivo. Um clique abre no editor |
 | **Editor** | Detalhado abaixo |
 | **Exportações** | Galeria dos vídeos prontos, download, texto do post e compartilhamento pelo celular |
 | **Sua Identidade** | Logo, cores, fontes, @ da igreja e templates padrão |
 | **Configurações** | Membros da equipe, papéis e preferências |
+
+### Acervo (estilo streaming)
+
+Cada igreja tem o seu acervo, e cada pessoa vê só os cultos da própria igreja (tudo filtrado por `organizacao_id`, como o resto do sistema). Um culto é uma gravação com a sua ficha.
+
+- **Ficha do culto:** título (por exemplo, "Inconformados no altar"), data do culto, pregador, série (opcional) e uma descrição curta. O título nasce do nome do arquivo e a data, do dia do envio; a pessoa corrige. Com a IA, o título e a descrição passam a vir sugeridos pela pregação.
+- **Capas:** um pôster vertical 2:3, para as fileiras, e um banner 16:9, para o destaque e a página do culto. Os dois são gerados de um quadro da gravação com o título escrito na arte da igreja (fonte, cor de destaque e logo), pelo mesmo `arte.py` dos textos. A pessoa pode trocar o quadro ou enviar a própria imagem.
+- **Tela do acervo:**
+  - um banner de destaque com o culto mais recente (capa grande, título, pregador, data e os botões "Assistir" e "Ver cortes");
+  - fileiras horizontais, como no streaming: "Últimos cultos", uma fileira por série, "Por pregador", "Com cortes prontos" e "Continuar editando";
+  - busca no topo: por título e pregador de início, e por versículo, tema ou pergunta quando a IA estiver pronta.
+- **Página do culto:** o banner com a capa ao fundo, a ficha e as abas:
+  - **Visão geral:** a ficha e, com a IA, o resumo, os temas e os personagens bíblicos;
+  - **Cortes:** os Reels e Stories do culto, prontos e em edição, com a aprovação do pastor;
+  - **Versículos:** os citados na pregação, cada um levando ao trecho do vídeo em que aparece (IA);
+  - **Estudo:** o guia para células, com PDF (IA);
+  - **Transcrição:** o texto sincronizado com o vídeo, com download em SRT e TXT (IA);
+  - **Gravação:** o player, a forma de onda, os silêncios e, com a IA, os blocos do culto.
+- **Sem a IA**, as abas que dependem dela aparecem explicando que o conteúdo chega com a transcrição. A estrutura já nasce pronta para recebê-lo.
 
 ### Editor
 
@@ -548,11 +582,11 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 
 - [x] Upload retomável com barra de progresso, pausa e retomada depois de queda de internet
 - [x] Ingestão: proxy, waveform e miniaturas (cerca de 21 s para 90 s de vídeo 1080p na CPU da máquina de desenvolvimento)
-- [ ] Transcrição com WhisperX em português
+- [ ] Transcrição com WhisperX em português, com o vocabulário da igreja (nome do pastor, da igreja e dos ministérios, livros bíblicos) por `hotwords` e `initial_prompt`
 - [ ] Limpeza de áudio opcional
 - [ ] Corte automático de silêncios e vícios de fala, com ajuste de intensidade. **Silêncios prontos** (leve, médio e forte, com prévia pulando os cortes); os vícios de fala dependem da transcrição
 - [ ] Editor com prévia, edição pelo texto e linha do tempo simples. **Prévia enquadrada e linha do tempo com o trecho prontas**; a edição pelo texto depende da transcrição
-- [ ] Legendas animadas com 4 presets
+- [ ] Legendas animadas com 4 presets, com a palavra-chave destacada na cor da igreja
 - [x] Reenquadramento 9:16 com recorte central e ponto ajustável (também 4:5, 1:1 e 16:9, com zoom)
 - [x] HolyStories: 3 templates de story com frase de destaque e logo (Culto de hoje, Frase da pregação e Versículo; exporta vídeo ou imagem)
 - [x] Exportação 1080x1920 com download e compartilhamento pelo celular (27 s escolhidos viraram 22 s de Reel em 17 s de render na CPU de desenvolvimento)
@@ -563,7 +597,11 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 
 ### Fase 2 — IA de conteúdo (4 a 6 semanas)
 
-- [ ] **HolySermon:** o LLM sugere de 5 a 10 cortes por pregação, e cada um abre no editor com um clique
+- [ ] **HolySermon:** o LLM sugere de 5 a 10 cortes por pregação, e cada um abre no editor com um clique. Cada sugestão traz título, motivo, nota e as partes (pode juntar trechos de lugares diferentes da pregação, na linha do tempo que já existe). Segue a estratégia da igreja, escrita uma vez em linguagem natural ("priorize o apelo e a oração")
+- [ ] Separar o culto em blocos (louvor, avisos, oração, oferta e pregação), para cortar só a pregação: detecção de música e fala e o LLM para nomear os blocos
+- [ ] **HolyStudy:** resumo, temas, palavras-chave, personagens bíblicos e versículos citados de cada pregação, e um guia de estudo para células (perguntas, versículos-chave, aplicação e oração), com PDF
+- [ ] Busca no acervo por versículo, tema ou pergunta, com embeddings locais
+- [ ] Tradução da transcrição e das legendas para espanhol e inglês (só texto, sem dublagem)
 - [ ] Títulos, legendas de post e hashtags gerados por rede
 - [ ] Reenquadramento seguindo o rosto e zoom dinâmico nas ênfases
 - [ ] **HolyMoments:** energia do áudio, cenas e nota visual opcional
@@ -579,9 +617,20 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] B-roll pelo Pexels, com busca feita pelo LLM a partir da frase
 - [x] Fluxo de aprovação: o editor manda e o pastor ou líder aprova pelo celular (por um link de 7 dias, sem conta: aprova ou pede ajuste com comentário, e o editor vê a resposta sozinho)
 - [x] Agente de pasta monitorada: um script no PC da mídia envia sozinho a gravação do OBS quando o culto termina (`apps/agente`, baixado pelo site em .zip; usa uma chave de envio que só serve para enviar e pode ser revogada)
-- [ ] Publicação direta no YouTube, que é a API mais simples, e depois Instagram e TikTok
+- [ ] Publicação direta no YouTube, no horário escolhido para cada corte e com aprovação antes se a igreja quiser, e depois Instagram e TikTok
+- [ ] **Acervo da igreja** no estilo de streaming: ficha do culto, capas geradas, fileiras e a página do culto com abas (seção 8)
+- [ ] Importar pelo link do YouTube ou do Google Drive (só vídeos da própria igreja)
+- [ ] Monitorar o canal do YouTube pelo feed RSS público e começar sozinho quando a live do culto termina
+- [ ] Marcar a pregação e exportar o vídeo 16:9 só da mensagem, sem louvor nem avisos (automático quando a separação em blocos existir)
+- [ ] Exportar para DaVinci e Premiere: XML com as partes, SRT e folga nas pontas
+- [ ] Escolher a capa do vídeo exportado e um QR code para baixar no celular
+- [ ] Abertura, encerramento e chamada no modelo, e a fonte própria da igreja
+- [ ] Tela dividida com o pregador e o telão
 
 ### Fase 4 — SaaS (quando houver demanda)
+
+- [ ] Transcrição ao vivo durante o culto, para quem não ouve bem (Whisper em streaming na GPU, com os versículos aparecendo na hora)
+- [ ] Página pública do acervo para os membros, com a identidade da igreja (opcional; o foco continua sendo a equipe de mídia)
 
 - [ ] Planos, cotas de minutos processados e cobrança com Pix (Asaas ou Mercado Pago)
 - [ ] Seguir o caminho de crescimento da seção 11: R2, VPS, Atlas e mais workers de GPU

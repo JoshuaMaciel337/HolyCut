@@ -24,6 +24,8 @@ O que os concorrentes (Cut.Pro, OpusClip, FeedChurch, Doxus e Bíblia IA) fazem,
 - **Stack aprovado:** FastAPI, Next.js 16 com Tailwind 4, MongoDB, FFmpeg e Docker Compose. É o padrão da equipe: Python, MongoDB via pymongo, `logging` em vez de `print`, fuso `America/Sao_Paulo` e scripts com `argparse --agora --automatico`. **Proibido** usar Redis, bancos SQL e ORM. A fila de jobs roda no próprio Mongo.
 - **Git:** identidade local `Joshua Maciel <JoshuaMaciel337@users.noreply.github.com>`. Mensagens no formato "Área: descrição curta.", com acento, um corpo curto dizendo o porquê e o trailer `Co-Authored-By` do Claude. Commits pequenos, um por área, direto na `main`.
 - **Licenças:** só bibliotecas e modelos com licença permissiva. Evite AGPL, como o YOLO da Ultralytics: para rosto, use o MediaPipe. Música e texto bíblico só com licença, porque ARA e NVI têm direitos autorais.
+- **Fiel ao que foi pregado:** a IA só organiza o que o pastor disse. Ela não gera sermão nem "melhora" a mensagem; títulos, ganchos, resumos, guias e legendas de post saem da fala real, e o título de um corte tem de ser uma frase ou ideia que ele disse de fato. Quando não tem confiança, a IA omite em vez de inventar. Todo texto automático aparece marcado como gerado por IA, para revisar. A transcrição não corrige o português do pregador.
+- **A igreja é dona de tudo:** exportação em formato aberto (MP4, SRT, TXT, PDF). E o HolyCut processa só o conteúdo da própria igreja.
 - **Prévia igual ao render:** toda diferença entre a prévia no navegador e o vídeo exportado é medida em números, não só no olho.
 
 ## Estado atual (atualizado em 30/09/2026)
@@ -31,7 +33,7 @@ O que os concorrentes (Cut.Pro, OpusClip, FeedChurch, Doxus e Bíblia IA) fazem,
 - **Fase 0 (fundação):** pronta.
 - **Fase 1 sem IA:** pronta. Inclui upload retomável (tus), ingestão (proxy 720p, forma de onda, níveis, miniaturas), corte de silêncios, editor de Reel com enquadramento e zoom, render em -14 LUFS, download e compartilhamento.
 - **Fase 2 sem IA:** pronta. Inclui Sua Identidade (logo, cor, @), textos sobre o vídeo, HolyStories com modelos, filtros de cor e biblioteca de músicas com licença e volume que abaixa sob a fala.
-- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio e aprovação pelo celular. O que falta sem IA espera o dono: publicar no YouTube (credenciais OAuth do Google) e B-roll do Pexels (chave da API).
+- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio e aprovação pelo celular. Em construção: o **Acervo** no estilo de streaming (seção 8 do PLANO). Depois, sem IA: importar pelo link do YouTube, monitorar o canal pelo RSS, marcar a pregação e exportar em 16:9, exportar para DaVinci. Esperam o dono: publicar no YouTube (credenciais OAuth do Google) e B-roll do Pexels (chave da API).
 - **Nenhuma IA real foi implementada ainda.** `MODO_IA=simulado`, e o job `teste` só simula as etapas. O job `diagnostico_gpu` confere a GPU no Nitro.
 
 ### O que espera o Nitro 5 (ordem sugerida)
