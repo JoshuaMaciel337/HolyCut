@@ -20,6 +20,7 @@ TAREFAS = {
     "teste": RECURSO_CPU,
     "diagnostico_gpu": RECURSO_GPU,
     "ingestao": RECURSO_CPU,
+    "renderizacao": RECURSO_CPU,
 }
 
 

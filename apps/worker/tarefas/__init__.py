@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from worker.tarefas.diagnostico_gpu import executar_diagnostico_gpu
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
+from worker.tarefas.renderizacao import executar_renderizacao, marcar_exportacao_com_erro
 from worker.tarefas.teste import executar_teste
 
 
@@ -19,4 +20,5 @@ REGISTRO = {
     "teste": Tarefa(executar_teste),
     "diagnostico_gpu": Tarefa(executar_diagnostico_gpu),
     "ingestao": Tarefa(executar_ingestao, ao_falhar=marcar_midia_com_erro),
+    "renderizacao": Tarefa(executar_renderizacao, ao_falhar=marcar_exportacao_com_erro),
 }

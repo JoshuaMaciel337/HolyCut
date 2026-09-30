@@ -1,0 +1,117 @@
+# Renderização de ponta a ponta: ingestão, projeto, exportação e o vídeo final.
+# FFmpeg de verdade e MongoDB de verdade. Pulado quando o FFmpeg não está instalado.
+import json
+import re
+import shutil
+import subprocess
+
+import pytest
+from bson import ObjectId
+
+from core.modelos.job import montar_job
+from core.modelos.midia import chave_arquivo, montar_midia
+from core.modelos.projeto import chave_exportacao, montar_exportacao, montar_projeto
+from core.utils import storage
+from core.utils.fila import enfileirar_job, pegar_proximo_job
+from worker.worker_principal import processar_job
+
+pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="FFmpeg não instalado")
+
+# 3 s de som e 1 s de silêncio, repetindo: silêncios em 3-4, 7-8, 11-12...
+AUDIO_COM_PAUSAS = "aevalsrc=0.5*sin(2*PI*220*t)*lt(mod(t\\,4)\\,3):s=48000:d={d}"
+
+
+def gerar_gravacao(caminho, largura, altura, duracao):
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "lavfi", "-i", f"testsrc2=size={largura}x{altura}:rate=30:duration={duracao}",
+         "-f", "lavfi", "-i", AUDIO_COM_PAUSAS.format(d=duracao),
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(caminho)],
+        check=True, timeout=120)
+
+
+def rodar(db, tipo):
+    job = pegar_proximo_job(db, [tipo], "w-teste")
+    assert job is not None, f"nenhum job {tipo} na fila"
+    resultado = processar_job(db, job, "w-teste")
+    assert resultado == "concluido", db.jobs.find_one({"_id": job["_id"]}).get("erro")
+
+
+def midia_pronta(db, largura=1920, altura=1080, duracao=20):
+    midia = montar_midia(ObjectId(), ObjectId(), "Culto.mp4", 1)
+    midia["_id"] = db.midias.insert_one(midia).inserted_id
+    original = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], midia["original"]))
+    original.parent.mkdir(parents=True, exist_ok=True)
+    gerar_gravacao(original, largura, altura, duracao)
+    db.midias.update_one({"_id": midia["_id"]}, {"$set": {"status": "processando"}})
+    enfileirar_job(db, montar_job("ingestao", midia["organizacao_id"], {"midia_id": str(midia["_id"])}))
+    rodar(db, "ingestao")
+    return db.midias.find_one({"_id": midia["_id"]})
+
+
+def exportar(db, midia, **alteracoes):
+    projeto = {**montar_projeto(midia["organizacao_id"], midia, None), **alteracoes}
+    projeto["_id"] = db.projetos.insert_one(projeto).inserted_id
+    exportacao = montar_exportacao(projeto, None)
+    exportacao["_id"] = db.exportacoes.insert_one(exportacao).inserted_id
+    enfileirar_job(db, montar_job("renderizacao", midia["organizacao_id"], {"exportacao_id": str(exportacao["_id"])}))
+    rodar(db, "renderizacao")
+    exportacao = db.exportacoes.find_one({"_id": exportacao["_id"]})
+    video = storage.caminho_local(chave_exportacao(exportacao["organizacao_id"], exportacao["_id"], "video.mp4"))
+    return exportacao, video
+
+
+def sondar(caminho):
+    saida = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height,duration",
+                            "-of", "json", str(caminho)], capture_output=True, text=True, check=True).stdout
+    streams = {s["codec_type"]: s for s in json.loads(saida)["streams"]}
+    return streams["video"], streams.get("audio")
+
+
+def volume_integrado(caminho) -> float:
+    comando = ["ffmpeg", "-hide_banner", "-nostats", "-i", str(caminho), "-af", "ebur128", "-f", "null", "-"]
+    saida = subprocess.run(comando, capture_output=True, text=True, timeout=120).stderr
+    return float(re.findall(r"I:\s+(-?[\d.]+) LUFS", saida)[-1])
+
+
+def test_reel_9_16_com_corte_de_silencios(db_limpo):
+    midia = midia_pronta(db_limpo)
+    exportacao, video = exportar(db_limpo, midia, trecho={"inicio": 2.0, "fim": 18.0})
+
+    # 16 s escolhidos menos 4 silêncios de cerca de 0,75 s (perto de 3-4, 7-8, 11-12 e 15-16).
+    # O AAC da gravação suaviza as bordas de cada silêncio em alguns milissegundos.
+    assert exportacao["status"] == "pronta"
+    assert exportacao["trechos"] == 5
+    assert 12.8 < exportacao["duracao"] < 13.2
+    fluxo_video, fluxo_audio = sondar(video)
+    assert (fluxo_video["width"], fluxo_video["height"]) == (1080, 1920)
+    assert abs(float(fluxo_video["duration"]) - exportacao["duracao"]) < 0.05   # o arquivo tem o que foi planejado
+    # Áudio e vídeo terminam juntos: não houve deriva de sincronia nos cortes
+    assert abs(float(fluxo_audio["duration"]) - float(fluxo_video["duration"])) < 0.07
+    assert -15.5 < volume_integrado(video) < -12.5          # normalizado para -14 LUFS
+    assert set(exportacao["arquivos"]) == {"video.mp4", "capa.jpg"}
+
+
+def test_reel_sem_corte_de_video_gravado_em_pe(db_limpo):
+    midia = midia_pronta(db_limpo, largura=1080, altura=1920, duracao=6)
+    exportacao, video = exportar(db_limpo, midia, silencios={"intensidade": None},
+                                 enquadramento={"x": 0.5, "y": 0.5, "zoom": 1.5})
+    assert abs(exportacao["duracao"] - 6.0) < 0.1
+    fluxo_video, fluxo_audio = sondar(video)
+    assert (fluxo_video["width"], fluxo_video["height"]) == (1080, 1920)
+    assert abs(float(fluxo_audio["duration"]) - float(fluxo_video["duration"])) < 0.07
+
+
+def test_trecho_todo_em_silencio_falha_sem_novas_tentativas(db_limpo):
+    midia = midia_pronta(db_limpo, duracao=8)
+    projeto = {**montar_projeto(midia["organizacao_id"], midia, None), "trecho": {"inicio": 3.2, "fim": 3.8}}
+    projeto["_id"] = db_limpo.projetos.insert_one(projeto).inserted_id
+    exportacao = montar_exportacao(projeto, None)
+    exportacao["_id"] = db_limpo.exportacoes.insert_one(exportacao).inserted_id
+    enfileirar_job(db_limpo, montar_job("renderizacao", midia["organizacao_id"],
+                                        {"exportacao_id": str(exportacao["_id"])}))
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "erro"
+    salvo = db_limpo.exportacoes.find_one({"_id": exportacao["_id"]})
+    assert salvo["status"] == "erro"
+    assert "ficou vazio" in salvo["erro"]

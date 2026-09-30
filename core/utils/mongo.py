@@ -26,9 +26,19 @@ INDICES = {
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
         ([("status", 1), ("lease_ate", 1)], {}),
         ([("entrada.midia_id", 1)], {}),
+        ([("entrada.exportacao_id", 1)], {}),
     ],
     "midias": [
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
+    ],
+    "projetos": [
+        ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
+        ([("midia_id", 1)], {}),
+    ],
+    "exportacoes": [
+        ([("projeto_id", 1), ("criado_em", -1)], {}),
+        ([("organizacao_id", 1), ("criado_em", -1)], {}),
+        ([("midia_id", 1)], {}),
     ],
     # Registro de workers online. O MongoDB apaga sozinho quem sumiu há mais de 1 hora.
     "workers": [

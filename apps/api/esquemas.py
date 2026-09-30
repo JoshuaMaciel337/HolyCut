@@ -105,6 +105,94 @@ class SilenciosSaida(BaseModel):
     duracao_final: float
 
 
+Proporcao = Literal["9:16", "4:5", "1:1", "16:9"]
+IntensidadeCorte = Literal["leve", "media", "forte"]
+
+
+class TrechoEntrada(BaseModel):
+    inicio: float = Field(ge=0)
+    fim: float = Field(gt=0)
+
+
+class SilenciosProjetoEntrada(BaseModel):
+    intensidade: IntensidadeCorte | None = None
+
+
+class EnquadramentoEntrada(BaseModel):
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    zoom: float = Field(ge=1, le=3)
+
+
+class AudioProjetoEntrada(BaseModel):
+    normalizar: bool = True
+
+
+class ProjetoCriarEntrada(BaseModel):
+    midia_id: str
+    nome: str | None = Field(default=None, max_length=120)
+    proporcao: Proporcao = "9:16"
+
+
+class ProjetoAtualizarEntrada(BaseModel):
+    versao: int = Field(description="Versão que a tela editou. Se o projeto mudou depois, a API responde 409.")
+    nome: str | None = Field(default=None, min_length=1, max_length=120)
+    proporcao: Proporcao | None = None
+    trecho: TrechoEntrada | None = None
+    silencios: SilenciosProjetoEntrada | None = None
+    enquadramento: EnquadramentoEntrada | None = None
+    audio: AudioProjetoEntrada | None = None
+
+
+class ProjetoSaida(BaseModel):
+    id: str
+    midia_id: str
+    nome: str
+    tipo: str
+    proporcao: str
+    trecho: TrechoEntrada
+    silencios: SilenciosProjetoEntrada
+    enquadramento: EnquadramentoEntrada
+    audio: AudioProjetoEntrada
+    versao: int
+    criado_em: datetime
+    atualizado_em: datetime
+
+
+class ExportacaoSaida(BaseModel):
+    id: str
+    projeto_id: str
+    midia_id: str
+    nome: str
+    status: str
+    processamento: ProcessamentoSaida | None = None
+    duracao: float | None = None
+    tamanho: int | None = None
+    largura: int
+    altura: int
+    arquivos: list[str] = []
+    erro: str | None = None
+    criado_em: datetime
+    concluido_em: datetime | None = None
+
+
+def projeto_para_saida(doc: dict) -> ProjetoSaida:
+    return ProjetoSaida.model_validate({**doc, "id": str(doc["_id"]), "midia_id": str(doc["midia_id"])})
+
+
+def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida:
+    processamento, status, erro = None, doc["status"], doc.get("erro")
+    if job is not None and status == "processando":
+        processamento = ProcessamentoSaida(status=job["status"], progresso=job.get("progresso", 0),
+                                           mensagem=job.get("mensagem", ""))
+        if job["status"] == STATUS_JOB_ERRO:
+            status, erro = "erro", erro or job.get("erro")
+    return ExportacaoSaida.model_validate({
+        **doc, "id": str(doc["_id"]), "projeto_id": str(doc["projeto_id"]), "midia_id": str(doc["midia_id"]),
+        "status": status, "erro": erro, "processamento": processamento,
+    })
+
+
 class MidiaAtualizarEntrada(BaseModel):
     nome: str = Field(min_length=1, max_length=120)
 

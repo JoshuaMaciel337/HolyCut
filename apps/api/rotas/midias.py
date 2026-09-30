@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import MidiaAtualizarEntrada, MidiaSaida, SilenciosSaida, midia_para_saida
+from api.rotas.exportacoes import apagar_exportacoes
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE
 from core.modelos.midia import (
@@ -111,6 +112,8 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
         {"$set": {"status": STATUS_JOB_ERRO, "erro": "A mídia foi excluída.", "mensagem": "Cancelado",
                   "lease_ate": None, "concluido_em": momento, "atualizado_em": momento}},
     )
+    await apagar_exportacoes(db, {"midia_id": midia["_id"]})
+    await db.projetos.delete_many({"midia_id": midia["_id"]})
     await db.midias.delete_one({"_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
