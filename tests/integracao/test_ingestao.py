@@ -1,7 +1,6 @@
 # Ingestão de ponta a ponta: FFmpeg de verdade e MongoDB de verdade.
 # Pulado quando o FFmpeg não está instalado. No Docker e no CI ele roda.
 import json
-import os
 import shutil
 import subprocess
 
@@ -104,7 +103,8 @@ def test_ingestao_de_audio(db_limpo):
 
 
 def test_arquivo_invalido_falha_na_hora_sem_novas_tentativas(db_limpo):
-    midia_id = preparar_midia(db_limpo, "Corrompido.mp4", lambda c: c.write_bytes(os.urandom(4096)))
+    # Conteúdo fixo: com bytes aleatórios, às vezes o ffprobe achava um formato e o erro mudava
+    midia_id = preparar_midia(db_limpo, "Corrompido.mp4", lambda c: c.write_bytes(b"isto nao e um video\n" * 200))
 
     resultado, midia, job = processar(db_limpo, midia_id)
     assert resultado == "erro"
