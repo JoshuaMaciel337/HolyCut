@@ -45,6 +45,7 @@ MODELOS_PADRAO = [
         "nome": "Versículo",
         "descricao": "O versículo no centro, com a referência na cor da igreja e o vídeo desfocado atrás.",
         "fundo": {"escurecer": 0.45, "desfoque": 14},
+        "cor": {"filtro": "cinema", "intensidade": 0.6},
         "marca": {"logo": True, "posicao": "topo_direita", "tamanho": 0.14, "opacidade": 0.9},
         "textos": [
             {"id": "versiculo", "tipo": "versiculo", "texto": "Tudo posso naquele que me fortalece",
@@ -75,7 +76,8 @@ def aplicar_modelo(modelo: dict, identidade: dict) -> dict:
         texto["texto"] = preencher(texto.get("texto", ""), identidade)
         if texto["texto"].strip():
             textos.append(texto)
-    return {"fundo": copy.deepcopy(modelo.get("fundo") or {}), "marca": marca, "textos": textos}
+    return {"fundo": copy.deepcopy(modelo.get("fundo") or {}), "cor": copy.deepcopy(modelo.get("cor") or {}),
+            "marca": marca, "textos": textos}
 
 
 def montar_modelo_da_igreja(organizacao_id, projeto: dict, nome: str, criado_por,
@@ -89,6 +91,7 @@ def montar_modelo_da_igreja(organizacao_id, projeto: dict, nome: str, criado_por
         "tipo": projeto.get("tipo", "reel"),
         "proporcao": projeto.get("proporcao", "9:16"),
         "fundo": copy.deepcopy(projeto.get("fundo") or {}),
+        "cor": copy.deepcopy(projeto.get("cor") or {}),
         "marca": copy.deepcopy(projeto.get("marca") or {}),
         "textos": copy.deepcopy(projeto.get("textos") or []),
         "criado_por": criado_por,

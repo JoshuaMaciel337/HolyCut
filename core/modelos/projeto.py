@@ -29,12 +29,13 @@ ARQUIVO_IMAGEM_EXPORTADA = "imagem.jpg"
 ARQUIVOS_EXPORTACAO = {ARQUIVO_VIDEO_EXPORTADO, ARQUIVO_CAPA_EXPORTADA, ARQUIVO_IMAGEM_EXPORTADA}
 FORMATOS_EXPORTACAO = ("video", "imagem")
 FUNDO_PADRAO = {"escurecer": 0.0, "desfoque": 0}
+COR_PADRAO = {"filtro": "natural", "intensidade": 1.0}
 ESCURECER_MAXIMO = 0.8
 DESFOQUE_MAXIMO = 30
 
 # Campos do projeto que definem o vídeo. A exportação guarda uma cópia deles,
 # então editar o projeto depois não muda um vídeo já exportado.
-CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos", "fundo")
+CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos", "fundo", "cor")
 
 
 def _id_do_modelo(modelo: dict | None) -> str | None:
@@ -79,6 +80,7 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         "marca": visual.get("marca") or marca_padrao(identidade),
         "textos": visual.get("textos", []),
         "fundo": {**FUNDO_PADRAO, **visual.get("fundo", {})},
+        "cor": {**COR_PADRAO, **visual.get("cor", {})},
         "versao": 1,
         "criado_em": momento,
         "atualizado_em": momento,

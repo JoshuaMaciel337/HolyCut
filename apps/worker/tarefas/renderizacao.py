@@ -116,7 +116,7 @@ def exportar_imagem(db, exportacao: dict, config: dict, original, trechos, durac
         nome = f"camada_{indice}.png"
         storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, nome), para_png(imagem))
         entradas += ["-i", str(caminho(nome))]
-    filtro = montar_filtro_imagem(recorte, largura, altura, len(visiveis), config.get("fundo"))
+    filtro = montar_filtro_imagem(recorte, largura, altura, len(visiveis), config.get("fundo"), config.get("cor"))
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
 
     reportar(40, "Gerando a imagem")
@@ -203,7 +203,7 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     filtro = montar_filtro(trechos, recorte, largura, altura, tem_audio=bool(midia.get("audio")),
                            normalizar=(config.get("audio") or {}).get("normalizar", True),
                            camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas],
-                           fundo=config.get("fundo"))
+                           fundo=config.get("fundo"), cor=config.get("cor"))
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
     saida = caminho(ARQUIVO_VIDEO_EXPORTADO)
     argumentos = [

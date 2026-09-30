@@ -96,3 +96,22 @@ def test_exportar_imagem(cliente, db_limpo):
     video = cliente.post(f"/api/projetos/{projeto['id']}/exportar").json()   # sem corpo: vídeo, como antes
     assert video["formato"] == "video"
     assert cliente.post(f"/api/projetos/{projeto['id']}/exportar", json={"formato": "gif"}).status_code == 422
+
+
+def test_filtros_de_cor_e_cor_do_projeto(cliente, db_limpo):
+    filtros = cliente.get("/api/filtros").json()
+    assert [f["id"] for f in filtros] == ["natural", "quente", "frio", "cinema", "pb", "vivo"]
+    pb = next(f for f in filtros if f["id"] == "pb")
+    assert pb["operacoes"][0]["tipo"] == "matriz" and len(pb["operacoes"][0]["valores"]) == 3
+    assert pb["operacoes"][1] == {"tipo": "contraste", "valor": 1.12}
+
+    projeto = cliente.post("/api/projetos", json={"midia_id": criar_midia(db_limpo, cliente)}).json()
+    assert projeto["cor"] == {"filtro": "natural", "intensidade": 1.0}
+    salvo = cliente.patch(f"/api/projetos/{projeto['id']}",
+                          json={"versao": 1, "cor": {"filtro": "cinema", "intensidade": 0.4}})
+    assert salvo.json()["cor"] == {"filtro": "cinema", "intensidade": 0.4}
+    assert cliente.patch(f"/api/projetos/{projeto['id']}",
+                         json={"versao": 2, "cor": {"filtro": "sepia", "intensidade": 1}}).status_code == 422
+    story = cliente.post("/api/projetos", json={"midia_id": projeto["midia_id"], "tipo": "story",
+                                                "modelo_id": "versiculo"}).json()
+    assert story["cor"] == {"filtro": "cinema", "intensidade": 0.6}   # a cor vem do modelo

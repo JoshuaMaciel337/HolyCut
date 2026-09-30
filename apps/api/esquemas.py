@@ -150,6 +150,17 @@ class FundoEntrada(BaseModel):
     desfoque: float = Field(default=0, ge=0, le=30)
 
 
+class CorEntrada(BaseModel):
+    filtro: Literal["natural", "quente", "frio", "cinema", "pb", "vivo"] = "natural"
+    intensidade: float = Field(default=1.0, ge=0, le=1)
+
+
+class FiltroSaida(BaseModel):
+    id: str
+    nome: str
+    operacoes: list[dict] = Field(description="Na intensidade máxima: matriz 3x3 ou contraste")
+
+
 class CamadaEntrada(BaseModel):
     """Uma camada para a prévia: o logo da igreja ou um texto, do tamanho da moldura."""
     largura: int = Field(ge=90, le=1920)
@@ -198,6 +209,7 @@ class ProjetoAtualizarEntrada(BaseModel):
     marca: MarcaEntrada | None = None
     textos: list[TextoEntrada] | None = Field(default=None, max_length=6)
     fundo: FundoEntrada | None = None
+    cor: CorEntrada | None = None
 
 
 class ProjetoSaida(BaseModel):
@@ -213,6 +225,7 @@ class ProjetoSaida(BaseModel):
     marca: MarcaEntrada = MarcaEntrada()
     textos: list[TextoEntrada] = []
     fundo: FundoEntrada = FundoEntrada()
+    cor: CorEntrada = CorEntrada()
     modelo_id: str | None = None
     versao: int
     criado_em: datetime
@@ -230,6 +243,7 @@ class ModeloSaida(BaseModel):
     descricao: str = ""
     pronto: bool = Field(description="Modelo que vem com o HolyCut (não pode ser apagado)")
     fundo: FundoEntrada = FundoEntrada()
+    cor: CorEntrada = CorEntrada()
     marca: MarcaEntrada = MarcaEntrada()
     textos: list[TextoEntrada] = []
 

@@ -7,8 +7,9 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import SistemaSaida, worker_para_saida
+from api.esquemas import FiltroSaida, SistemaSaida, worker_para_saida
 from core.config import MODO_IA, VERSAO
+from core.utils.cores import FILTROS
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api", tags=["sistema"])
@@ -38,3 +39,15 @@ async def sistema(_usuario=Depends(usuario_atual), db=Depends(obter_db)):
     limite = agora() - timedelta(seconds=WORKER_ONLINE_SEGUNDOS)
     workers = [worker_para_saida(w) async for w in db.workers.find({"visto_em": {"$gte": limite}})]
     return SistemaSaida(mongo=True, modo_ia=MODO_IA, workers=workers)
+
+
+@router.get("/filtros", response_model=list[FiltroSaida])
+async def filtros_de_cor(_usuario=Depends(usuario_atual)):
+    """As operações de cada filtro, para a prévia montar o mesmo filtro SVG que o render aplica."""
+    return [
+        FiltroSaida(id=identificador, nome=nome, operacoes=[
+            {"tipo": tipo, "valores": valor} if tipo == "matriz" else {"tipo": tipo, "valor": valor}
+            for tipo, valor in operacoes
+        ])
+        for identificador, nome, operacoes in FILTROS
+    ]

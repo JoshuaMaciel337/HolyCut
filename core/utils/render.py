@@ -17,6 +17,7 @@ import subprocess
 from functools import lru_cache
 
 from core.config import FFMPEG
+from core.utils.cores import filtro_ffmpeg
 
 FPS = 30
 TAXA_AUDIO = 48000
@@ -70,17 +71,23 @@ def expressao_selecao(trechos: list[tuple[float, float]]) -> str:
     return "+".join(f"gte(t,{a - meio:.4f})*lt(t,{b - meio:.4f})" for a, b in trechos)
 
 
-def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None) -> str:
-    """Recorta, redimensiona e aplica o fundo (desfoque e escurecimento), antes das camadas de arte."""
+def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor: dict | None = None) -> str:
+    """
+    Recorta, redimensiona, aplica o filtro de cor e o fundo (desfoque e escurecimento), antes das
+    camadas de arte. É a mesma ordem da prévia: filtro de cor, blur e preto translúcido por cima.
+    """
     cadeia = (f"crop={recorte['largura']}:{recorte['altura']}:{recorte['x']}:{recorte['y']},"
               f"scale={largura}:{altura}:flags=lanczos,setsar=1")
-    fundo = fundo or {}
+    fundo, cor = fundo or {}, cor or {}
     desfoque, escurecer = float(fundo.get("desfoque") or 0), float(fundo.get("escurecer") or 0)
-    if desfoque <= 0 and escurecer <= 0:
+    filtro_cor = filtro_ffmpeg(cor.get("filtro") or "natural", float(cor.get("intensidade", 1.0)))
+    if desfoque <= 0 and escurecer <= 0 and not filtro_cor:
         return cadeia
-    # Em RGB, como o navegador faz na prévia (blur e preto translúcido por cima). O drawbox escurecia
-    # no espaço YUV e tirava a saturação: o amarelo virava bege (medido comparando com a prévia).
+    # Em RGB, como o navegador faz na prévia. O drawbox escurecia no espaço YUV e tirava a
+    # saturação: o amarelo virava bege (medido comparando com a prévia).
     cadeia += ",format=gbrp"
+    if filtro_cor:
+        cadeia += f",{filtro_cor}"
     if desfoque > 0:
         cadeia += f",gblur=sigma={desfoque:.1f}"
     if escurecer > 0:
@@ -104,7 +111,8 @@ def _sobrepor(camadas: list[tuple[float, float]] | None, duracao: float | None) 
 
 def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: int, altura: int,
                   tem_audio: bool, normalizar: bool = True,
-                  camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None) -> str:
+                  camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None,
+                  cor: dict | None = None) -> str:
     """
     Grafo de filtros completo, com as saídas [v] e [a].
     camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. A camada i é a
@@ -113,7 +121,7 @@ def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: in
     selecao = expressao_selecao(trechos)
     duracao = duracao_dos_trechos(trechos)
     video = (f"[0:v]setpts=PTS-STARTPTS,fps={FPS},select='{selecao}',setpts=N/{FPS}/TB,"
-             f"{_enquadrar(recorte, largura, altura, fundo)}{_sobrepor(camadas, duracao)}")
+             f"{_enquadrar(recorte, largura, altura, fundo, cor)}{_sobrepor(camadas, duracao)}")
     if not tem_audio:
         return video
     audio = (
@@ -128,10 +136,10 @@ def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: in
 
 
 def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_camadas: int = 0,
-                         fundo: dict | None = None) -> str:
-    """Um quadro só (exportação em imagem): enquadra, aplica o fundo e sobrepõe as camadas."""
+                         fundo: dict | None = None, cor: dict | None = None) -> str:
+    """Um quadro só (exportação em imagem): enquadra, aplica cor e fundo e sobrepõe as camadas."""
     camadas = [(0.0, 0.0)] * quantidade_camadas
-    return f"[0:v]{_enquadrar(recorte, largura, altura, fundo)}{_sobrepor(camadas, None)}"
+    return f"[0:v]{_enquadrar(recorte, largura, altura, fundo, cor)}{_sobrepor(camadas, None)}"
 
 
 def instante_na_gravacao(trechos: list[tuple[float, float]], posicao_final: float) -> float:
