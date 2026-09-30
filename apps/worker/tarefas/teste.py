@@ -18,7 +18,7 @@ ETAPAS = [
 ]
 
 
-def executar_teste(job: dict, reportar: Callable[[int, str], None]) -> dict:
+def executar_teste(_db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     """Avança o progresso em passos. Com entrada.falhar=True, falha no meio de propósito."""
     entrada = job.get("entrada") or {}
     duracao = min(max(float(entrada.get("duracao", DURACAO_PADRAO_SEGUNDOS)), 1), DURACAO_MAXIMA_SEGUNDOS)

@@ -25,6 +25,10 @@ INDICES = {
         ([("status", 1), ("tipo", 1), ("prioridade", -1), ("criado_em", 1)], {"name": "fila_busca"}),
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
         ([("status", 1), ("lease_ate", 1)], {}),
+        ([("entrada.midia_id", 1)], {}),
+    ],
+    "midias": [
+        ([("organizacao_id", 1), ("criado_em", -1)], {}),
     ],
     # Registro de workers online. O MongoDB apaga sozinho quem sumiu há mais de 1 hora.
     "workers": [

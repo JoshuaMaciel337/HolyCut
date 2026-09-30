@@ -19,7 +19,12 @@ RECURSO_GPU = "gpu"
 TAREFAS = {
     "teste": RECURSO_CPU,
     "diagnostico_gpu": RECURSO_GPU,
+    "ingestao": RECURSO_CPU,
 }
+
+
+class ErroDefinitivo(Exception):
+    """Falha que não melhora tentando de novo. O job vai direto para erro, com esta mensagem."""
 
 
 def tipos_por_recursos(recursos: list[str]) -> list[str]:

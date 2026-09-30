@@ -57,3 +57,29 @@ def remover(chave: str, raiz: Path = PASTA_ARMAZENAMENTO) -> bool:
     except Exception as e:
         logging.error(f"Erro ao remover {chave}: {e}")
         return False
+
+
+def tamanho(chave: str, raiz: Path = PASTA_ARMAZENAMENTO) -> int | None:
+    """Tamanho em bytes, ou None se o arquivo não existe."""
+    try:
+        return caminho_local(chave, raiz).stat().st_size
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def remover_pasta(chave_pasta: str, raiz: Path = PASTA_ARMAZENAMENTO) -> bool:
+    """Apaga uma pasta inteira, por exemplo todos os arquivos de uma mídia."""
+    try:
+        shutil.rmtree(caminho_local(chave_pasta, raiz), ignore_errors=False)
+        return True
+    except FileNotFoundError:
+        return True
+    except Exception as e:
+        logging.error(f"Erro ao remover a pasta {chave_pasta}: {e}")
+        return False
+
+
+def espaco_livre(raiz: Path = PASTA_ARMAZENAMENTO) -> int:
+    """Bytes livres no disco onde fica o armazenamento."""
+    raiz.mkdir(parents=True, exist_ok=True)
+    return shutil.disk_usage(raiz).free

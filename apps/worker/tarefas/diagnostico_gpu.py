@@ -46,7 +46,7 @@ def consultar_ollama() -> dict | None:
         return None
 
 
-def executar_diagnostico_gpu(job: dict, reportar: Callable[[int, str], None]) -> dict:
+def executar_diagnostico_gpu(_db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     reportar(10, "Consultando a GPU")
     gpus = consultar_gpus()
     reportar(60, "Consultando o Ollama")

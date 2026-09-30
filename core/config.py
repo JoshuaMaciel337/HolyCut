@@ -23,6 +23,22 @@ DATABASE_NAME = os.environ.get("DATABASE_NAME", "holycut")
 PASTA_ARMAZENAMENTO = Path(os.environ.get("PASTA_ARMAZENAMENTO", PASTA_RAIZ / "armazenamento"))
 
 # -----------------------------------------------
+# UPLOAD (protocolo tus)
+# -----------------------------------------------
+UPLOAD_MAX_BYTES = int(float(os.environ.get("UPLOAD_MAX_GB", "20")) * 1024**3)
+# Um envio que deixaria menos que isso livre no disco é recusado.
+# Disco cheio derruba o Mongo e o Docker no meio do trabalho.
+ESPACO_MINIMO_LIVRE_BYTES = int(float(os.environ.get("ESPACO_MINIMO_LIVRE_GB", "2")) * 1024**3)
+EXTENSOES_VIDEO = {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".ts"}
+EXTENSOES_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
+
+# -----------------------------------------------
+# FFMPEG
+# -----------------------------------------------
+FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
+FFPROBE = os.environ.get("FFPROBE", "ffprobe")
+
+# -----------------------------------------------
 # SESSÃO
 # -----------------------------------------------
 # TODO: .env — o valor padrão só serve para desenvolvimento local

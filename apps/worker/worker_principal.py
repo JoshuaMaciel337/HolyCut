@@ -26,7 +26,7 @@ from core.config import (
     INTERVALO_LIMPEZA_SEGUNDOS,
     MODO_IA,
 )
-from core.modelos.job import tipos_por_recursos
+from core.modelos.job import STATUS_ERRO, ErroDefinitivo, tipos_por_recursos
 from core.utils.fila import (
     atualizar_progresso,
     concluir_job,
@@ -103,27 +103,34 @@ def criar_reportador(db, job_id, worker_id: str):
 def processar_job(db, job: dict, worker_id: str) -> str:
     """Executa um job e grava o resultado. Nunca deixa exceção escapar."""
     rotulo = f"[{worker_id}] [{job['tipo']} {job['_id']}]"
-    funcao = REGISTRO.get(job["tipo"])
-    if funcao is None:
+    tarefa = REGISTRO.get(job["tipo"])
+    if tarefa is None:
         logging.error(f"{rotulo} Tipo sem implementação neste worker.")
-        return falhar_job(db, job, worker_id, "Tipo de job sem implementação no worker.") or "erro"
+        return falhar_job(db, job, worker_id, "Tipo de job sem implementação no worker.", definitivo=True) or "erro"
 
     fim = threading.Event()
     threading.Thread(target=manter_posse, args=(db, job["_id"], worker_id, fim), daemon=True).start()
     inicio = time.monotonic()
     try:
-        saida = funcao(job, criar_reportador(db, job["_id"], worker_id))
+        saida = tarefa.executar(db, job, criar_reportador(db, job["_id"], worker_id))
         if not concluir_job(db, job["_id"], worker_id, saida):
             logging.warning(f"{rotulo} Terminou, mas a posse já tinha sido perdida. Resultado descartado.")
             return "descartado"
         logging.info(f"{rotulo} Concluído em {time.monotonic() - inicio:.1f}s.")
         return "concluido"
     except Exception as e:
-        logging.error(f"{rotulo} Falhou: {e}")
+        definitivo = isinstance(e, ErroDefinitivo)
+        mensagem = str(e) if definitivo else f"{type(e).__name__}: {e}"
+        logging.error(f"{rotulo} Falhou{' (sem nova tentativa)' if definitivo else ''}: {e}")
         logging.debug(traceback.format_exc())
-        status = falhar_job(db, job, worker_id, f"{type(e).__name__}: {e}")
+        status = falhar_job(db, job, worker_id, mensagem, definitivo=definitivo)
         if status:
             logging.info(f"{rotulo} Status após a falha: {status}.")
+        if status == STATUS_ERRO and tarefa.ao_falhar:
+            try:
+                tarefa.ao_falhar(db, job, mensagem)
+            except Exception as erro_aviso:
+                logging.error(f"{rotulo} Erro ao registrar a falha definitiva: {erro_aviso}")
         return status or "erro"
     finally:
         fim.set()

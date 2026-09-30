@@ -127,13 +127,15 @@ def concluir_job(db, job_id, worker_id: str, saida: dict | None = None) -> bool:
         return False
 
 
-def falhar_job(db, job: dict, worker_id: str, erro: str) -> str | None:
+def falhar_job(db, job: dict, worker_id: str, erro: str, definitivo: bool = False) -> str | None:
     """
     Registra a falha. Se ainda há tentativas, devolve o job para a fila com espera crescente.
+    definitivo=True encerra na hora, para erros que não melhoram tentando de novo
+    (por exemplo, um arquivo que não é vídeo).
     Retorna o novo status ou None se não conseguiu gravar.
     """
     momento = agora()
-    esgotou = job.get("tentativas", 1) >= job.get("max_tentativas", 1)
+    esgotou = definitivo or job.get("tentativas", 1) >= job.get("max_tentativas", 1)
     if esgotou:
         campos = {"status": STATUS_ERRO, "mensagem": "Falhou", "concluido_em": momento}
     else:

@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from api.rotas import auth, eventos, jobs, sistema
+from api.rotas import auth, eventos, jobs, midias, sistema, uploads
 from core.config import COOKIE_SEGURO, DATABASE_NAME, JWT_SEGREDO, VERSAO
 from core.utils.mongo import conectar, criar_cliente_async, criar_indices
 
@@ -103,3 +103,5 @@ app.include_router(sistema.router)
 app.include_router(auth.router)
 app.include_router(jobs.router)
 app.include_router(eventos.router)
+app.include_router(uploads.router)
+app.include_router(midias.router)

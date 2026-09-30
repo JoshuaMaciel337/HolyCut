@@ -5,7 +5,7 @@ description = "HolyCut — IA que transforma cultos em Stories, Reels e cortes"
 requires-python = ">=3.11"
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py311"
 extend-exclude = ["apps/web", "brand/referencia"]
 
