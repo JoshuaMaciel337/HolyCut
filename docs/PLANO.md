@@ -128,7 +128,7 @@ O padrão da equipe proíbe tecnologias fora da lista sem aprovação. Um app we
 |---|---|---|---|
 | Framework da API | **FastAPI** | O padrão proíbe frameworks web em *scripts de automação*. Isto é uma API web. FastAPI é Python, tipado e gera documentação sozinha. | Flask, mais simples e menos tipado |
 | Frontend | **Next.js + TypeScript + Tailwind** | Um editor de vídeo no navegador precisa de React. O Next também serve a landing page com bom SEO. | Vite + React, sem landing integrada |
-| Upload grande | **tus** (Uppy no navegador, tusd como serviço) | Upload retomável de arquivos de vários GB. | Upload em partes feito à mão |
+| Upload grande | **tus** (tus-js-client no navegador, servidor tus na própria API; ver `docs/decisoes/0001`) | Upload retomável de arquivos de vários GB. | Upload em partes feito à mão |
 | Containers | **Docker Compose** | A GPU funciona no Windows via WSL2 e o FFmpeg fica igual em todas as máquinas. | Instalar tudo direto no Windows |
 
 ---
@@ -547,8 +547,8 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 
 ### Fase 1 — MVP: AutoCut + legendas (4 a 6 semanas)
 
-- [ ] Upload retomável com barra de progresso
-- [ ] Ingestão: proxy, waveform e miniaturas
+- [x] Upload retomável com barra de progresso, pausa e retomada depois de queda de internet
+- [x] Ingestão: proxy, waveform e miniaturas (cerca de 21 s para 90 s de vídeo 1080p na CPU da máquina de desenvolvimento)
 - [ ] Transcrição com WhisperX em português
 - [ ] Limpeza de áudio opcional
 - [ ] Corte automático de silêncios e vícios de fala, com ajuste de intensidade

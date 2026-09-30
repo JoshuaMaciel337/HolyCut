@@ -28,7 +28,9 @@ cp .env.example .env        # e defina JWT_SEGREDO
 docker compose up --build
 ```
 
-Abra http://localhost:3000. Crie uma conta e use o **Teste do pipeline** no painel.
+Abra http://localhost:3000, crie uma conta e envie a gravação de um culto. O teste da fila e da GPU fica em **Diagnóstico**, no painel Sistema.
+
+Os vídeos enviados ficam em `./armazenamento`. Como gravações de culto são grandes, aponte `PASTA_ARMAZENAMENTO_HOST` no `.env` para o disco com mais espaço. A API recusa um envio que deixaria menos de 2 GB livres.
 
 Se alguma porta já estiver em uso no seu computador, troque `MONGO_PORTA`, `API_PORTA` ou `WEB_PORTA` no `.env`. Por exemplo, use `MONGO_PORTA=27019` quando já houver um MongoDB local na 27017.
 
