@@ -125,12 +125,29 @@ export type Fundo = {
   desfoque: number;
 };
 
+export type FiltroId = "natural" | "quente" | "frio" | "cinema" | "pb" | "vivo";
+
+export type Cor = {
+  filtro: FiltroId;
+  /** 0 a 1. */
+  intensidade: number;
+};
+
+export type OperacaoCor = { tipo: "matriz"; valores: number[][] } | { tipo: "contraste"; valor: number };
+
+export type FiltroCor = {
+  id: FiltroId;
+  nome: string;
+  operacoes: OperacaoCor[];
+};
+
 export type Modelo = {
   id: string;
   nome: string;
   descricao: string;
   pronto: boolean;
   fundo: Fundo;
+  cor: Cor;
   marca: Marca;
   textos: TextoProjeto[];
 };
@@ -149,6 +166,7 @@ export type Projeto = {
   marca: Marca;
   textos: TextoProjeto[];
   fundo: Fundo;
+  cor: Cor;
   versao: number;
   criado_em: string;
   atualizado_em: string;

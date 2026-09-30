@@ -570,7 +570,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] **HolyMoments:** energia do áudio, cenas, picos do chat da live e nota visual opcional
 - [x] **Sua Identidade:** kit da igreja aplicado automaticamente em todo projeto (logo, cor de destaque e @; o logo entra ligado em todo Reel novo)
 - [ ] Biblioteca de músicas com licença registrada e volume que abaixa sob a fala
-- [ ] Filtros e correção de cor com LUTs
+- [x] Filtros e correção de cor (Natural, Quente, Frio, Cinema, P&B e Vivo, com intensidade; matrizes de cor em vez de LUTs, para a prévia sair igual ao render)
 - [ ] Detecção de versículos com overlay. **Overlay pronto**: título, frase e versículo com referência, digitados, em três estilos; a detecção automática depende da transcrição
 - [x] Sistema de templates editáveis (a igreja salva o visual de qualquer projeto como modelo; fundo com escurecer e desfocar)
 

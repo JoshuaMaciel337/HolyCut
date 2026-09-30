@@ -8,18 +8,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
+import { PainelCor } from "@/componentes/PainelCor";
 import { PainelFundo } from "@/componentes/PainelFundo";
 import { PainelMarca } from "@/componentes/PainelMarca";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
 import { PainelTextos } from "@/componentes/PainelTextos";
 import { PreviaEnquadrada } from "@/componentes/PreviaEnquadrada";
 import { chamarApi, ErroApi } from "@/lib/api";
+import { cssDoFiltro, FiltroSvg, useFiltros } from "@/lib/filtros";
 import { formatarTempo } from "@/lib/formatar";
 import { PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
 import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Projeto, Proporcao, Silencios } from "@/lib/tipos";
 
 const ESPERA_SALVAR_MS = 700;
-type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo">;
+type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo" | "cor">;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
 
 /** Cortes de silêncio que caem dentro do trecho, recortados nas bordas dele. */
@@ -45,6 +47,7 @@ export default function PaginaProjeto() {
   const [ultimaExportacao, setUltimaExportacao] = useState<Exportacao | null>(null);
   const [aviso, setAviso] = useState("");
   const player = useRef<HTMLVideoElement>(null);
+  const filtros = useFiltros();
 
   // Salvamento: em fila, um de cada vez, sempre com a versão mais nova que o servidor devolveu
   const versao = useRef(0);
@@ -68,6 +71,7 @@ export default function PaginaProjeto() {
           enquadramento: carregado.enquadramento,
           marca: carregado.marca,
           fundo: carregado.fundo,
+          cor: carregado.cor,
           textos: carregado.textos,
         };
         edicaoAtual.current = inicial;
@@ -282,6 +286,7 @@ export default function PaginaProjeto() {
   const base = `/api/midias/${midia.id}/arquivos`;
   const opcaoCorte: OpcaoCorte = intensidade ?? "desligado";
   const alvo = PROPORCOES[edicao.proporcao];
+  const filtroEscolhido = filtros.find((filtro) => filtro.id === edicao.cor.filtro);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -317,6 +322,7 @@ export default function PaginaProjeto() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr]">
         <section className="flex flex-col items-center gap-4" aria-label="Prévia">
+          <FiltroSvg id="cor-previa" filtro={filtroEscolhido} intensidade={edicao.cor.intensidade} />
           <PreviaEnquadrada
             player={player}
             src={`${base}/proxy.mp4`}
@@ -327,6 +333,7 @@ export default function PaginaProjeto() {
             enquadramento={edicao.enquadramento}
             aoMudar={(enquadramento) => editar({ enquadramento })}
             fundo={edicao.fundo}
+            filtroCor={cssDoFiltro("cor-previa", filtroEscolhido, edicao.cor.intensidade)}
           >
             {identidade?.logo && edicao.marca.logo ? (
               <CamadaSobreposta pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "logo", marca: edicao.marca }} />
@@ -451,6 +458,12 @@ export default function PaginaProjeto() {
             aoMudar={(textos) => editar({ textos })}
             duracaoFinal={duracaoFinal}
             posicaoFinal={posicaoFinal}
+          />
+
+          <PainelCor
+            cor={edicao.cor}
+            aoMudar={(cor) => editar({ cor })}
+            capa={midia.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
           />
 
           <PainelFundo fundo={edicao.fundo} aoMudar={(fundo) => editar({ fundo })} />

@@ -22,6 +22,8 @@ type Props = {
   children?: ReactNode;
   /** Desfoque e escurecimento do vídeo, como o render aplica antes das camadas. */
   fundo?: Fundo;
+  /** Filtro de cor em CSS (url(#...) de um FiltroSvg), aplicado antes do desfoque, como no render. */
+  filtroCor?: string;
 };
 
 function limitar(valor: number, [minimo, maximo]: [number, number]): number {
@@ -29,7 +31,7 @@ function limitar(valor: number, [minimo, maximo]: [number, number]): number {
 }
 
 /** Mostra só o que vai para o vídeo final. Arrastar a imagem muda o enquadramento. */
-export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children, fundo }: Props) {
+export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children, fundo, filtroCor }: Props) {
   const recipiente = useRef<HTMLDivElement>(null);
   const inicio = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   const [disponivel, setDisponivel] = useState(0);
@@ -78,7 +80,9 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
             left: `${(-recorte.x / recorte.largura) * 100}%`,
             top: `${(-recorte.y / recorte.altura) * 100}%`,
             // O desfoque do render é em pixels do vídeo final; aqui, na escala da moldura
-            filter: fundo?.desfoque ? `blur(${(fundo.desfoque * quadroLargura) / alvo.largura}px)` : undefined,
+            filter:
+              [filtroCor, fundo?.desfoque ? `blur(${(fundo.desfoque * quadroLargura) / alvo.largura}px)` : ""].filter(Boolean).join(" ") ||
+              undefined,
           }}
         />
         {fundo?.escurecer ? <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: fundo.escurecer }} /> : null}

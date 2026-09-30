@@ -8,6 +8,7 @@ import { Suspense, useEffect, useState } from "react";
 
 import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
 import { chamarApi, ErroApi } from "@/lib/api";
+import { cssDoFiltro, FiltroSvg, useFiltros } from "@/lib/filtros";
 import { formatarTempo } from "@/lib/formatar";
 import type { Identidade, Midia, Modelo, Projeto, TextoProjeto } from "@/lib/tipos";
 
@@ -41,8 +42,13 @@ function CartaoModelo({
 }) {
   const temCapa = midia.arquivos.includes("capa.jpg");
   const comLogo = modelo.marca.logo && identidade?.logo;
+  const filtros = useFiltros();
+  const filtro = filtros.find((f) => f.id === modelo.cor.filtro);
+  const idFiltro = `modelo-cor-${modelo.id}`;
+  const desfoque = modelo.fundo.desfoque ? `blur(${(modelo.fundo.desfoque * 176) / LARGURA_FINAL}px)` : "";
   return (
     <li className="cartao flex flex-col overflow-hidden">
+      <FiltroSvg id={idFiltro} filtro={filtro} intensidade={modelo.cor.intensidade} />
       <button
         type="button"
         onClick={aoEscolher}
@@ -58,7 +64,7 @@ function CartaoModelo({
             unoptimized
             sizes="176px"
             className="object-cover"
-            style={{ filter: modelo.fundo.desfoque ? `blur(${(modelo.fundo.desfoque * 176) / LARGURA_FINAL}px)` : undefined }}
+            style={{ filter: [cssDoFiltro(idFiltro, filtro, modelo.cor.intensidade), desfoque].filter(Boolean).join(" ") || undefined }}
           />
         ) : null}
         {modelo.fundo.escurecer ? <div className="absolute inset-0 bg-black" style={{ opacity: modelo.fundo.escurecer }} /> : null}
