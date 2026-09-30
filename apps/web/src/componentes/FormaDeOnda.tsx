@@ -19,10 +19,12 @@ type Props = {
   /** Trecho escolhido: o resto fica escurecido. Com aoMudarFaixa, as bordas viram alças arrastáveis. */
   faixa?: [number, number];
   aoMudarFaixa?: (faixa: [number, number]) => void;
+  /** As outras partes do vídeo: aparecem destacadas de leve, por cima do escurecido. */
+  outrasFaixas?: [number, number][];
 };
 
 /** Desenha a forma de onda num canvas. A parte já tocada fica com o gradiente da marca. */
-export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cortes = [], faixa, aoMudarFaixa }: Props) {
+export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cortes = [], faixa, aoMudarFaixa, outrasFaixas = [] }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const arrastando = useRef<"inicio" | "fim" | null>(null);
   const [largura, setLargura] = useState(0);
@@ -88,6 +90,8 @@ export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cort
       contexto.fillStyle = "rgba(8, 9, 15, 0.72)";
       contexto.fillRect(0, 0, inicio, altura);
       contexto.fillRect(fim, 0, largura - fim, altura);
+      contexto.fillStyle = "rgba(123, 97, 255, 0.22)";
+      for (const [a, b] of outrasFaixas) contexto.fillRect(paraX(a), 0, Math.max(paraX(b) - paraX(a), 1), altura);
       contexto.fillStyle = estilos.getPropertyValue("--hc-orange").trim() || "#FF8A00";
       for (const x of [inicio, fim]) {
         contexto.fillRect(Math.min(Math.max(x - 1.5, 0), largura - 3), 0, 3, altura);
@@ -96,7 +100,7 @@ export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cort
     }
     contexto.fillStyle = "#ffffff";
     contexto.fillRect(Math.min(tocado, largura - 2), 0, 2, altura);
-  }, [barras, tempo, duracao, largura, altura, cortes, faixa]);
+  }, [barras, tempo, duracao, largura, altura, cortes, faixa, outrasFaixas]);
 
   function segundosNaPosicao(clienteX: number): number {
     const retangulo = canvas.current!.getBoundingClientRect();

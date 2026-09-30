@@ -23,12 +23,12 @@ App web que transforma a gravação do culto em Stories, Reels e cortes da prega
 - **Licenças:** só bibliotecas e modelos com licença permissiva. Evite AGPL, como o YOLO da Ultralytics: para rosto, use o MediaPipe. Música e texto bíblico só com licença, porque ARA e NVI têm direitos autorais.
 - **Prévia igual ao render:** toda diferença entre a prévia no navegador e o vídeo exportado é medida em números, não só no olho.
 
-## Estado atual (30/09/2026, commit 1bc90a6)
+## Estado atual (atualizado em 30/09/2026)
 
 - **Fase 0 (fundação):** pronta.
 - **Fase 1 sem IA:** pronta. Inclui upload retomável (tus), ingestão (proxy 720p, forma de onda, níveis, miniaturas), corte de silêncios, editor de Reel com enquadramento e zoom, render em -14 LUFS, download e compartilhamento.
 - **Fase 2 sem IA:** pronta. Inclui Sua Identidade (logo, cor, @), textos sobre o vídeo, HolyStories com modelos, filtros de cor e biblioteca de músicas com licença e volume que abaixa sob a fala.
-- **Fase 3 sem IA:** em andamento. Veja o checklist no PLANO.
+- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo com dividir, apagar, mover e arrastar partes. Próximos: agente de pasta monitorada (OBS), fluxo de aprovação pelo celular e integração com o chat das lives. YouTube e Pexels esperam o dono criar as chaves.
 - **Nenhuma IA real foi implementada ainda.** `MODO_IA=simulado`, e o job `teste` só simula as etapas. O job `diagnostico_gpu` confere a GPU no Nitro.
 
 ### O que espera o Nitro 5 (ordem sugerida)
@@ -54,7 +54,9 @@ Cada etapa de IA vira uma tarefa nova em `apps/worker/tarefas/`, registrada em `
 
 ## Decisões técnicas que não aparecem de cara no código
 
-- **Render numa passada só.** O FFmpeg lê o original uma vez e seleciona os trechos com `select` e `aselect`. Os cortes ficam alinhados a 1/30 s, o áudio vai em blocos de 1600 amostras a 48 kHz, e os limites caem meio quadro antes de cada borda. Sem isso, perdia-se um quadro por corte e o som saía de sincronia.
+- **Linha do tempo:** o projeto guarda `partes` (intervalos da gravação na ordem da lista, que podem se repetir). Projetos antigos só têm `trecho`, e o `partes_do_projeto` os converte na leitura.
+
+- **Render numa passada só.** O FFmpeg abre o original uma vez por parte da linha do tempo, seleciona os trechos de cada parte com `select` e `aselect` e emenda as partes com `concat`. Os cortes ficam alinhados a 1/30 s, o áudio vai em blocos de 1600 amostras a 48 kHz, e os limites caem meio quadro antes de cada borda. Sem isso, perdia-se um quadro por corte e o som saía de sincronia.
 - **Arte:** logo e textos são desenhados uma vez pelo `core/utils/arte.py`, com Pillow e as fontes da marca. O mesmo PNG vai para a prévia (`/api/arte/camada`) e para o overlay do FFmpeg. O layout é fixo em `Layout.BASIC`, porque o worker tem libraqm e a API não.
 - **Cor e fundo em RGB** (`format=gbrp`). Os filtros de cor são matrizes 3×3 e contraste, não LUTs. No navegador viram `feColorMatrix` com `colorInterpolationFilters="sRGB"`, e a prévia sai igual ao render (medido).
 - **Música:** o `sidechaincompress` baixa cerca de 14 dB quando há voz (medido). Com `-stream_loop`, a faixa recomeça do 0, não do ponto escolhido. A prévia imita isso pelos picos da forma de onda, de forma aproximada.

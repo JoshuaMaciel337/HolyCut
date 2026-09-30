@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { chamarApi, ErroApi } from "@/lib/api";
+import { duracaoDasPartes } from "@/lib/partes";
 import { formatarTempo } from "@/lib/formatar";
 import type { Midia, Projeto } from "@/lib/tipos";
 
@@ -55,7 +56,7 @@ export function ReelsDaMidia({ midia, tempoAtual = 0 }: { midia: Midia; tempoAtu
                   <span className="block truncate font-medium">{projeto.nome}</span>
                   <span className="text-xs text-suave">
                     {projeto.tipo === "story" ? "Story" : "Reel"} · {projeto.proporcao} ·{" "}
-                    {formatarTempo(projeto.trecho.fim - projeto.trecho.inicio)} escolhidos
+                    {formatarTempo(duracaoDasPartes(projeto.partes))} escolhidos
                   </span>
                 </span>
                 <ChevronRight className="size-4 shrink-0" aria-hidden />

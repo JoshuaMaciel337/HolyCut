@@ -11,6 +11,7 @@ import { chamarApi, ErroApi } from "@/lib/api";
 import { useEnvios } from "@/lib/envios";
 import { useEventosJobs } from "@/lib/eventos";
 import { useSessao } from "@/lib/sessao";
+import { duracaoDasPartes } from "@/lib/partes";
 import { formatarTempo } from "@/lib/formatar";
 import type { Midia, Projeto } from "@/lib/tipos";
 import { useSistema } from "@/lib/useSistema";
@@ -186,7 +187,7 @@ export default function PaginaInicio() {
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{projeto.nome}</span>
                         <span className="text-xs text-suave">
-                          {projeto.proporcao} · {formatarTempo(projeto.trecho.fim - projeto.trecho.inicio)}
+                          {projeto.proporcao} · {formatarTempo(duracaoDasPartes(projeto.partes))}
                         </span>
                       </span>
                       <ChevronRight className="size-4 shrink-0" aria-hidden />

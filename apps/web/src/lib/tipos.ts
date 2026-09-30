@@ -178,6 +178,13 @@ export type Modelo = {
   textos: TextoProjeto[];
 };
 
+/** Uma parte da gravação que entra no vídeo. As partes seguem a ordem da lista. */
+export type Parte = {
+  id: string;
+  inicio: number;
+  fim: number;
+};
+
 export type Projeto = {
   id: string;
   midia_id: string;
@@ -185,7 +192,7 @@ export type Projeto = {
   tipo: "reel" | "story";
   modelo_id: string | null;
   proporcao: Proporcao;
-  trecho: { inicio: number; fim: number };
+  partes: Parte[];
   silencios: { intensidade: Intensidade | null };
   enquadramento: { x: number; y: number; zoom: number };
   audio: { normalizar: boolean };

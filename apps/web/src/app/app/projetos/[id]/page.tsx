@@ -1,12 +1,29 @@
 "use client";
 
-import { ArrowLeft, BookmarkPlus, Check, CircleAlert, Clapperboard, ImageIcon, LoaderCircle, Pause, Play, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  BookmarkPlus,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  Clapperboard,
+  ImageIcon,
+  LoaderCircle,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Scissors,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
+import { LinhaDoTempo } from "@/componentes/LinhaDoTempo";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
 import { MusicaNaPrevia } from "@/componentes/MusicaNaPrevia";
 import { PainelCor } from "@/componentes/PainelCor";
@@ -19,21 +36,25 @@ import { PreviaEnquadrada } from "@/componentes/PreviaEnquadrada";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { cssDoFiltro, FiltroSvg, useFiltros } from "@/lib/filtros";
 import { formatarTempo } from "@/lib/formatar";
+import {
+  cortesNaParte,
+  DURACAO_MINIMA_PARTE,
+  duracaoDasPartes,
+  duracaoFinalDaParte,
+  instanteNaParte,
+  MAXIMO_PARTES,
+  mover,
+  novoIdDeParte,
+  posicaoNaParte,
+} from "@/lib/partes";
 import { PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
-import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Musica, Projeto, Proporcao, Silencios } from "@/lib/tipos";
+import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Musica, Parte, Projeto, Proporcao, Silencios } from "@/lib/tipos";
 
 const ESPERA_SALVAR_MS = 700;
 // Pico da forma de onda (em % da escala cheia) a partir do qual a prévia considera que há voz
 const PICO_DE_FALA = 4;
-type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo" | "cor" | "musica">;
+type Edicao = Pick<Projeto, "nome" | "proporcao" | "partes" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo" | "cor" | "musica">;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
-
-/** Cortes de silêncio que caem dentro do trecho, recortados nas bordas dele. */
-function cortesNoTrecho(cortes: [number, number][], inicio: number, fim: number): [number, number][] {
-  return cortes
-    .filter(([a, b]) => b > inicio && a < fim)
-    .map(([a, b]) => [Math.max(a, inicio), Math.min(b, fim)] as [number, number]);
-}
 
 export default function PaginaProjeto() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +72,10 @@ export default function PaginaProjeto() {
   const [exportando, setExportando] = useState(false);
   const [ultimaExportacao, setUltimaExportacao] = useState<Exportacao | null>(null);
   const [aviso, setAviso] = useState("");
+  const [avisoParte, setAvisoParte] = useState("");
+  // Parte em que a prévia está (a que as alças e os botões da linha do tempo editam)
+  const [indiceAtual, setIndiceAtual] = useState(0);
+  const indiceRef = useRef(0);
   const player = useRef<HTMLVideoElement>(null);
   const filtros = useFiltros();
 
@@ -71,7 +96,7 @@ export default function PaginaProjeto() {
         const inicial: Edicao = {
           nome: carregado.nome,
           proporcao: carregado.proporcao,
-          trecho: carregado.trecho,
+          partes: carregado.partes,
           silencios: carregado.silencios,
           enquadramento: carregado.enquadramento,
           marca: carregado.marca,
@@ -156,43 +181,62 @@ export default function PaginaProjeto() {
     [salvar],
   );
 
-  const cortes = useMemo(() => {
-    if (!edicao || !intensidade || silencios?.intensidade !== intensidade) return [];
-    return cortesNoTrecho(silencios.silencios, edicao.trecho.inicio, edicao.trecho.fim);
-  }, [edicao, intensidade, silencios]);
-  const duracaoFinal = edicao
-    ? edicao.trecho.fim - edicao.trecho.inicio - cortes.reduce((soma, [a, b]) => soma + (b - a), 0)
-    : 0;
-  // Onde a prévia está na linha do tempo do vídeo final (já sem o que foi cortado)
-  const posicaoFinal = edicao
-    ? Math.max(
-        0,
-        Math.min(tempo, edicao.trecho.fim) -
-          edicao.trecho.inicio -
-          cortes.reduce((soma, [a, b]) => soma + Math.max(0, Math.min(b, tempo) - a), 0),
-      )
+  const partes = useMemo(() => edicao?.partes ?? [], [edicao]);
+  const indice = Math.min(indiceAtual, Math.max(partes.length - 1, 0));
+  const parteAtual = partes[indice];
+  // Cortes de silêncio de cada parte, e quanto cada uma dura no vídeo final
+  const cortesPorParte = useMemo(() => {
+    const ativos = intensidade && silencios?.intensidade === intensidade ? silencios.silencios : [];
+    return partes.map((parte) => cortesNaParte(ativos, parte));
+  }, [partes, intensidade, silencios]);
+  const duracoes = partes.map((parte, i) => duracaoFinalDaParte(parte, cortesPorParte[i] ?? []));
+  const duracaoFinal = duracoes.reduce((soma, duracao) => soma + duracao, 0);
+  // Onde a prévia está no vídeo final: as partes anteriores inteiras mais o ponto dentro da atual
+  const posicaoFinal = parteAtual
+    ? duracoes.slice(0, indice).reduce((soma, duracao) => soma + duracao, 0) +
+      posicaoNaParte(parteAtual, cortesPorParte[indice] ?? [], tempo)
     : 0;
 
-  // A prévia toca só o trecho, pulando os cortes, como vai ficar no vídeo final
-  const regras = useRef({ inicio: 0, fim: 0, cortes: [] as [number, number][] });
+  const irParaParte = useCallback((novo: number) => {
+    indiceRef.current = novo;
+    setIndiceAtual(novo);
+  }, []);
+
+  // A prévia toca as partes na ordem, pulando os cortes, como vai ficar no vídeo final
+  const regras = useRef({ partes: [] as Parte[], cortes: [] as [number, number][][] });
   useEffect(() => {
-    if (edicao) regras.current = { inicio: edicao.trecho.inicio, fim: edicao.trecho.fim, cortes };
-  }, [edicao, cortes]);
+    regras.current = { partes, cortes: cortesPorParte };
+  }, [partes, cortesPorParte]);
 
   useEffect(() => {
     const elemento = player.current;
     if (!elemento) return;
     let quadro = 0;
+    /** Fim da parte: segue para a próxima, ou para no fim do vídeo e volta ao começo. */
+    const avancar = () => {
+      const { partes: lista } = regras.current;
+      const atual = Math.min(indiceRef.current, lista.length - 1);
+      const proxima = atual + 1 < lista.length ? atual + 1 : 0;
+      indiceRef.current = proxima;
+      setIndiceAtual(proxima);
+      elemento.currentTime = lista[proxima].inicio;
+      return proxima;
+    };
     const acompanhar = () => {
-      const { inicio, fim, cortes: ativos } = regras.current;
-      const corte = ativos.find(([a, b]) => elemento.currentTime >= a && elemento.currentTime < b - 0.05);
-      if (corte) elemento.currentTime = corte[1];
-      if (elemento.currentTime >= fim) {
-        elemento.pause();
-        elemento.currentTime = inicio;
+      const { partes: lista, cortes: porParte } = regras.current;
+      const atual = Math.min(indiceRef.current, lista.length - 1);
+      const parte = lista[atual];
+      if (parte) {
+        const corte = (porParte[atual] ?? []).find(([a, b]) => elemento.currentTime >= a && elemento.currentTime < b - 0.05);
+        if (corte) elemento.currentTime = corte[1];
+        if (elemento.currentTime >= parte.fim && avancar() === 0) elemento.pause();
       }
       setTempo(elemento.currentTime);
       if (!elemento.paused) quadro = requestAnimationFrame(acompanhar);
+    };
+    // A gravação acabou antes do fim da parte (a última parte vai até o fim do arquivo)
+    const aoTerminar = () => {
+      if (avancar() !== 0) void elemento.play();
     };
     const aoTocar = () => {
       setTocando(true);
@@ -209,8 +253,10 @@ export default function PaginaProjeto() {
     elemento.addEventListener("play", aoTocar);
     elemento.addEventListener("pause", aoPausar);
     elemento.addEventListener("seeked", aoSaltar);
+    elemento.addEventListener("ended", aoTerminar);
     return () => {
       cancelAnimationFrame(quadro);
+      elemento.removeEventListener("ended", aoTerminar);
       elemento.removeEventListener("play", aoTocar);
       elemento.removeEventListener("pause", aoPausar);
       elemento.removeEventListener("seeked", aoSaltar);
@@ -224,23 +270,102 @@ export default function PaginaProjeto() {
       elemento.pause();
       return;
     }
-    if (elemento.currentTime < edicao.trecho.inicio || elemento.currentTime >= edicao.trecho.fim - 0.1) {
-      elemento.currentTime = edicao.trecho.inicio;
+    const lista = edicao.partes;
+    const atual = Math.min(indiceRef.current, lista.length - 1);
+    if (elemento.currentTime >= lista[atual].fim - 0.1) {
+      const proxima = atual + 1 < lista.length ? atual + 1 : 0;
+      irParaParte(proxima);
+      elemento.currentTime = lista[proxima].inicio;
+    } else if (elemento.currentTime < lista[atual].inicio) {
+      elemento.currentTime = lista[atual].inicio;
     }
     void elemento.play();
   }
 
-  function buscar(segundos: number) {
+  function levarPreviaPara(segundos: number) {
     if (player.current) player.current.currentTime = segundos;
     setTempo(segundos);
   }
 
+  /** Clique na forma de onda da gravação. Se cair em outra parte, ela passa a ser a atual. */
+  function buscar(segundos: number) {
+    const lista = edicaoAtual.current?.partes ?? [];
+    const dentro = (parte: Parte) => segundos >= parte.inicio && segundos <= parte.fim;
+    const atual = lista[indiceRef.current];
+    if (!atual || !dentro(atual)) {
+      const achada = lista.findIndex(dentro);
+      if (achada >= 0) irParaParte(achada);
+    }
+    levarPreviaPara(segundos);
+  }
+
+  /** Clique num bloco da linha do tempo: vai para aquele ponto do vídeo final. */
+  function buscarNaLinhaDoTempo(novo: number, posicao: number) {
+    const parte = partes[novo];
+    if (!parte) return;
+    irParaParte(novo);
+    levarPreviaPara(instanteNaParte(parte, cortesPorParte[novo] ?? [], posicao));
+  }
+
+  function trocarParte(novaParte: Parte) {
+    if (!edicao) return;
+    editar({ partes: edicao.partes.map((parte, i) => (i === indice ? novaParte : parte)) });
+  }
+
   function marcar(lado: "inicio" | "fim") {
-    if (!edicao || !midia?.duracao) return;
+    if (!parteAtual) return;
     const agora = Math.round(tempo * 100) / 100;
-    const { inicio, fim } = edicao.trecho;
-    const trecho = lado === "inicio" ? { inicio: Math.min(agora, fim - 1), fim } : { inicio, fim: Math.max(agora, inicio + 1) };
-    editar({ trecho });
+    const { inicio, fim } = parteAtual;
+    trocarParte(lado === "inicio" ? { ...parteAtual, inicio: Math.min(agora, fim - 1) } : { ...parteAtual, fim: Math.max(agora, inicio + 1) });
+  }
+
+  function dividir() {
+    if (!edicao || !parteAtual) return;
+    const ponto = Math.round(tempo * 100) / 100;
+    if (ponto - parteAtual.inicio < DURACAO_MINIMA_PARTE || parteAtual.fim - ponto < DURACAO_MINIMA_PARTE) {
+      setAvisoParte("Para dividir, leve a prévia até um ponto da parte com pelo menos 1 segundo de cada lado.");
+      return;
+    }
+    if (edicao.partes.length >= MAXIMO_PARTES) {
+      setAvisoParte(`O vídeo pode ter até ${MAXIMO_PARTES} partes.`);
+      return;
+    }
+    setAvisoParte("");
+    const segunda = { id: novoIdDeParte(edicao.partes), inicio: ponto, fim: parteAtual.fim };
+    editar({ partes: [...edicao.partes.slice(0, indice), { ...parteAtual, fim: ponto }, segunda, ...edicao.partes.slice(indice + 1)] });
+    irParaParte(indice + 1);
+  }
+
+  function novaParte() {
+    if (!edicao || !midia?.duracao) return;
+    if (edicao.partes.length >= MAXIMO_PARTES) {
+      setAvisoParte(`O vídeo pode ter até ${MAXIMO_PARTES} partes.`);
+      return;
+    }
+    setAvisoParte("");
+    const duracao = Math.floor(midia.duracao * 100) / 100;
+    const inicio = Math.min(Math.round(tempo * 100) / 100, duracao - DURACAO_MINIMA_PARTE);
+    const parte = { id: novoIdDeParte(edicao.partes), inicio, fim: Math.min(inicio + 10, duracao) };
+    editar({ partes: [...edicao.partes.slice(0, indice + 1), parte, ...edicao.partes.slice(indice + 1)] });
+    irParaParte(indice + 1);
+    levarPreviaPara(inicio);
+  }
+
+  function reordenar(de: number, para: number) {
+    if (!edicao || para < 0 || para >= edicao.partes.length) return;
+    const idAtual = edicao.partes[indice]?.id;
+    const novas = mover(edicao.partes, de, para);
+    editar({ partes: novas });
+    irParaParte(Math.max(novas.findIndex((parte) => parte.id === idAtual), 0));
+  }
+
+  function apagarParte() {
+    if (!edicao || edicao.partes.length < 2) return;
+    const restantes = edicao.partes.filter((_, i) => i !== indice);
+    const novo = Math.min(indice, restantes.length - 1);
+    editar({ partes: restantes });
+    irParaParte(novo);
+    levarPreviaPara(restantes[novo].inicio);
   }
 
   async function exportar(formato: "video" | "imagem") {
@@ -285,7 +410,7 @@ export default function PaginaProjeto() {
     </Link>
   );
 
-  if (!projeto || !edicao || !midia || !midia.video || !midia.duracao) {
+  if (!projeto || !edicao || !parteAtual || !midia || !midia.video || !midia.duracao) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         {voltar}
@@ -430,20 +555,70 @@ export default function PaginaProjeto() {
           </section>
 
           <section className="cartao p-6" aria-labelledby="titulo-trecho">
-            <h2 id="titulo-trecho" className="font-display text-lg font-bold">
-              Trecho
-            </h2>
-            <p className="mt-1 text-sm text-suave">Arraste as alças laranja ou marque pelo ponto em que a prévia está.</p>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="titulo-trecho" className="font-display text-lg font-bold">
+                Linha do tempo
+              </h2>
+              <p className="text-sm tabular-nums text-suave">
+                {partes.length} {partes.length === 1 ? "parte" : "partes"} · {formatarTempo(duracaoFinal)} no vídeo
+              </p>
+            </div>
+            <p className="mt-1 text-sm text-suave">Divida no ponto da prévia e arraste as partes para mudar a ordem. A mesma parte da gravação pode entrar mais de uma vez.</p>
+            <div className="mt-4">
+              <LinhaDoTempo
+                partes={partes}
+                duracoes={duracoes}
+                indiceAtual={indice}
+                posicaoFinal={posicaoFinal}
+                aoBuscar={buscarNaLinhaDoTempo}
+                aoReordenar={reordenar}
+              />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={dividir} className="botao-contorno px-4 py-2 text-sm">
+                <Scissors className="size-4" aria-hidden /> Dividir aqui
+              </button>
+              <button type="button" onClick={novaParte} className="botao-contorno px-4 py-2 text-sm">
+                <Plus className="size-4" aria-hidden /> Nova parte aqui
+              </button>
+              <button
+                type="button"
+                onClick={() => reordenar(indice, indice - 1)}
+                disabled={indice === 0}
+                className="botao-contorno px-3 py-2 text-sm disabled:opacity-40"
+                aria-label="Mover a parte para antes"
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => reordenar(indice, indice + 1)}
+                disabled={indice >= partes.length - 1}
+                className="botao-contorno px-3 py-2 text-sm disabled:opacity-40"
+                aria-label="Mover a parte para depois"
+              >
+                <ChevronRight className="size-4" aria-hidden />
+              </button>
+              <button type="button" onClick={apagarParte} disabled={partes.length < 2} className="botao-contorno px-4 py-2 text-sm disabled:opacity-40">
+                <Trash2 className="size-4" aria-hidden /> Apagar parte
+              </button>
+            </div>
+            {avisoParte ? <p className="mt-2 text-sm text-amarelo">{avisoParte}</p> : null}
+
+            <h3 className="mt-6 text-sm font-semibold">
+              Parte {indice + 1} na gravação <span className="font-normal text-suave">· arraste as alças laranja ou marque pelo ponto da prévia</span>
+            </h3>
             {forma ? (
-              <div className="mt-4">
+              <div className="mt-2">
                 <FormaDeOnda
                   picos={forma.picos}
                   duracao={midia.duracao}
                   tempo={tempo}
                   aoBuscar={buscar}
-                  cortes={cortes}
-                  faixa={[edicao.trecho.inicio, edicao.trecho.fim]}
-                  aoMudarFaixa={([inicio, fim]) => editar({ trecho: { inicio: Math.round(inicio * 100) / 100, fim: Math.round(fim * 100) / 100 } })}
+                  cortes={cortesPorParte.flat()}
+                  faixa={[parteAtual.inicio, parteAtual.fim]}
+                  aoMudarFaixa={([inicio, fim]) => trocarParte({ ...parteAtual, inicio: Math.round(inicio * 100) / 100, fim: Math.round(fim * 100) / 100 })}
+                  outrasFaixas={partes.filter((_, i) => i !== indice).map((parte) => [parte.inicio, parte.fim] as [number, number])}
                 />
               </div>
             ) : null}
@@ -457,7 +632,7 @@ export default function PaginaProjeto() {
                 </button>
               </div>
               <p className="tabular-nums text-suave">
-                {formatarTempo(edicao.trecho.inicio)} até {formatarTempo(edicao.trecho.fim)} · {formatarTempo(edicao.trecho.fim - edicao.trecho.inicio)}
+                {formatarTempo(parteAtual.inicio)} até {formatarTempo(parteAtual.fim)} · {formatarTempo(parteAtual.fim - parteAtual.inicio)}
               </p>
             </div>
           </section>
@@ -467,11 +642,11 @@ export default function PaginaProjeto() {
             aoMudar={(opcao) => editar({ silencios: { intensidade: opcao === "desligado" ? null : opcao } })}
             dados={
               silencios && intensidade && silencios.intensidade === intensidade
-                ? { ...silencios, silencios: cortes, tempo_cortado: edicao.trecho.fim - edicao.trecho.inicio - duracaoFinal, duracao_final: duracaoFinal }
+                ? { ...silencios, silencios: cortesPorParte.flat(), tempo_cortado: duracaoDasPartes(partes) - duracaoFinal, duracao_final: duracaoFinal }
                 : null
             }
             carregando={Boolean(intensidade) && silencios?.intensidade !== intensidade}
-            duracao={edicao.trecho.fim - edicao.trecho.inicio}
+            duracao={duracaoDasPartes(partes)}
             pular
             aoMudarPular={() => undefined}
             semOpcaoPular
