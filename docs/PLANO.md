@@ -568,10 +568,10 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] Títulos, legendas de post e hashtags gerados por rede
 - [ ] Reenquadramento seguindo o rosto e zoom dinâmico nas ênfases
 - [ ] **HolyMoments:** energia do áudio, cenas, picos do chat da live e nota visual opcional
-- [ ] **Sua Identidade:** kit da igreja aplicado automaticamente em todo projeto
+- [x] **Sua Identidade:** kit da igreja aplicado automaticamente em todo projeto (logo, cor de destaque e @; o logo entra ligado em todo Reel novo)
 - [ ] Biblioteca de músicas com licença registrada e volume que abaixa sob a fala
 - [ ] Filtros e correção de cor com LUTs
-- [ ] Detecção de versículos com overlay
+- [ ] Detecção de versículos com overlay. **Overlay pronto**: título, frase e versículo com referência, digitados, em três estilos; a detecção automática depende da transcrição
 - [ ] Sistema de templates editáveis
 
 ### Fase 3 — Produto completo (4 a 6 semanas)

@@ -83,6 +83,39 @@ export type Silencios = {
 
 export type Proporcao = "9:16" | "4:5" | "1:1" | "16:9";
 
+export type Identidade = {
+  nome_exibicao: string;
+  instagram: string;
+  cor_destaque: string;
+  logo: boolean;
+  atualizado_em: string | null;
+};
+
+export type PosicaoLogo = "topo_esquerda" | "topo_direita" | "base_esquerda" | "base_direita";
+
+export type Marca = {
+  logo: boolean;
+  posicao: PosicaoLogo;
+  tamanho: number;
+  opacidade: number;
+};
+
+export type EstiloTexto = "destaque" | "limpo" | "manuscrito";
+export type PosicaoTexto = "topo" | "centro" | "base";
+
+export type TextoProjeto = {
+  id: string;
+  tipo: "titulo" | "frase" | "versiculo";
+  texto: string;
+  referencia: string;
+  estilo: EstiloTexto;
+  posicao: PosicaoTexto;
+  /** Segundos no vídeo final. */
+  inicio: number;
+  /** null: até o fim do vídeo. */
+  fim: number | null;
+};
+
 export type Projeto = {
   id: string;
   midia_id: string;
@@ -93,6 +126,8 @@ export type Projeto = {
   silencios: { intensidade: Intensidade | null };
   enquadramento: { x: number; y: number; zoom: number };
   audio: { normalizar: boolean };
+  marca: Marca;
+  textos: TextoProjeto[];
   versao: number;
   criado_em: string;
   atualizado_em: string;

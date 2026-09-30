@@ -1,7 +1,7 @@
 "use client";
 
 import { Move } from "lucide-react";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { calcularRecorte, limitesDoCentro, PROPORCOES } from "@/lib/recorte";
 import type { Proporcao } from "@/lib/tipos";
@@ -18,6 +18,8 @@ type Props = {
   enquadramento: Enquadramento;
   aoMudar: (enquadramento: Enquadramento) => void;
   alturaMaxima?: number;
+  /** Camadas de arte (logo, textos) desenhadas por cima do vídeo. */
+  children?: ReactNode;
 };
 
 function limitar(valor: number, [minimo, maximo]: [number, number]): number {
@@ -25,7 +27,7 @@ function limitar(valor: number, [minimo, maximo]: [number, number]): number {
 }
 
 /** Mostra só o que vai para o vídeo final. Arrastar a imagem muda o enquadramento. */
-export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620 }: Props) {
+export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children }: Props) {
   const recipiente = useRef<HTMLDivElement>(null);
   const inicio = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   const [disponivel, setDisponivel] = useState(0);
@@ -75,6 +77,7 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
             top: `${(-recorte.y / recorte.altura) * 100}%`,
           }}
         />
+        {children}
         <div
           className="absolute inset-0 cursor-grab active:cursor-grabbing"
           role="application"

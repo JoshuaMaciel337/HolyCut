@@ -5,17 +5,20 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
+import { PainelMarca } from "@/componentes/PainelMarca";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
+import { PainelTextos } from "@/componentes/PainelTextos";
 import { PreviaEnquadrada } from "@/componentes/PreviaEnquadrada";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { formatarTempo } from "@/lib/formatar";
 import { PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
-import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Midia, Projeto, Proporcao, Silencios } from "@/lib/tipos";
+import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Projeto, Proporcao, Silencios } from "@/lib/tipos";
 
 const ESPERA_SALVAR_MS = 700;
-type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento">;
+type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos">;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
 
 /** Cortes de silêncio que caem dentro do trecho, recortados nas bordas dele. */
@@ -30,6 +33,7 @@ export default function PaginaProjeto() {
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [edicao, setEdicao] = useState<Edicao | null>(null);
   const [midia, setMidia] = useState<Midia | null>(null);
+  const [identidade, setIdentidade] = useState<Identidade | null>(null);
   const [forma, setForma] = useState<DadosFormaDeOnda | null>(null);
   const [silencios, setSilencios] = useState<Silencios | null>(null);
   const [erro, setErro] = useState("");
@@ -60,11 +64,18 @@ export default function PaginaProjeto() {
           trecho: carregado.trecho,
           silencios: carregado.silencios,
           enquadramento: carregado.enquadramento,
+          marca: carregado.marca,
+          textos: carregado.textos,
         };
         edicaoAtual.current = inicial;
         setProjeto(carregado);
         setEdicao(inicial);
         setMidia(gravacao);
+        chamarApi<Identidade>("/identidade")
+          .then((dados) => {
+            if (!cancelado) setIdentidade(dados);
+          })
+          .catch(() => undefined);
         if (gravacao.arquivos.includes("forma_de_onda.json")) {
           const resposta = await fetch(`/api/midias/${gravacao.id}/arquivos/forma_de_onda.json`, { credentials: "same-origin" });
           if (resposta.ok && !cancelado) setForma(await resposta.json());
@@ -252,6 +263,7 @@ export default function PaginaProjeto() {
 
   const base = `/api/midias/${midia.id}/arquivos`;
   const opcaoCorte: OpcaoCorte = intensidade ?? "desligado";
+  const alvo = PROPORCOES[edicao.proporcao];
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -296,7 +308,20 @@ export default function PaginaProjeto() {
             proporcao={edicao.proporcao}
             enquadramento={edicao.enquadramento}
             aoMudar={(enquadramento) => editar({ enquadramento })}
-          />
+          >
+            {identidade?.logo && edicao.marca.logo ? (
+              <CamadaSobreposta pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "logo", marca: edicao.marca }} />
+            ) : null}
+            {edicao.textos
+              .filter((texto) => texto.texto.trim())
+              .map((texto) => (
+                <CamadaSobreposta
+                  key={texto.id}
+                  pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "texto", texto }}
+                  visivel={posicaoFinal >= texto.inicio && (texto.fim === null || posicaoFinal < texto.fim)}
+                />
+              ))}
+          </PreviaEnquadrada>
           <div className="flex items-center gap-3">
             <button type="button" onClick={alternarReproducao} className="botao-cta size-12 p-0" aria-label={tocando ? "Pausar" : "Tocar o trecho"}>
               {tocando ? <Pause className="size-5" aria-hidden /> : <Play className="size-5" aria-hidden />}
@@ -401,6 +426,15 @@ export default function PaginaProjeto() {
             aoMudarPular={() => undefined}
             semOpcaoPular
           />
+
+          <PainelTextos
+            textos={edicao.textos}
+            aoMudar={(textos) => editar({ textos })}
+            duracaoFinal={duracaoFinal}
+            posicaoFinal={posicaoFinal}
+          />
+
+          <PainelMarca marca={edicao.marca} temLogo={Boolean(identidade?.logo)} aoMudar={(marca) => editar({ marca })} />
 
           <section className="cartao p-6" aria-labelledby="titulo-exportar">
             <div className="flex flex-wrap items-center justify-between gap-4">

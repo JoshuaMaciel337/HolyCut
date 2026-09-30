@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, Palette } from "lucide-react";
 import Link from "next/link";
 
 import { Logo } from "@/componentes/Logo";
@@ -15,6 +15,9 @@ export function Cabecalho() {
           <Logo altura={30} prioridade />
         </Link>
         <div className="flex items-center gap-3">
+          <Link href="/app/identidade" className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm text-suave hover:text-texto">
+            <Palette className="size-4" aria-hidden /> <span className="hidden sm:inline">Sua Identidade</span>
+          </Link>
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium">{sessao.organizacao.nome}</p>
             <p className="text-xs text-suave">{sessao.usuario.nome}</p>
