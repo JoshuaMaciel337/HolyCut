@@ -4,7 +4,7 @@
 #   1. ffprobe: duração, resolução, fps e áudio
 #   2. uma passada do FFmpeg gera a cópia leve (proxy 720p) e o áudio de
 #      análise (WAV 16 kHz mono, usado depois na transcrição e nos silêncios)
-#   3. forma de onda: picos do áudio, 20 por segundo
+#   3. forma de onda (picos, 20 por segundo) e níveis em dB a cada 10 ms
 #   4. miniaturas em uma única imagem (sprite) e a capa
 # -----------------------------------------------
 import json
@@ -23,8 +23,10 @@ from core.modelos.midia import (
     ARQUIVO_CAPA,
     ARQUIVO_FORMA_DE_ONDA,
     ARQUIVO_MINIATURAS,
+    ARQUIVO_NIVEIS,
     ARQUIVO_PROXY_AUDIO,
     ARQUIVO_PROXY_VIDEO,
+    NIVEIS_POR_SEGUNDO,
     STATUS_ERRO,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
@@ -56,29 +58,39 @@ FILTRO_PROXY = (
 # -----------------------------------------------
 # FUNÇÕES AUXILIARES
 # -----------------------------------------------
-def calcular_forma_de_onda(caminho_wav: Path, por_segundo: int = PICOS_POR_SEGUNDO) -> dict:
-    """Pico de cada janela de 1/por_segundo s, em % do volume máximo possível (0 a 100)."""
-    picos: list[int] = []
+def analisar_audio(caminho_wav: Path, picos_por_segundo: int = PICOS_POR_SEGUNDO) -> tuple[dict, np.ndarray]:
+    """
+    Lê o WAV uma vez e devolve:
+      - a forma de onda: pico de cada janela de 1/picos_por_segundo s, em % do volume máximo (0 a 100)
+      - os níveis: pico de cada 10 ms em dB (-100 a 0), base do corte de silêncios
+    """
+    fator = NIVEIS_POR_SEGUNDO // picos_por_segundo
+    picos_10ms: list[int] = []
     with wave.open(str(caminho_wav), "rb") as wav:
         if wav.getsampwidth() != 2:
-            raise ValueError("A forma de onda espera áudio PCM de 16 bits.")
+            raise ValueError("A análise espera áudio PCM de 16 bits.")
         canais = wav.getnchannels()
-        janela = max(wav.getframerate() // por_segundo, 1)
-        frames_por_bloco = janela * por_segundo * 60  # lê 1 minuto por vez
+        janela = max(wav.getframerate() // NIVEIS_POR_SEGUNDO, 1)
+        frames_por_bloco = janela * NIVEIS_POR_SEGUNDO * 60  # lê 1 minuto por vez
         while dados := wav.readframes(frames_por_bloco):
             amostras = np.abs(np.frombuffer(dados, dtype="<i2").astype(np.int32))
             if canais > 1:
                 amostras = amostras[: len(amostras) // canais * canais].reshape(-1, canais).max(axis=1)
             completas = len(amostras) // janela
             if completas:
-                picos.extend(amostras[: completas * janela].reshape(completas, janela).max(axis=1).tolist())
+                picos_10ms.extend(amostras[: completas * janela].reshape(completas, janela).max(axis=1).tolist())
             if len(amostras) % janela:
-                picos.append(int(amostras[completas * janela:].max()))
-    return {
+                picos_10ms.append(int(amostras[completas * janela:].max()))
+
+    picos = np.array(picos_10ms, dtype=np.int32)
+    niveis = np.clip(np.round(20 * np.log10(np.maximum(picos, 1) / 32767)), -100, 0).astype(np.int8)
+    agrupados = np.pad(picos, (0, -len(picos) % fator)).reshape(-1, fator).max(axis=1) if len(picos) else picos
+    forma = {
         "versao": 1,
-        "picos_por_segundo": por_segundo,
-        "picos": [min(round(p * 100 / 32767), 100) for p in picos],
+        "picos_por_segundo": picos_por_segundo,
+        "picos": np.minimum(np.round(agrupados * 100 / 32767), 100).astype(int).tolist(),
     }
+    return forma, niveis
 
 
 def planejar_miniaturas(duracao: float) -> dict:
@@ -154,13 +166,14 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     if tem_audio:
         arquivos.append(ARQUIVO_AUDIO_ANALISE)  # uso interno: a API não serve este arquivo
 
-    # 3. Forma de onda
+    # 3. Forma de onda e níveis do áudio
     if tem_audio:
         reportar(78, "Desenhando a forma de onda")
-        forma = calcular_forma_de_onda(caminho(ARQUIVO_AUDIO_ANALISE))
+        forma, niveis = analisar_audio(caminho(ARQUIVO_AUDIO_ANALISE))
         storage.salvar_bytes(chave_arquivo(organizacao_id, midia_id, ARQUIVO_FORMA_DE_ONDA),
                              json.dumps(forma, separators=(",", ":")).encode())
-        arquivos.append(ARQUIVO_FORMA_DE_ONDA)
+        storage.salvar_bytes(chave_arquivo(organizacao_id, midia_id, ARQUIVO_NIVEIS), niveis.tobytes())
+        arquivos += [ARQUIVO_FORMA_DE_ONDA, ARQUIVO_NIVEIS]
 
     # 4. Miniaturas e capa, a partir da cópia leve
     miniaturas = None

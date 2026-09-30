@@ -64,7 +64,9 @@ def test_ingestao_de_video_horizontal(db_limpo):
     assert midia["status"] == "pronta"
     assert 11.5 < midia["duracao"] < 12.5
     assert midia["video"]["largura"] == 1920 and midia["video"]["fps"] == 60
-    assert set(midia["arquivos"]) == {"proxy.mp4", "audio.wav", "forma_de_onda.json", "miniaturas.jpg", "capa.jpg"}
+    assert set(midia["arquivos"]) == {"proxy.mp4", "audio.wav", "forma_de_onda.json", "niveis.bin",
+                                      "miniaturas.jpg", "capa.jpg"}
+    assert 1150 <= arquivo_da(midia, "niveis.bin").stat().st_size <= 1250   # 12 s a 100 por segundo
     assert job["progresso"] == 100
 
     assert sondar_video(arquivo_da(midia, "proxy.mp4")) == (1280, 720)
@@ -97,7 +99,7 @@ def test_ingestao_de_audio(db_limpo):
     resultado, midia, _ = processar(db_limpo, midia_id)
     assert resultado == "concluido"
     assert midia["video"] is None
-    assert set(midia["arquivos"]) == {"proxy.m4a", "audio.wav", "forma_de_onda.json"}
+    assert set(midia["arquivos"]) == {"proxy.m4a", "audio.wav", "forma_de_onda.json", "niveis.bin"}
     assert midia["miniaturas"] is None
 
 

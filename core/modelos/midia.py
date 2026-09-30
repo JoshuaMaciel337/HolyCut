@@ -19,6 +19,9 @@ ARQUIVO_AUDIO_ANALISE = "audio.wav"
 ARQUIVO_FORMA_DE_ONDA = "forma_de_onda.json"
 ARQUIVO_MINIATURAS = "miniaturas.jpg"
 ARQUIVO_CAPA = "capa.jpg"
+# Nível do áudio em dB a cada 10 ms (int8). Base do corte de silêncios. Uso interno.
+ARQUIVO_NIVEIS = "niveis.bin"
+NIVEIS_POR_SEGUNDO = 100
 ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_ONDA,
                      ARQUIVO_MINIATURAS, ARQUIVO_CAPA}
 

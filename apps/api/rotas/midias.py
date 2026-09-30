@@ -2,7 +2,11 @@
 # HolyCut API — mídias (as gravações enviadas)
 # -----------------------------------------------
 import logging
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
 
+import numpy as np
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,12 +14,19 @@ from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import MidiaAtualizarEntrada, MidiaSaida, midia_para_saida
+from api.esquemas import MidiaAtualizarEntrada, MidiaSaida, SilenciosSaida, midia_para_saida
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE
-from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_PROCESSANDO, chave_arquivo, pasta_da_midia
+from core.modelos.midia import (
+    ARQUIVO_NIVEIS,
+    ARQUIVOS_PUBLICOS,
+    STATUS_PROCESSANDO,
+    chave_arquivo,
+    pasta_da_midia,
+)
 from core.utils import storage
 from core.utils.mongo import agora
+from core.utils.silencios import INTENSIDADES, MARGEM_PADRAO, detectar_silencios, tempo_cortado
 
 router = APIRouter(prefix="/api/midias", tags=["midias"])
 
@@ -50,6 +61,16 @@ async def jobs_de_ingestao(db, midias: list[dict]) -> dict:
         return {}
     cursor = db.jobs.find({"_id": {"$in": ids}}, {"status": 1, "progresso": 1, "mensagem": 1, "erro": 1})
     return {job["_id"]: job async for job in cursor}
+
+
+@lru_cache(maxsize=16)
+def _ler_niveis(caminho: str, _modificado_em: float) -> np.ndarray:
+    return np.fromfile(caminho, dtype=np.int8)
+
+
+def carregar_niveis(caminho: Path) -> np.ndarray:
+    """Níveis de 10 ms da mídia. Ficam em memória: o arquivo não muda depois da ingestão."""
+    return _ler_niveis(str(caminho), caminho.stat().st_mtime)
 
 
 async def para_saida(db, midias: list[dict]) -> list[MidiaSaida]:
@@ -106,3 +127,30 @@ async def baixar_arquivo(midia_id: str, nome: str, usuario=Depends(usuario_atual
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
     return FileResponse(caminho, media_type=TIPOS_ARQUIVO.get(caminho.suffix, "application/octet-stream"),
                         headers={"Cache-Control": CACHE_ARQUIVOS})
+
+
+@router.get("/{midia_id}/silencios", response_model=SilenciosSaida)
+async def silencios_da_midia(
+    midia_id: str,
+    intensidade: Literal["leve", "media", "forte"] = "media",
+    limiar_db: float | None = Query(default=None, ge=-80, le=-10),
+    duracao_minima: float | None = Query(default=None, ge=0.1, le=10),
+    usuario=Depends(usuario_atual),
+    db=Depends(obter_db),
+):
+    """Trechos de silêncio para a intensidade escolhida. limiar_db e duracao_minima ajustam fino."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if ARQUIVO_NIVEIS not in midia.get("arquivos", []):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta gravação ainda não tem a análise do áudio.")
+    parametros = {**INTENSIDADES[intensidade]}
+    if limiar_db is not None:
+        parametros["limiar_db"] = limiar_db
+    if duracao_minima is not None:
+        parametros["duracao_minima"] = duracao_minima
+
+    caminho = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_NIVEIS))
+    niveis = await run_in_threadpool(carregar_niveis, caminho)
+    cortes = detectar_silencios(niveis, margem=MARGEM_PADRAO, duracao=midia["duracao"], **parametros)
+    removido = tempo_cortado(cortes)
+    return SilenciosSaida(intensidade=intensidade, margem=MARGEM_PADRAO, silencios=cortes, tempo_cortado=removido,
+                          duracao_final=round(max(midia["duracao"] - removido, 0), 2), **parametros)

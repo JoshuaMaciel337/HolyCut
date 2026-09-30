@@ -95,6 +95,16 @@ class MidiaSaida(BaseModel):
     enviado_em: datetime | None = None
 
 
+class SilenciosSaida(BaseModel):
+    intensidade: str
+    limiar_db: float
+    duracao_minima: float
+    margem: float
+    silencios: list[tuple[float, float]]
+    tempo_cortado: float
+    duracao_final: float
+
+
 class MidiaAtualizarEntrada(BaseModel):
     nome: str = Field(min_length=1, max_length=120)
 

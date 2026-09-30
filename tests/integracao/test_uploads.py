@@ -3,6 +3,7 @@ import base64
 import os
 import uuid
 
+import numpy as np
 import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
@@ -172,6 +173,31 @@ def test_renomear_e_excluir_midia(cliente, db_limpo):
     job = db_limpo.jobs.find_one({"entrada.midia_id": midia_id})
     assert job["status"] == "erro"
     assert job["erro"] == "A mídia foi excluída."
+
+
+def test_silencios_da_midia(cliente, db_limpo):
+    local = criar_envio(cliente, 3).headers["Location"]
+    midia_id = ObjectId(local.rsplit("/", 1)[1])
+    cliente.patch(local, headers={**PEDACO, "Upload-Offset": "0"}, content=b"abc")
+    midia = db_limpo.midias.find_one({"_id": midia_id})
+    rota = f"/api/midias/{midia_id}/silencios"
+    assert cliente.get(rota).status_code == 409  # ainda sem a análise do áudio
+
+    # 2 s de fala, 1 s de silêncio e 2 s de fala
+    niveis = np.concatenate([np.full(200, -12), np.full(100, -90), np.full(200, -12)]).astype(np.int8)
+    storage.salvar_bytes(chave_arquivo(midia["organizacao_id"], midia_id, "niveis.bin"), niveis.tobytes())
+    db_limpo.midias.update_one({"_id": midia_id}, {"$set": {"status": "pronta", "duracao": 5.0,
+                                                           "arquivos": ["niveis.bin"]}})
+
+    media = cliente.get(rota).json()
+    assert media["intensidade"] == "media"
+    assert media["silencios"] == [[2.12, 2.88]]
+    assert media["tempo_cortado"] == 0.76
+    assert media["duracao_final"] == 4.24
+    assert cliente.get(rota, params={"intensidade": "leve"}).json()["silencios"] == [[2.12, 2.88]]  # 1 s alcança 1 s
+    assert cliente.get(rota, params={"duracao_minima": 1.5}).json()["silencios"] == []
+    assert cliente.get(rota, params={"intensidade": "maxima"}).status_code == 422
+    assert cliente.get(f"/api/midias/{midia_id}/arquivos/niveis.bin").status_code == 404  # arquivo interno
 
 
 def test_midia_mostra_erro_quando_a_ingestao_falha_de_vez(cliente, db_limpo):

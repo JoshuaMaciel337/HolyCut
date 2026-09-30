@@ -8,7 +8,7 @@ import pytest
 from api.rotas.uploads import ler_metadados
 from core.modelos.midia import STATUS_ENVIANDO, extensao_aceita, montar_midia, nome_para_exibir
 from core.utils.ffmpeg import ler_progresso, resumir_sondagem
-from worker.tarefas.ingestao import calcular_forma_de_onda, planejar_miniaturas
+from worker.tarefas.ingestao import analisar_audio, planejar_miniaturas
 
 
 def b64(texto: str) -> str:
@@ -95,12 +95,17 @@ def test_forma_de_onda_de_um_wav_sintetico(tmp_path):
         wav.setframerate(taxa)
         wav.writeframes(np.concatenate([silencio, tom, tom[:400]]).tobytes())
 
-    forma = calcular_forma_de_onda(caminho, por_segundo=20)
+    forma, niveis = analisar_audio(caminho, picos_por_segundo=20)
     picos = forma["picos"]
     assert forma["picos_por_segundo"] == 20
     assert len(picos) == 41                      # 2 s a 20 por segundo, mais meio pico no fim
     assert max(picos[:20]) == 0
     assert all(48 <= p <= 51 for p in picos[20:40])
+
+    assert niveis.dtype.name == "int8"
+    assert len(niveis) == 203                    # 2 s a 100 por segundo, mais o pedaço do fim
+    assert set(niveis[:100].tolist()) == {-90}   # silêncio digital: o piso de 16 bits é 1/32767 ≈ -90 dB
+    assert all(-7 <= n <= -5 for n in niveis[101:199])  # tom a 50% do máximo ≈ -6 dB
 
 
 def test_planejar_miniaturas():
