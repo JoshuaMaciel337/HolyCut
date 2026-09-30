@@ -16,6 +16,7 @@ App web que transforma a gravação do culto em Stories, Reels e cortes da prega
 ## Pedidos fixos do dono do projeto
 
 - **Fora do escopo, não propor:** avatar de IA, dublagem, clonagem de voz, lip-sync e correção de olhar.
+- **O HolyCut é independente:** não se liga a nenhum outro projeto do dono (como o painel de lives), nem por código, banco, dados ou login. Não propor integração.
 - **O repositório é público.** O `.env` nunca vai para o Git. Antes de cada push, procure no diff por senhas, tokens, chaves e e-mails pessoais.
 - **Tudo em português:** código, mensagens da interface, logs, testes e commits.
 - **Stack aprovado:** FastAPI, Next.js 16 com Tailwind 4, MongoDB, FFmpeg e Docker Compose. É o padrão da equipe: Python, MongoDB via pymongo, `logging` em vez de `print`, fuso `America/Sao_Paulo` e scripts com `argparse --agora --automatico`. **Proibido** usar Redis, bancos SQL e ORM. A fila de jobs roda no próprio Mongo.
@@ -28,7 +29,7 @@ App web que transforma a gravação do culto em Stories, Reels e cortes da prega
 - **Fase 0 (fundação):** pronta.
 - **Fase 1 sem IA:** pronta. Inclui upload retomável (tus), ingestão (proxy 720p, forma de onda, níveis, miniaturas), corte de silêncios, editor de Reel com enquadramento e zoom, render em -14 LUFS, download e compartilhamento.
 - **Fase 2 sem IA:** pronta. Inclui Sua Identidade (logo, cor, @), textos sobre o vídeo, HolyStories com modelos, filtros de cor e biblioteca de músicas com licença e volume que abaixa sob a fala.
-- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio e aprovação pelo celular. Próximo: integração com o chat das lives. YouTube e Pexels esperam o dono criar as chaves.
+- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio e aprovação pelo celular. O que falta sem IA espera o dono: publicar no YouTube (credenciais OAuth do Google) e B-roll do Pexels (chave da API).
 - **Nenhuma IA real foi implementada ainda.** `MODO_IA=simulado`, e o job `teste` só simula as etapas. O job `diagnostico_gpu` confere a GPU no Nitro.
 
 ### O que espera o Nitro 5 (ordem sugerida)

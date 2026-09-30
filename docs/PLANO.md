@@ -54,7 +54,6 @@ Não entram no plano: avatar de IA, dublagem, clonagem de voz, lip-sync e corre�
 | Legenda só queimada pelo FFmpeg | **Legenda desenhada no navegador para prévia e em ASS para exportação** | A prévia fica instantânea enquanto a pessoa edita. As duas saídas vêm da mesma especificação de estilo. |
 | Upload simples | **Upload retomável (protocolo tus)** | A gravação de um culto passa fácil de 5 GB. Se a internet da igreja cair no meio, o upload continua de onde parou. |
 | HolyMoments só com LLM | **Sinais de áudio e vídeo + LLM** | No louvor quase não há fala útil. Os momentos fortes aparecem na energia do áudio, nas mudanças de cena e, opcionalmente, num modelo de visão. |
-| Chat unificado das lives como "ligação futura" | **Picos do chat viram marcadores de momento** | Onde o chat da live explode costuma ser um momento marcante. É um sinal barato e muito bom para o HolyMoments. |
 | Servidor na nuvem ou GPU alugada | **O próprio notebook como servidor, exposto por Cloudflare Tunnel** | Custo zero de hospedagem. O túnel sai do notebook para a Cloudflare, então não precisa abrir porta no roteador nem ter IP fixo (seção 11). |
 
 ---
@@ -241,7 +240,7 @@ Uma transcrição de 2 horas tem cerca de 20 mil palavras e ocupa perto de 1,5 M
 | 3 | `transcricao` | GPU | WhisperX em português com alinhamento por palavra e, se ligado, separação de falantes |
 | 4 | `analise_fala` | CPU | Silêncios, vícios de fala e trechos de música x fala |
 | 5 | `analise_video` | CPU/GPU | Mudança de cena e trajetória do rosto para o recorte vertical, com suavização |
-| 6 | `analise_momentos` | CPU/GPU | Energia do áudio, cenas, picos do chat da live e, opcionalmente, nota visual |
+| 6 | `analise_momentos` | CPU/GPU | Energia do áudio, cenas e, opcionalmente, nota visual |
 | 7 | `sugestao_cortes` | GPU | LLM lê a transcrição em blocos e devolve trechos em JSON, com título, gancho, nota e motivo |
 | 8 | `renderizacao` | CPU/GPU | Monta o vídeo final (detalhe abaixo) |
 | 9 | `textos_post` | GPU | Legenda do post, hashtags e título para cada rede |
@@ -567,7 +566,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] **HolySermon:** o LLM sugere de 5 a 10 cortes por pregação, e cada um abre no editor com um clique
 - [ ] Títulos, legendas de post e hashtags gerados por rede
 - [ ] Reenquadramento seguindo o rosto e zoom dinâmico nas ênfases
-- [ ] **HolyMoments:** energia do áudio, cenas, picos do chat da live e nota visual opcional
+- [ ] **HolyMoments:** energia do áudio, cenas e nota visual opcional
 - [x] **Sua Identidade:** kit da igreja aplicado automaticamente em todo projeto (logo, cor de destaque e @; o logo entra ligado em todo Reel novo)
 - [x] Biblioteca de músicas com licença registrada e volume que abaixa sob a fala (a faixa só entra com a licença; CC BY exige o crédito e o editor lembra de pôr na legenda; a música abaixa cerca de 14 dB quando há voz, pelo sidechaincompress do FFmpeg)
 - [x] Filtros e correção de cor (Natural, Quente, Frio, Cinema, P&B e Vivo, com intensidade; matrizes de cor em vez de LUTs, para a prévia sair igual ao render)
@@ -580,7 +579,6 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] B-roll pelo Pexels, com busca feita pelo LLM a partir da frase
 - [x] Fluxo de aprovação: o editor manda e o pastor ou líder aprova pelo celular (por um link de 7 dias, sem conta: aprova ou pede ajuste com comentário, e o editor vê a resposta sozinho)
 - [x] Agente de pasta monitorada: um script no PC da mídia envia sozinho a gravação do OBS quando o culto termina (`apps/agente`, baixado pelo site em .zip; usa uma chave de envio que só serve para enviar e pode ser revogada)
-- [ ] Integração com o projeto do chat unificado das lives
 - [ ] Publicação direta no YouTube, que é a API mais simples, e depois Instagram e TikTok
 
 ### Fase 4 — SaaS (quando houver demanda)
