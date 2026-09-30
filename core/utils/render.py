@@ -27,6 +27,11 @@ LUFS_ALVO = -14            # padrão de volume das redes sociais
 PICO_MAXIMO_DB = -1.5
 FADE_ENTRADA = 0.05
 FADE_SAIDA = 0.08
+# Música abaixando sob a fala (sidechaincompress): começa a agir com a voz acima de ~-34 dBFS
+LIMIAR_FALA = 0.02
+RAZAO_ABAIXAR = 10
+ATAQUE_MS = 15
+SOLTURA_MS = 400
 
 
 def alinhar(segundos: float) -> float:
@@ -112,27 +117,42 @@ def _sobrepor(camadas: list[tuple[float, float]] | None, duracao: float | None) 
 def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: int, altura: int,
                   tem_audio: bool, normalizar: bool = True,
                   camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None,
-                  cor: dict | None = None) -> str:
+                  cor: dict | None = None, musica: dict | None = None) -> str:
     """
     Grafo de filtros completo, com as saídas [v] e [a].
     camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. A camada i é a
     entrada i + 1 do FFmpeg (a entrada 0 é a gravação).
+    musica: {"entrada": índice da faixa no FFmpeg, "volume": 0 a 1, "abaixar_na_fala": bool}.
     """
     selecao = expressao_selecao(trechos)
     duracao = duracao_dos_trechos(trechos)
     video = (f"[0:v]setpts=PTS-STARTPTS,fps={FPS},select='{selecao}',setpts=N/{FPS}/TB,"
              f"{_enquadrar(recorte, largura, altura, fundo, cor)}{_sobrepor(camadas, duracao)}")
-    if not tem_audio:
+    if not tem_audio and not musica:
         return video
-    audio = (
-        f"[0:a]asetpts=PTS-STARTPTS,aresample={TAXA_AUDIO},asetnsamples=n={AMOSTRAS_POR_QUADRO}:p=0,"
-        f"aselect='{selecao}',asetpts=N/SR/TB"
-    )
-    if normalizar:
-        audio += f",loudnorm=I={LUFS_ALVO}:TP={PICO_MAXIMO_DB}:LRA=11,aresample={TAXA_AUDIO}"
-    audio += (f",afade=t=in:d={FADE_ENTRADA},"
-              f"afade=t=out:st={max(duracao - FADE_SAIDA, 0):.3f}:d={FADE_SAIDA}[a]")
-    return f"{video};\n{audio}"
+
+    acabamento = f"loudnorm=I={LUFS_ALVO}:TP={PICO_MAXIMO_DB}:LRA=11,aresample={TAXA_AUDIO}," if normalizar else ""
+    acabamento += (f"afade=t=in:d={FADE_ENTRADA},"
+                   f"afade=t=out:st={max(duracao - FADE_SAIDA, 0):.3f}:d={FADE_SAIDA}[a]")
+    voz = (f"[0:a]asetpts=PTS-STARTPTS,aresample={TAXA_AUDIO},asetnsamples=n={AMOSTRAS_POR_QUADRO}:p=0,"
+           f"aselect='{selecao}',asetpts=N/SR/TB")
+    if not musica:
+        return f"{video};\n{voz},{acabamento}"
+
+    faixa = (f"[{musica['entrada']}:a]aresample={TAXA_AUDIO},aformat=channel_layouts=stereo,"
+             f"atrim=0:{duracao:.3f},asetpts=PTS-STARTPTS,volume={float(musica['volume']):.3f}")
+    if not tem_audio:
+        return f"{video};\n{faixa},{acabamento}"
+    partes = [video]
+    if musica.get("abaixar_na_fala", True):
+        # A voz vira a "chave" do compressor: quando alguém fala, a música abaixa sozinha
+        partes += [f"{voz},aformat=channel_layouts=stereo,asplit=2[voz][chave]", f"{faixa}[musica0]",
+                   f"[musica0][chave]sidechaincompress=threshold={LIMIAR_FALA}:ratio={RAZAO_ABAIXAR}"
+                   f":attack={ATAQUE_MS}:release={SOLTURA_MS}[musica]"]
+    else:
+        partes += [f"{voz},aformat=channel_layouts=stereo[voz]", f"{faixa}[musica]"]
+    partes.append(f"[voz][musica]amix=inputs=2:duration=first:normalize=0,{acabamento}")
+    return ";\n".join(partes)
 
 
 def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_camadas: int = 0,

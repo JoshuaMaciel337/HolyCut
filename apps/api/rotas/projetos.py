@@ -21,6 +21,7 @@ from api.esquemas import (
 from api.rotas.exportacoes import apagar_exportacoes
 from api.rotas.identidade import carregar_identidade
 from api.rotas.modelos import buscar_modelo
+from api.rotas.musicas import buscar_musica
 from core.modelos.job import montar_job
 from core.modelos.midia import STATUS_PRONTA
 from core.modelos.projeto import DURACAO_MINIMA_TRECHO, montar_exportacao, montar_projeto
@@ -104,6 +105,8 @@ async def atualizar_projeto(projeto_id: str, dados: ProjetoAtualizarEntrada,
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O texto precisa terminar depois de começar.")
     if dados.textos is not None and len({texto.id for texto in dados.textos}) != len(dados.textos):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Dois textos com o mesmo identificador.")
+    if dados.musica is not None and dados.musica.id is not None:
+        await buscar_musica(db, dados.musica.id, usuario)
     if not campos:
         return projeto_para_saida(projeto)
 

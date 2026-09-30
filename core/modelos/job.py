@@ -21,6 +21,7 @@ TAREFAS = {
     "diagnostico_gpu": RECURSO_GPU,
     "ingestao": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
+    "preparar_musica": RECURSO_CPU,
 }
 
 

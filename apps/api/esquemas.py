@@ -110,6 +110,7 @@ IntensidadeCorte = Literal["leve", "media", "forte"]
 PosicaoLogo = Literal["topo_esquerda", "topo_direita", "base_esquerda", "base_direita"]
 EstiloTexto = Literal["destaque", "limpo", "manuscrito"]
 PosicaoTexto = Literal["topo", "centro", "base"]
+LicencaMusica = Literal["propria", "dominio_publico", "cc_by", "licenciada"]
 
 
 class IdentidadeSaida(BaseModel):
@@ -153,6 +154,43 @@ class FundoEntrada(BaseModel):
 class CorEntrada(BaseModel):
     filtro: Literal["natural", "quente", "frio", "cinema", "pb", "vivo"] = "natural"
     intensidade: float = Field(default=1.0, ge=0, le=1)
+
+
+class MusicaProjetoEntrada(BaseModel):
+    id: str | None = Field(default=None, max_length=24, description="None: sem música")
+    volume: float = Field(default=0.25, ge=0, le=1)
+    abaixar_na_fala: bool = True
+    inicio: float = Field(default=0, ge=0, description="Segundo da música em que o vídeo começa")
+
+
+class MusicaCriarEntrada(BaseModel):
+    titulo: str = Field(min_length=1, max_length=120)
+    artista: str = Field(default="", max_length=120)
+    licenca: LicencaMusica
+    atribuicao: str = Field(default="", max_length=300, description="Obrigatória na CC BY")
+    fonte: str = Field(default="", max_length=300, description="Onde a música foi obtida")
+
+
+class MusicaAtualizarEntrada(BaseModel):
+    titulo: str | None = Field(default=None, min_length=1, max_length=120)
+    artista: str | None = Field(default=None, max_length=120)
+    licenca: LicencaMusica | None = None
+    atribuicao: str | None = Field(default=None, max_length=300)
+    fonte: str | None = Field(default=None, max_length=300)
+
+
+class MusicaSaida(BaseModel):
+    id: str
+    titulo: str
+    artista: str
+    licenca: str
+    licenca_nome: str
+    atribuicao: str
+    fonte: str
+    status: str
+    duracao: float | None = None
+    erro: str | None = None
+    criado_em: datetime
 
 
 class FiltroSaida(BaseModel):
@@ -210,6 +248,7 @@ class ProjetoAtualizarEntrada(BaseModel):
     textos: list[TextoEntrada] | None = Field(default=None, max_length=6)
     fundo: FundoEntrada | None = None
     cor: CorEntrada | None = None
+    musica: MusicaProjetoEntrada | None = None
 
 
 class ProjetoSaida(BaseModel):
@@ -226,6 +265,7 @@ class ProjetoSaida(BaseModel):
     textos: list[TextoEntrada] = []
     fundo: FundoEntrada = FundoEntrada()
     cor: CorEntrada = CorEntrada()
+    musica: MusicaProjetoEntrada = MusicaProjetoEntrada()
     modelo_id: str | None = None
     versao: int
     criado_em: datetime

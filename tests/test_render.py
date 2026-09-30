@@ -111,6 +111,33 @@ def test_filtro_sem_audio_e_sem_normalizar():
     assert "loudnorm" not in com_audio
 
 
+def test_filtro_com_musica_abaixando_sob_a_fala():
+    recorte = calcular_recorte(1920, 1080, "9:16")
+    musica = {"entrada": 3, "volume": 0.3, "abaixar_na_fala": True}
+    partes = montar_filtro([(0.0, 2.0), (3.0, 5.0)], recorte, 1080, 1920, tem_audio=True,
+                           camadas=[(0, 4), (1, 2)], musica=musica).split(";\n")
+    assert partes[-4].endswith("asplit=2[voz][chave]")        # a voz vai para a mixagem e para a chave
+    assert partes[-3] == ("[3:a]aresample=48000,aformat=channel_layouts=stereo,atrim=0:4.000,"
+                          "asetpts=PTS-STARTPTS,volume=0.300[musica0]")
+    assert partes[-2].startswith("[musica0][chave]sidechaincompress=threshold=0.02:ratio=10:")
+    assert partes[-2].endswith("[musica]")
+    assert partes[-1].startswith("[voz][musica]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-14")
+    assert partes[-1].endswith("[a]")
+    assert len(re.findall(r"\[a\]", ";".join(partes))) == 1
+
+
+def test_filtro_com_musica_sem_abaixar_e_sem_audio_na_gravacao():
+    recorte = calcular_recorte(1920, 1080, "9:16")
+    musica = {"entrada": 1, "volume": 0.5, "abaixar_na_fala": False}
+    sem_abaixar = montar_filtro([(0.0, 2.0)], recorte, 1080, 1920, tem_audio=True, musica=musica)
+    assert "sidechaincompress" not in sem_abaixar
+    assert "[voz][musica]amix=inputs=2" in sem_abaixar
+
+    so_musica = montar_filtro([(0.0, 2.0)], recorte, 1080, 1920, tem_audio=False, musica=musica).split(";\n")
+    assert len(so_musica) == 2 and "[0:a]" not in so_musica[1]   # a gravação muda não entra no áudio
+    assert so_musica[1].startswith("[1:a]aresample=48000") and so_musica[1].endswith("[a]")
+
+
 # -----------------------------------------------
 # PROJETO E EXPORTAÇÃO
 # -----------------------------------------------
@@ -120,12 +147,14 @@ def test_projeto_e_exportacao_guardam_a_configuracao():
     assert projeto["nome"] == "Reel · Culto de domingo"
     assert projeto["trecho"] == {"inicio": 0.0, "fim": 2400.46}
     assert projeto["silencios"] == {"intensidade": "media"}
+    assert projeto["musica"] == {"id": None, "volume": 0.25, "abaixar_na_fala": True, "inicio": 0.0}
     with pytest.raises(ValueError):
         montar_projeto("org1", midia, "u1", proporcao="3:2")
 
     projeto["_id"] = "p1"
     exportacao = montar_exportacao(projeto, "u1")
     assert exportacao["configuracao"]["trecho"] == projeto["trecho"]
+    assert exportacao["configuracao"]["musica"] == projeto["musica"]
     assert (exportacao["largura"], exportacao["altura"]) == (1080, 1920)
     projeto["trecho"]["fim"] = 30.0            # editar o projeto depois
     projeto["enquadramento"]["zoom"] = 2.0

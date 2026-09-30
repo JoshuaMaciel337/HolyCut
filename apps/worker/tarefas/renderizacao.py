@@ -15,11 +15,14 @@ from collections.abc import Callable
 
 import numpy as np
 from bson import ObjectId
+from bson.errors import InvalidId
 from PIL import Image
 
 from core.modelos.identidade import chave_logo, identidade_padrao
 from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import ARQUIVO_NIVEIS, chave_arquivo
+from core.modelos.musica import ARQUIVO_MUSICA, MUSICA_DO_PROJETO_PADRAO, chave_musica
+from core.modelos.musica import STATUS_PRONTA as STATUS_MUSICA_PRONTA
 from core.modelos.projeto import (
     ARQUIVO_CAPA_EXPORTADA,
     ARQUIVO_IMAGEM_EXPORTADA,
@@ -91,6 +94,24 @@ def desenhar_camadas(db, organizacao_id, config: dict, largura: int, altura: int
                               float(texto.get("tamanho") or 1.0))
         camadas.append((imagem, inicio_texto, fim_texto))
     return camadas
+
+
+def musica_do_projeto(db, organizacao_id, escolha: dict | None):
+    """(arquivo, ajustes) da faixa escolhida, ou None se não houver música ou ela não estiver pronta."""
+    if not escolha or not escolha.get("id"):
+        return None
+    try:
+        musica = db.musicas.find_one({"_id": ObjectId(escolha["id"]), "organizacao_id": organizacao_id})
+    except InvalidId:
+        musica = None
+    caminho = (storage.caminho_local(chave_musica(organizacao_id, musica["_id"], ARQUIVO_MUSICA))
+               if musica and musica.get("status") == STATUS_MUSICA_PRONTA else None)
+    if caminho is None or not caminho.is_file():
+        logging.warning(f"[{organizacao_id}] A música {escolha['id']} não está pronta. O vídeo sai sem ela.")
+        return None
+    ajustes = {**MUSICA_DO_PROJETO_PADRAO, **escolha}
+    ajustes["inicio"] = min(max(float(ajustes["inicio"] or 0), 0.0), max(float(musica.get("duracao") or 0) - 1, 0.0))
+    return caminho, ajustes
 
 
 def cortes_de_silencio(midia: dict, intensidade: str | None) -> list[tuple[float, float]]:
@@ -200,17 +221,28 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, nome), para_png(imagem))
         entradas_camadas += ["-loop", "1", "-framerate", str(FPS), "-t", f"{duracao:.3f}", "-i", str(caminho(nome))]
 
+    # Música da biblioteca, em loop a partir do ponto escolhido, depois das camadas nas entradas do FFmpeg
+    faixa = musica_do_projeto(db, organizacao_id, config.get("musica"))
+    entradas_musica, musica = [], None
+    if faixa:
+        caminho_faixa, ajustes = faixa
+        entradas_musica = ["-stream_loop", "-1", "-ss", f"{ajustes['inicio']:.3f}", "-i", str(caminho_faixa)]
+        musica = {"entrada": 1 + len(camadas), "volume": ajustes["volume"],
+                  "abaixar_na_fala": ajustes["abaixar_na_fala"]}
+    tem_saida_de_audio = bool(midia.get("audio")) or musica is not None
+
     filtro = montar_filtro(trechos, recorte, largura, altura, tem_audio=bool(midia.get("audio")),
                            normalizar=(config.get("audio") or {}).get("normalizar", True),
                            camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas],
-                           fundo=config.get("fundo"), cor=config.get("cor"))
+                           fundo=config.get("fundo"), cor=config.get("cor"), musica=musica)
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
     saida = caminho(ARQUIVO_VIDEO_EXPORTADO)
     argumentos = [
         "-ss", f"{inicio:.3f}", "-t", f"{fim - inicio:.3f}", "-i", str(original),
         *entradas_camadas,
+        *entradas_musica,
         *opcao_filtro_em_arquivo(str(caminho(ARQUIVO_FILTRO))),
-        "-map", "[v]", *(["-map", "[a]"] if midia.get("audio") else []),
+        "-map", "[v]", *(["-map", "[a]"] if tem_saida_de_audio else []),
         "-c:v", "libx264", "-preset", PRESET_X264, "-crf", CRF_X264, "-profile:v", "high",
         "-r", str(FPS), "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(saida),
     ]

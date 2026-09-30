@@ -50,9 +50,10 @@ def test_espera_retry_cresce_e_para_no_maximo():
 
 
 def test_tipos_por_recursos():
-    assert tipos_por_recursos(["cpu"]) == ["teste", "ingestao", "renderizacao"]
+    assert tipos_por_recursos(["cpu"]) == ["teste", "ingestao", "renderizacao", "preparar_musica"]
     assert tipos_por_recursos(["gpu"]) == ["diagnostico_gpu"]
-    assert set(tipos_por_recursos(["cpu", "gpu"])) == {"teste", "diagnostico_gpu", "ingestao", "renderizacao"}
+    assert set(tipos_por_recursos(["cpu", "gpu"])) == {"teste", "diagnostico_gpu", "ingestao", "renderizacao",
+                                                        "preparar_musica"}
 
 
 # -----------------------------------------------

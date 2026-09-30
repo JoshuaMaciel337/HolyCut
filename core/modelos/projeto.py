@@ -9,6 +9,7 @@ from datetime import datetime
 from core.config import TZ
 from core.modelos.identidade import marca_padrao
 from core.modelos.modelos_story import DURACAO_PADRAO_STORY, aplicar_modelo
+from core.modelos.musica import MUSICA_DO_PROJETO_PADRAO
 
 PROPORCOES = {
     "9:16": (1080, 1920),   # Reels, Stories, TikTok, Shorts
@@ -35,7 +36,8 @@ DESFOQUE_MAXIMO = 30
 
 # Campos do projeto que definem o vídeo. A exportação guarda uma cópia deles,
 # então editar o projeto depois não muda um vídeo já exportado.
-CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos", "fundo", "cor")
+CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos", "fundo", "cor",
+                   "musica")
 
 
 def _id_do_modelo(modelo: dict | None) -> str | None:
@@ -81,6 +83,7 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         "textos": visual.get("textos", []),
         "fundo": {**FUNDO_PADRAO, **visual.get("fundo", {})},
         "cor": {**COR_PADRAO, **visual.get("cor", {})},
+        "musica": dict(MUSICA_DO_PROJETO_PADRAO),
         "versao": 1,
         "criado_em": momento,
         "atualizado_em": momento,

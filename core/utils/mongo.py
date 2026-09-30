@@ -27,6 +27,7 @@ INDICES = {
         ([("status", 1), ("lease_ate", 1)], {}),
         ([("entrada.midia_id", 1)], {}),
         ([("entrada.exportacao_id", 1)], {}),
+        ([("entrada.musica_id", 1)], {}),
     ],
     "midias": [
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
@@ -34,6 +35,9 @@ INDICES = {
     "projetos": [
         ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
         ([("midia_id", 1)], {}),
+    ],
+    "musicas": [
+        ([("organizacao_id", 1), ("criado_em", -1)], {}),
     ],
     "modelos": [
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
