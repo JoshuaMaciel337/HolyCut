@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from api.rotas import (
+    acervo,
     aprovar,
     auth,
     chaves_envio,
@@ -126,3 +127,4 @@ app.include_router(modelos.router)
 app.include_router(musicas.router)
 app.include_router(chaves_envio.router)
 app.include_router(aprovar.router)
+app.include_router(acervo.router)

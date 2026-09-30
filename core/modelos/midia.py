@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import PurePosixPath
 
 from core.config import EXTENSOES_AUDIO, EXTENSOES_VIDEO, TZ
+from core.modelos.culto import ARQUIVO_BANNER, ARQUIVO_POSTER
 
 STATUS_ENVIANDO = "enviando"        # upload em andamento
 STATUS_PROCESSANDO = "processando"  # ingestão na fila ou rodando
@@ -22,8 +23,9 @@ ARQUIVO_CAPA = "capa.jpg"
 # Nível do áudio em dB a cada 10 ms (int8). Base do corte de silêncios. Uso interno.
 ARQUIVO_NIVEIS = "niveis.bin"
 NIVEIS_POR_SEGUNDO = 100
+# As capas do acervo (pôster e banner) são desenhadas depois, pelo job capas_culto
 ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_ONDA,
-                     ARQUIVO_MINIATURAS, ARQUIVO_CAPA}
+                     ARQUIVO_MINIATURAS, ARQUIVO_CAPA, ARQUIVO_POSTER, ARQUIVO_BANNER}
 
 
 def extensao_aceita(nome_arquivo: str) -> str | None:

@@ -22,6 +22,7 @@ TAREFAS = {
     "ingestao": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "preparar_musica": RECURSO_CPU,
+    "capas_culto": RECURSO_CPU,
 }
 
 

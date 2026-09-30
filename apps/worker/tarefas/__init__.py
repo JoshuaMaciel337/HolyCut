@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from worker.tarefas.capas import executar_capas_culto
 from worker.tarefas.diagnostico_gpu import executar_diagnostico_gpu
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.preparar_musica import executar_preparar_musica, marcar_musica_com_erro
@@ -23,4 +24,5 @@ REGISTRO = {
     "ingestao": Tarefa(executar_ingestao, ao_falhar=marcar_midia_com_erro),
     "renderizacao": Tarefa(executar_renderizacao, ao_falhar=marcar_exportacao_com_erro),
     "preparar_musica": Tarefa(executar_preparar_musica, ao_falhar=marcar_musica_com_erro),
+    "capas_culto": Tarefa(executar_capas_culto),
 }

@@ -1,12 +1,13 @@
 # -----------------------------------------------
 # HolyCut API — formatos de entrada e saída
 # -----------------------------------------------
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from core.modelos.aprovacao import expirada
+from core.modelos.culto import ficha_do_culto
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
 from core.modelos.projeto import MAXIMO_PARTES, partes_do_projeto
@@ -78,6 +79,25 @@ class ProcessamentoSaida(BaseModel):
     mensagem: str
 
 
+class FichaCultoEntrada(BaseModel):
+    data: date | None = Field(default=None, description="Dia do culto")
+    pregador: str = Field(default="", max_length=80)
+    serie: str = Field(default="", max_length=80, description="Série de mensagens, se houver")
+    descricao: str = Field(default="", max_length=500)
+
+    @field_validator("pregador", "serie", "descricao", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return " ".join(valor.split()) if isinstance(valor, str) else valor
+
+
+class FichaCultoSaida(BaseModel):
+    data: str
+    pregador: str = ""
+    serie: str = ""
+    descricao: str = ""
+
+
 class MidiaSaida(BaseModel):
     id: str
     nome: str
@@ -90,11 +110,48 @@ class MidiaSaida(BaseModel):
     audio: dict | None = None
     miniaturas: dict | None = None
     arquivos: list[str] = []
+    ficha: FichaCultoSaida
+    capa_versao: int | None = None
+    capa_personalizada: bool = False
     erro: str | None = None
     processamento: ProcessamentoSaida | None = None
     criado_em: datetime
     atualizado_em: datetime
     enviado_em: datetime | None = None
+
+
+class CultoResumoSaida(BaseModel):
+    """Um culto nas fileiras do acervo."""
+    id: str
+    titulo: str
+    data: str
+    pregador: str = ""
+    serie: str = ""
+    descricao: str = ""
+    duracao: float | None = None
+    video: bool
+    capa_versao: int | None = Field(description="Muda quando as capas são redesenhadas")
+    cortes: int = Field(description="Vídeos e imagens prontos deste culto")
+    em_edicao: int = Field(description="Reels e Stories criados a partir deste culto")
+
+
+class FileiraSaida(BaseModel):
+    id: str
+    titulo: str
+    ids: list[str]
+
+
+class AcervoSaida(BaseModel):
+    cultos: list[CultoResumoSaida]
+    destaque: str | None
+    fileiras: list[FileiraSaida]
+    series: list[str]
+    pregadores: list[str]
+    preparando: int = Field(description="Gravações que ainda estão chegando ou sendo preparadas")
+
+
+class CapaEntrada(BaseModel):
+    instante: float = Field(ge=0, description="Segundo da gravação usado como fundo da capa")
 
 
 class SilenciosSaida(BaseModel):
@@ -402,7 +459,8 @@ def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida
 
 
 class MidiaAtualizarEntrada(BaseModel):
-    nome: str = Field(min_length=1, max_length=120)
+    nome: str | None = Field(default=None, min_length=1, max_length=120, description="O título do culto")
+    ficha: FichaCultoEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -437,8 +495,12 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                                            mensagem=job.get("mensagem", ""))
         if job["status"] == STATUS_JOB_ERRO:  # o worker caiu de vez sem avisar a mídia
             status, erro = STATUS_ERRO, erro or job.get("erro")
+    capa = doc.get("capa") or {}
     return MidiaSaida.model_validate({
         **doc,
+        "ficha": ficha_do_culto(doc),
+        "capa_versao": capa.get("versao"),
+        "capa_personalizada": bool(capa.get("personalizada")),
         "id": str(doc["_id"]),
         "status": status,
         "erro": erro,

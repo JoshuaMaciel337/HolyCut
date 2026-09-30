@@ -85,14 +85,17 @@ async def apagar_exportacoes(db, filtro: dict):
 # ROTAS
 # -----------------------------------------------
 @router.get("", response_model=list[ExportacaoSaida])
-async def listar_exportacoes(projeto_id: str | None = None, limite: int = Query(default=20, ge=1, le=100),
+async def listar_exportacoes(projeto_id: str | None = None, midia_id: str | None = None,
+                             limite: int = Query(default=20, ge=1, le=100),
                              usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Do projeto, da gravação (todos os cortes de um culto) ou da igreja toda."""
     filtro = {"organizacao_id": usuario["organizacao_id"]}
-    if projeto_id:
-        try:
-            filtro["projeto_id"] = ObjectId(projeto_id)
-        except InvalidId:
-            return []
+    for campo, valor in (("projeto_id", projeto_id), ("midia_id", midia_id)):
+        if valor:
+            try:
+                filtro[campo] = ObjectId(valor)
+            except InvalidId:
+                return []
     cursor = db.exportacoes.find(filtro).sort("criado_em", -1).limit(limite)
     return await para_saida(db, [e async for e in cursor])
 

@@ -35,6 +35,7 @@ from core.modelos.midia import (
 from core.utils import storage
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
 from core.utils.mongo import agora
+from worker.tarefas.capas import gerar_capas
 
 # -----------------------------------------------
 # CONFIGURAÇÕES
@@ -210,5 +211,10 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
         "processado_em": momento,
         "atualizado_em": momento,
     }})
+    # As capas do acervo são um extra: se falharem, a gravação continua pronta e dá para pedir de novo
+    try:
+        gerar_capas(db, db.midias.find_one({"_id": midia_id}))
+    except Exception as e:
+        logging.warning(f"[{organizacao_id}] Não foi possível desenhar as capas de {midia_id}: {e}")
     reportar(100, "Pronta para editar")
     return {"midia_id": str(midia_id), "duracao": duracao, "arquivos": arquivos}

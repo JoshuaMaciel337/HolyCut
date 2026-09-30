@@ -9,23 +9,26 @@ from typing import Literal
 import numpy as np
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import MidiaAtualizarEntrada, MidiaSaida, SilenciosSaida, midia_para_saida
+from api.esquemas import CapaEntrada, MidiaAtualizarEntrada, MidiaSaida, SilenciosSaida, midia_para_saida
 from api.rotas.exportacoes import apagar_exportacoes
+from core.modelos.culto import ARQUIVO_FUNDO_CAPA, CAPA_IMAGEM_MAX_BYTES
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
-from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE
+from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
     ARQUIVO_NIVEIS,
     ARQUIVOS_PUBLICOS,
     STATUS_PROCESSANDO,
+    STATUS_PRONTA,
     chave_arquivo,
     pasta_da_midia,
 )
 from core.utils import storage
+from core.utils.arte import ErroImagem, preparar_fundo_capa
 from core.utils.mongo import agora
 from core.utils.silencios import INTENSIDADES, MARGEM_PADRAO, detectar_silencios, tempo_cortado
 
@@ -39,6 +42,7 @@ TIPOS_ARQUIVO = {
 }
 # Os arquivos de uma mídia não mudam depois de gerados
 CACHE_ARQUIVOS = "private, max-age=86400"
+PRIORIDADE_CAPAS = 7   # rápido, e a pessoa está vendo a capa mudar
 
 
 # -----------------------------------------------
@@ -74,6 +78,17 @@ def carregar_niveis(caminho: Path) -> np.ndarray:
     return _ler_niveis(str(caminho), caminho.stat().st_mtime)
 
 
+async def pedir_capas(db, midia: dict, usuario: dict):
+    """Põe o redesenho das capas na fila, se ainda não houver um esperando para esta gravação."""
+    if midia["status"] != STATUS_PRONTA:
+        return   # a ingestão desenha as capas quando termina
+    ja_na_fila = await db.jobs.find_one({"tipo": "capas_culto", "entrada.midia_id": str(midia["_id"]),
+                                         "status": STATUS_PENDENTE})
+    if ja_na_fila is None:
+        await db.jobs.insert_one(montar_job("capas_culto", midia["organizacao_id"], {"midia_id": str(midia["_id"])},
+                                            prioridade=PRIORIDADE_CAPAS, criado_por=usuario["_id"]))
+
+
 async def para_saida(db, midias: list[dict]) -> list[MidiaSaida]:
     jobs = await jobs_de_ingestao(db, midias)
     return [midia_para_saida(m, jobs.get(m.get("job_ingestao_id"))) for m in midias]
@@ -95,11 +110,73 @@ async def ver_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depends(ob
 
 
 @router.patch("/{midia_id}", response_model=MidiaSaida)
-async def renomear_midia(midia_id: str, dados: MidiaAtualizarEntrada,
-                         usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def atualizar_midia(midia_id: str, dados: MidiaAtualizarEntrada,
+                          usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """O título (nome) e a ficha do culto. Mudar o que aparece na capa redesenha as capas."""
     midia = await buscar_midia(db, midia_id, usuario)
-    await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"nome": dados.nome, "atualizado_em": agora()}})
-    return (await para_saida(db, [{**midia, "nome": dados.nome}]))[0]
+    campos = {}
+    if dados.nome is not None:
+        campos["nome"] = dados.nome
+    if dados.ficha is not None:
+        ficha = dados.ficha.model_dump()
+        ficha["data"] = ficha["data"].isoformat() if ficha["data"] else None
+        campos["ficha"] = ficha
+    if not campos:
+        return (await para_saida(db, [midia]))[0]
+    await db.midias.update_one({"_id": midia["_id"]}, {"$set": {**campos, "atualizado_em": agora()}})
+    atualizada = {**midia, **campos}
+    await pedir_capas(db, atualizada, usuario)
+    return (await para_saida(db, [atualizada]))[0]
+
+
+@router.post("/{midia_id}/capa", response_model=MidiaSaida)
+async def escolher_quadro_da_capa(midia_id: str, dados: CapaEntrada,
+                                  usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Usa o quadro deste instante da gravação como fundo das capas."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if not midia.get("video"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Esta gravação não tem vídeo. Envie uma imagem.")
+    capa = {**(midia.get("capa") or {}), "instante": round(min(dados.instante, midia.get("duracao") or 0), 2),
+            "personalizada": False}
+    await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"capa": capa, "atualizado_em": agora()}})
+    await pedir_capas(db, {**midia, "capa": capa}, usuario)
+    return (await para_saida(db, [{**midia, "capa": capa}]))[0]
+
+
+@router.put("/{midia_id}/capa/imagem", response_model=MidiaSaida)
+async def enviar_imagem_da_capa(midia_id: str, request: Request,
+                                usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """O corpo é a própria imagem (JPG, PNG ou WEBP). Ela vira o fundo das capas."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    conteudo = bytearray()
+    async for pedaco in request.stream():
+        conteudo += pedaco
+        if len(conteudo) > CAPA_IMAGEM_MAX_BYTES:
+            raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "A imagem pode ter no máximo 10 MB.")
+    if not conteudo:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Envie uma imagem.")
+    try:
+        jpeg = await run_in_threadpool(preparar_fundo_capa, bytes(conteudo))
+    except ErroImagem as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+    chave = chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_FUNDO_CAPA)
+    if not await run_in_threadpool(storage.salvar_bytes, chave, jpeg):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Não foi possível salvar a imagem.")
+    capa = {**(midia.get("capa") or {}), "personalizada": True}
+    await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"capa": capa, "atualizado_em": agora()}})
+    await pedir_capas(db, {**midia, "capa": capa}, usuario)
+    return (await para_saida(db, [{**midia, "capa": capa}]))[0]
+
+
+@router.delete("/{midia_id}/capa/imagem", response_model=MidiaSaida)
+async def remover_imagem_da_capa(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Volta a usar um quadro da gravação."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    await run_in_threadpool(storage.remover, chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_FUNDO_CAPA))
+    capa = {**(midia.get("capa") or {}), "personalizada": False}
+    await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"capa": capa, "atualizado_em": agora()}})
+    await pedir_capas(db, {**midia, "capa": capa}, usuario)
+    return (await para_saida(db, [{**midia, "capa": capa}]))[0]
 
 
 @router.delete("/{midia_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -9,6 +9,7 @@
 import io
 from functools import lru_cache
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, UnidentifiedImageError
 
 from core.config import PASTA_FONTES
@@ -172,4 +173,155 @@ def camada_texto(largura: int, altura: int, texto: str, estilo: str = "destaque"
 def para_png(imagem: Image.Image) -> bytes:
     saida = io.BytesIO()
     imagem.save(saida, format="PNG", compress_level=6)
+    return saida.getvalue()
+
+
+# -----------------------------------------------
+# CAPAS DO ACERVO
+# -----------------------------------------------
+FUNDO_ESCURO = (8, 9, 15)       # --hc-ink
+MAX_LINHAS_TITULO_POSTER = 4
+MAX_LINHAS_TITULO_BANNER = 3
+
+
+def _cobrir(imagem: Image.Image, largura: int, altura: int) -> Image.Image:
+    """Preenche o tamanho sem distorcer, cortando as sobras pelo centro (como o object-fit: cover)."""
+    escala = max(largura / imagem.width, altura / imagem.height)
+    tamanho = (max(round(imagem.width * escala), largura), max(round(imagem.height * escala), altura))
+    nova = imagem.resize(tamanho, Image.Resampling.LANCZOS)
+    x, y = (nova.width - largura) // 2, (nova.height - altura) // 2
+    return nova.crop((x, y, x + largura, y + altura))
+
+
+def fundo_sem_video(largura: int, altura: int, cor_destaque: str = "#FF8A00") -> Image.Image:
+    """Para gravação só de áudio: fundo escuro com um brilho da cor da igreja no canto."""
+    cor = np.array(_hex_para_rgb(cor_destaque), dtype=np.float32)
+    ys, xs = np.mgrid[0:altura, 0:largura]
+    distancia = np.hypot((xs - largura * 0.8) / largura, (ys - altura * 0.2) / altura)
+    brilho = np.clip(1 - distancia / 0.9, 0, 1)[..., None] ** 2 * 0.55
+    pixels = np.array(FUNDO_ESCURO, dtype=np.float32) * (1 - brilho) + cor * brilho
+    return Image.fromarray(pixels.astype(np.uint8), "RGB")
+
+
+def _escurecer(imagem: Image.Image, vertical: bool) -> Image.Image:
+    """Degradê escuro embaixo (e à esquerda, no banner), onde o texto fica."""
+    largura, altura = imagem.size
+    y = np.linspace(0, 1, altura, dtype=np.float32)[:, None]
+    x = np.linspace(0, 1, largura, dtype=np.float32)[None, :]
+    inicio = 0.32 if vertical else 0.4
+    alfa = np.clip((y - inicio) / (0.95 - inicio), 0, 1) ** 1.1 * 0.94
+    if not vertical:
+        alfa = np.maximum(alfa, np.clip(1 - x / 0.72, 0, 1) ** 1.2 * 0.88)
+    alfa = np.maximum(alfa, 0.16)   # um véu leve em tudo, para a imagem não brigar com o texto
+    pixels = np.asarray(imagem, dtype=np.float32)
+    escuro = np.array(FUNDO_ESCURO, dtype=np.float32)
+    resultado = pixels * (1 - alfa[..., None]) + escuro * alfa[..., None]
+    return Image.fromarray(resultado.astype(np.uint8), "RGB")
+
+
+def _titulo_que_cabe(titulo: str, largura_maxima: int, tamanho_inicial: int, max_linhas: int):
+    tamanho = tamanho_inicial
+    while True:
+        fonte = carregar_fonte("display", "forte", tamanho)
+        linhas = quebrar_linhas(titulo, fonte, largura_maxima)
+        # Uma palavra comprida não quebra: a fonte diminui até a linha mais larga caber
+        cabe = max(fonte.getlength(linha) for linha in linhas) <= largura_maxima
+        if (len(linhas) <= max_linhas and cabe) or tamanho <= 18:
+            break
+        tamanho = int(tamanho * 0.92)
+    if len(linhas) > max_linhas:
+        linhas = linhas[:max_linhas]
+        ultima = linhas[-1]
+        while ultima and fonte.getlength(ultima + "…") > largura_maxima:
+            ultima = ultima[:-1]
+        linhas[-1] = ultima.rstrip() + "…"
+    return fonte, linhas
+
+
+def desenhar_capa(base: Image.Image | None, largura: int, altura: int, titulo: str, informacao: str = "",
+                  serie: str = "", cor_destaque: str = "#FF8A00", logo_png: bytes | None = None) -> Image.Image:
+    """
+    Capa do culto no acervo: o quadro do vídeo (ou o fundo da cor da igreja, se não houver) com o
+    título na fonte da marca. Vertical (pôster 2:3) ou horizontal (banner 16:9).
+    """
+    vertical = altura > largura
+    fundo = _cobrir(base.convert("RGB"), largura, altura) if base is not None else fundo_sem_video(largura, altura,
+                                                                                                  cor_destaque)
+    imagem = _escurecer(fundo, vertical).convert("RGBA")
+    # O texto vai numa camada própria, para ganhar sombra e ler sobre qualquer quadro
+    camada = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+    desenho = ImageDraw.Draw(camada)
+    cor = _hex_para_rgb(cor_destaque)
+
+    margem = int(largura * 0.07) if vertical else int(altura * 0.08)
+    largura_texto = largura - 2 * margem if vertical else int(largura * 0.55)
+    tamanho_titulo = int(largura * 0.115) if vertical else int(altura * 0.105)
+    fonte_titulo, linhas = _titulo_que_cabe((titulo or "Culto").strip(), largura_texto, tamanho_titulo,
+                                            MAX_LINHAS_TITULO_POSTER if vertical else MAX_LINHAS_TITULO_BANNER)
+    fonte_info = carregar_fonte("texto", "normal", max(int(tamanho_titulo * 0.36), 12))
+    fonte_serie = carregar_fonte("texto", "forte", max(int(tamanho_titulo * 0.3), 11))
+    subida, descida = fonte_titulo.getmetrics()
+    altura_linha = int((subida + descida) * 1.02)
+
+    # De baixo para cima: informação, título, série e a faixa na cor da igreja
+    y = altura - margem
+    if informacao:
+        y -= sum(fonte_info.getmetrics())
+        desenho.text((margem, y), informacao, font=fonte_info, fill=(255, 255, 255, 215))
+        y -= int(tamanho_titulo * 0.28)
+    y -= altura_linha * len(linhas)
+    for indice, linha in enumerate(linhas):
+        desenho.text((margem, y + indice * altura_linha), linha, font=fonte_titulo, fill=(255, 255, 255, 255))
+    y -= int(tamanho_titulo * 0.2)
+    if serie:
+        texto_serie = serie.upper()
+        while texto_serie and fonte_serie.getlength(texto_serie) > largura_texto:
+            texto_serie = texto_serie[:-1]
+        y -= sum(fonte_serie.getmetrics())
+        desenho.text((margem, y), texto_serie, font=fonte_serie, fill=(*cor, 255))
+        y -= int(tamanho_titulo * 0.18)
+    espessura = max(int(tamanho_titulo * 0.08), 3)
+    desenho.rounded_rectangle((margem, y - espessura, margem + int(tamanho_titulo * 0.9), y),
+                              radius=espessura // 2, fill=(*cor, 255))
+
+    sombra = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+    sombra.putalpha(camada.getchannel("A").point(lambda valor: int(valor * 0.75)))
+    sombra = sombra.filter(ImageFilter.GaussianBlur(radius=max(int(tamanho_titulo * 0.12), 3)))
+    imagem.alpha_composite(sombra)
+    imagem.alpha_composite(camada)
+
+    if logo_png:
+        logo = Image.open(io.BytesIO(logo_png)).convert("RGBA")
+        alvo_altura = int(altura * (0.07 if vertical else 0.1))
+        logo = logo.resize((max(int(logo.width * alvo_altura / logo.height), 1), alvo_altura),
+                           Image.Resampling.LANCZOS)
+        if logo.width > largura * 0.4:
+            logo = logo.resize((int(largura * 0.4), max(int(logo.height * largura * 0.4 / logo.width), 1)),
+                               Image.Resampling.LANCZOS)
+        imagem.alpha_composite(logo, (margem, margem))
+    return imagem.convert("RGB")
+
+
+LADO_MAXIMO_FUNDO_CAPA = 1920
+
+
+def preparar_fundo_capa(conteudo: bytes) -> bytes:
+    """Valida a imagem enviada para a capa e devolve um JPG de até 1920 px, sem transparência."""
+    try:
+        imagem = Image.open(io.BytesIO(conteudo))
+        imagem.load()
+    except (UnidentifiedImageError, OSError) as e:
+        raise ErroImagem("O arquivo não é uma imagem JPG, PNG ou WEBP válida.") from e
+    if imagem.mode in ("RGBA", "LA", "P"):
+        fundo = Image.new("RGB", imagem.size, FUNDO_ESCURO)
+        fundo.paste(imagem.convert("RGBA"), mask=imagem.convert("RGBA").getchannel("A"))
+        imagem = fundo
+    imagem = imagem.convert("RGB")
+    imagem.thumbnail((LADO_MAXIMO_FUNDO_CAPA, LADO_MAXIMO_FUNDO_CAPA), Image.Resampling.LANCZOS)
+    return para_jpeg(imagem, qualidade=90)
+
+
+def para_jpeg(imagem: Image.Image, qualidade: int = 86) -> bytes:
+    saida = io.BytesIO()
+    imagem.convert("RGB").save(saida, format="JPEG", quality=qualidade, optimize=True, progressive=True)
     return saida.getvalue()

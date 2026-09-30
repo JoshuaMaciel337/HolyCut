@@ -64,7 +64,7 @@ def test_ingestao_de_video_horizontal(db_limpo):
     assert 11.5 < midia["duracao"] < 12.5
     assert midia["video"]["largura"] == 1920 and midia["video"]["fps"] == 60
     assert set(midia["arquivos"]) == {"proxy.mp4", "audio.wav", "forma_de_onda.json", "niveis.bin",
-                                      "miniaturas.jpg", "capa.jpg"}
+                                      "miniaturas.jpg", "capa.jpg", "poster.jpg", "banner.jpg"}
     assert 1150 <= arquivo_da(midia, "niveis.bin").stat().st_size <= 1250   # 12 s a 100 por segundo
     assert job["progresso"] == 100
 
@@ -98,7 +98,9 @@ def test_ingestao_de_audio(db_limpo):
     resultado, midia, _ = processar(db_limpo, midia_id)
     assert resultado == "concluido"
     assert midia["video"] is None
-    assert set(midia["arquivos"]) == {"proxy.m4a", "audio.wav", "forma_de_onda.json", "niveis.bin"}
+    # Sem vídeo, as capas do acervo saem com o fundo na cor da igreja
+    assert set(midia["arquivos"]) == {"proxy.m4a", "audio.wav", "forma_de_onda.json", "niveis.bin",
+                                      "poster.jpg", "banner.jpg"}
     assert midia["miniaturas"] is None
 
 
