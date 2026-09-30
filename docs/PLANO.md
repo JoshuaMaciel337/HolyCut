@@ -555,7 +555,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] Editor com prévia, edição pelo texto e linha do tempo simples. **Prévia enquadrada e linha do tempo com o trecho prontas**; a edição pelo texto depende da transcrição
 - [ ] Legendas animadas com 4 presets
 - [x] Reenquadramento 9:16 com recorte central e ponto ajustável (também 4:5, 1:1 e 16:9, com zoom)
-- [ ] HolyStories: 3 templates de story com frase de destaque e logo
+- [x] HolyStories: 3 templates de story com frase de destaque e logo (Culto de hoje, Frase da pregação e Versículo; exporta vídeo ou imagem)
 - [x] Exportação 1080x1920 com download e compartilhamento pelo celular (27 s escolhidos viraram 22 s de Reel em 17 s de render na CPU de desenvolvimento)
 
 **Pronto quando:** uma pregação de 40 minutos vira um Reel legendado em menos de 15 minutos de trabalho humano. Isso cobre cerca de 70% do uso real de um app como o Captions.
@@ -572,7 +572,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] Biblioteca de músicas com licença registrada e volume que abaixa sob a fala
 - [ ] Filtros e correção de cor com LUTs
 - [ ] Detecção de versículos com overlay. **Overlay pronto**: título, frase e versículo com referência, digitados, em três estilos; a detecção automática depende da transcrição
-- [ ] Sistema de templates editáveis
+- [x] Sistema de templates editáveis (a igreja salva o visual de qualquer projeto como modelo; fundo com escurecer e desfocar)
 
 ### Fase 3 — Produto completo (4 a 6 semanas)
 

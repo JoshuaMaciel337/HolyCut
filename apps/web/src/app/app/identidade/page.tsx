@@ -33,7 +33,7 @@ export default function PaginaIdentidade() {
   // Exemplo com a cor escolhida, desenhado pelo mesmo código que desenha o vídeo
   const exemplo = useCamada(
     identidade && identidade.cor_destaque === rascunho.cor_destaque
-      ? { largura: 540, altura: 960, tipo: "texto", texto: { id: "exemplo", tipo: "titulo", texto: "Culto de hoje", referencia: "", estilo: "destaque", posicao: "centro", inicio: 0, fim: null } }
+      ? { largura: 540, altura: 960, tipo: "texto", texto: { id: "exemplo", tipo: "titulo", texto: "Culto de hoje", referencia: "", estilo: "destaque", posicao: "centro", inicio: 0, fim: null, tamanho: 1 } }
       : null,
   );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CircleAlert, Clapperboard, LoaderCircle, Pause, Play, RotateCcw } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, Check, CircleAlert, Clapperboard, ImageIcon, LoaderCircle, Pause, Play, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
+import { PainelFundo } from "@/componentes/PainelFundo";
 import { PainelMarca } from "@/componentes/PainelMarca";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
 import { PainelTextos } from "@/componentes/PainelTextos";
@@ -18,7 +19,7 @@ import { PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
 import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Projeto, Proporcao, Silencios } from "@/lib/tipos";
 
 const ESPERA_SALVAR_MS = 700;
-type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos">;
+type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo">;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
 
 /** Cortes de silêncio que caem dentro do trecho, recortados nas bordas dele. */
@@ -42,6 +43,7 @@ export default function PaginaProjeto() {
   const [tocando, setTocando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [ultimaExportacao, setUltimaExportacao] = useState<Exportacao | null>(null);
+  const [aviso, setAviso] = useState("");
   const player = useRef<HTMLVideoElement>(null);
 
   // Salvamento: em fila, um de cada vez, sempre com a versão mais nova que o servidor devolveu
@@ -65,6 +67,7 @@ export default function PaginaProjeto() {
           silencios: carregado.silencios,
           enquadramento: carregado.enquadramento,
           marca: carregado.marca,
+          fundo: carregado.fundo,
           textos: carregado.textos,
         };
         edicaoAtual.current = inicial;
@@ -225,7 +228,7 @@ export default function PaginaProjeto() {
     editar({ trecho });
   }
 
-  async function exportar() {
+  async function exportar(formato: "video" | "imagem") {
     const atual = edicaoAtual.current;
     if (!atual) return;
     setExportando(true);
@@ -234,11 +237,26 @@ export default function PaginaProjeto() {
       // Garante que o vídeo sai com a última edição: salva e espera a fila terminar
       clearTimeout(espera.current);
       if (!(await salvar(atual))) return;
-      setUltimaExportacao(await chamarApi<Exportacao>(`/projetos/${id}/exportar`, { metodo: "POST" }));
+      const corpo = { formato, instante: Math.round(posicaoFinal * 100) / 100 };
+      setUltimaExportacao(await chamarApi<Exportacao>(`/projetos/${id}/exportar`, { metodo: "POST", corpo }));
     } catch (e) {
       setErro(e instanceof ErroApi ? e.message : "Não foi possível exportar.");
     } finally {
       setExportando(false);
+    }
+  }
+
+  async function salvarComoModelo() {
+    const atual = edicaoAtual.current;
+    const nome = window.prompt("Nome do modelo (ex.: Culto de domingo)", atual?.nome.replace(/^(Story|Reel) · /, "") ?? "");
+    if (!atual || !nome?.trim()) return;
+    clearTimeout(espera.current);
+    if (!(await salvar(atual))) return;
+    try {
+      await chamarApi("/modelos", { metodo: "POST", corpo: { nome: nome.trim().slice(0, 60), projeto_id: id } });
+      setAviso(`Modelo "${nome.trim()}" salvo. Ele aparece quando você criar um Story.`);
+    } catch (e) {
+      setErro(e instanceof ErroApi ? e.message : "Não foi possível salvar o modelo.");
     }
   }
 
@@ -308,6 +326,7 @@ export default function PaginaProjeto() {
             proporcao={edicao.proporcao}
             enquadramento={edicao.enquadramento}
             aoMudar={(enquadramento) => editar({ enquadramento })}
+            fundo={edicao.fundo}
           >
             {identidade?.logo && edicao.marca.logo ? (
               <CamadaSobreposta pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "logo", marca: edicao.marca }} />
@@ -434,6 +453,8 @@ export default function PaginaProjeto() {
             posicaoFinal={posicaoFinal}
           />
 
+          <PainelFundo fundo={edicao.fundo} aoMudar={(fundo) => editar({ fundo })} />
+
           <PainelMarca marca={edicao.marca} temLogo={Boolean(identidade?.logo)} aoMudar={(marca) => editar({ marca })} />
 
           <section className="cartao p-6" aria-labelledby="titulo-exportar">
@@ -443,13 +464,23 @@ export default function PaginaProjeto() {
                   Exportar
                 </h2>
                 <p className="mt-1 text-sm text-suave">
-                  {PROPORCOES[edicao.proporcao].largura}×{PROPORCOES[edicao.proporcao].altura}, áudio no volume das redes (-14 LUFS).
+                  {PROPORCOES[edicao.proporcao].largura}×{PROPORCOES[edicao.proporcao].altura}. O vídeo sai com o áudio no volume das
+                  redes (-14 LUFS); a imagem é o quadro em que a prévia está ({formatarTempo(posicaoFinal)}).
                 </p>
               </div>
-              <button type="button" onClick={exportar} disabled={exportando} className="botao-cta">
-                <Clapperboard className="size-4" aria-hidden /> {exportando ? "Enviando para a fila..." : "Exportar"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => exportar("video")} disabled={exportando} className="botao-cta">
+                  <Clapperboard className="size-4" aria-hidden /> {exportando ? "Enviando para a fila..." : "Exportar vídeo"}
+                </button>
+                <button type="button" onClick={() => exportar("imagem")} disabled={exportando} className="botao-contorno">
+                  <ImageIcon className="size-4" aria-hidden /> Exportar imagem
+                </button>
+              </div>
             </div>
+            <button type="button" onClick={salvarComoModelo} className="mt-4 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto">
+              <BookmarkPlus className="size-4" aria-hidden /> Salvar o visual como modelo
+            </button>
+            {aviso ? <p className="mt-2 text-sm text-ciano">{aviso}</p> : null}
             <div className="mt-5">
               <ListaExportacoes projetoId={projeto.id} nova={ultimaExportacao} />
             </div>

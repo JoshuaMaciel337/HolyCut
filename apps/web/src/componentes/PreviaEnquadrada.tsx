@@ -4,7 +4,7 @@ import { Move } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { calcularRecorte, limitesDoCentro, PROPORCOES } from "@/lib/recorte";
-import type { Proporcao } from "@/lib/tipos";
+import type { Fundo, Proporcao } from "@/lib/tipos";
 
 type Enquadramento = { x: number; y: number; zoom: number };
 
@@ -20,6 +20,8 @@ type Props = {
   alturaMaxima?: number;
   /** Camadas de arte (logo, textos) desenhadas por cima do vídeo. */
   children?: ReactNode;
+  /** Desfoque e escurecimento do vídeo, como o render aplica antes das camadas. */
+  fundo?: Fundo;
 };
 
 function limitar(valor: number, [minimo, maximo]: [number, number]): number {
@@ -27,7 +29,7 @@ function limitar(valor: number, [minimo, maximo]: [number, number]): number {
 }
 
 /** Mostra só o que vai para o vídeo final. Arrastar a imagem muda o enquadramento. */
-export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children }: Props) {
+export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children, fundo }: Props) {
   const recipiente = useRef<HTMLDivElement>(null);
   const inicio = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   const [disponivel, setDisponivel] = useState(0);
@@ -75,8 +77,11 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
             height: `${(altura / recorte.altura) * 100}%`,
             left: `${(-recorte.x / recorte.largura) * 100}%`,
             top: `${(-recorte.y / recorte.altura) * 100}%`,
+            // O desfoque do render é em pixels do vídeo final; aqui, na escala da moldura
+            filter: fundo?.desfoque ? `blur(${(fundo.desfoque * quadroLargura) / alvo.largura}px)` : undefined,
           }}
         />
+        {fundo?.escurecer ? <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: fundo.escurecer }} /> : null}
         {children}
         <div
           className="absolute inset-0 cursor-grab active:cursor-grabbing"

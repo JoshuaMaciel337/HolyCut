@@ -114,13 +114,33 @@ export type TextoProjeto = {
   inicio: number;
   /** null: até o fim do vídeo. */
   fim: number | null;
+  /** Escala da fonte, de 0,5 a 2. */
+  tamanho: number;
+};
+
+export type Fundo = {
+  /** 0 a 0,8: quanto de preto por cima do vídeo. */
+  escurecer: number;
+  /** 0 a 30: desfoque, em pixels do vídeo final. */
+  desfoque: number;
+};
+
+export type Modelo = {
+  id: string;
+  nome: string;
+  descricao: string;
+  pronto: boolean;
+  fundo: Fundo;
+  marca: Marca;
+  textos: TextoProjeto[];
 };
 
 export type Projeto = {
   id: string;
   midia_id: string;
   nome: string;
-  tipo: string;
+  tipo: "reel" | "story";
+  modelo_id: string | null;
   proporcao: Proporcao;
   trecho: { inicio: number; fim: number };
   silencios: { intensidade: Intensidade | null };
@@ -128,6 +148,7 @@ export type Projeto = {
   audio: { normalizar: boolean };
   marca: Marca;
   textos: TextoProjeto[];
+  fundo: Fundo;
   versao: number;
   criado_em: string;
   atualizado_em: string;
@@ -138,6 +159,8 @@ export type Exportacao = {
   projeto_id: string;
   midia_id: string;
   nome: string;
+  formato: "video" | "imagem";
+  instante: number;
   status: "processando" | "pronta" | "erro";
   processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
   duracao: number | null;

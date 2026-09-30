@@ -318,7 +318,7 @@ export default function PaginaMidia() {
               <Informacao rotulo="Arquivo" valor={midia.nome_original} />
             </dl>
           </section>
-          <ReelsDaMidia midia={midia} />
+          <ReelsDaMidia midia={midia} tempoAtual={tempo} />
         </aside>
       </div>
     </main>

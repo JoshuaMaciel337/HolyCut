@@ -68,6 +68,7 @@ export function PainelTextos({ textos, aoMudar, duracaoFinal, posicaoFinal }: Pr
       posicao: "base",
       inicio: 0,
       fim: null,
+      tamanho: 1,
       ...modelo.base,
     };
     aoMudar([...textos, texto]);
@@ -134,6 +135,19 @@ export function PainelTextos({ textos, aoMudar, duracaoFinal, posicaoFinal }: Pr
                   <Opcoes rotulo="Estilo" opcoes={ESTILOS} valor={texto.estilo} aoMudar={(estilo) => atualizar(texto.id, { estilo })} />
                   <Opcoes rotulo="Posição" opcoes={POSICOES} valor={texto.posicao} aoMudar={(posicao) => atualizar(texto.id, { posicao })} />
                 </div>
+                <label className="flex items-center gap-3 text-sm">
+                  <span className="w-16 shrink-0 text-suave">Tamanho</span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2}
+                    step={0.05}
+                    value={texto.tamanho ?? 1}
+                    onChange={(evento) => atualizar(texto.id, { tamanho: Number(evento.target.value) })}
+                    className="w-full accent-[var(--hc-orange)]"
+                  />
+                  <span className="w-12 text-right tabular-nums">{Math.round((texto.tamanho ?? 1) * 100)}%</span>
+                </label>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <select
                     value={trecho ? "trecho" : "todo"}

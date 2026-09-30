@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Clapperboard } from "lucide-react";
+import { ChevronRight, Clapperboard, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,7 +10,7 @@ import { formatarTempo } from "@/lib/formatar";
 import type { Midia, Projeto } from "@/lib/tipos";
 
 /** Reels feitos a partir de uma gravação, e o botão para começar outro. */
-export function ReelsDaMidia({ midia }: { midia: Midia }) {
+export function ReelsDaMidia({ midia, tempoAtual = 0 }: { midia: Midia; tempoAtual?: number }) {
   const router = useRouter();
   const [projetos, setProjetos] = useState<Projeto[] | null>(null);
   const [criando, setCriando] = useState(false);
@@ -44,7 +44,7 @@ export function ReelsDaMidia({ midia }: { midia: Midia }) {
   return (
     <section className="cartao p-6" aria-labelledby="titulo-reels">
       <h2 id="titulo-reels" className="font-display text-lg font-bold">
-        Reels desta gravação
+        Reels e Stories desta gravação
       </h2>
       {projetos && projetos.length > 0 ? (
         <ul className="mt-3 flex flex-col">
@@ -54,7 +54,8 @@ export function ReelsDaMidia({ midia }: { midia: Midia }) {
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{projeto.nome}</span>
                   <span className="text-xs text-suave">
-                    {projeto.proporcao} · {formatarTempo(projeto.trecho.fim - projeto.trecho.inicio)} escolhidos
+                    {projeto.tipo === "story" ? "Story" : "Reel"} · {projeto.proporcao} ·{" "}
+                    {formatarTempo(projeto.trecho.fim - projeto.trecho.inicio)} escolhidos
                   </span>
                 </span>
                 <ChevronRight className="size-4 shrink-0" aria-hidden />
@@ -70,9 +71,16 @@ export function ReelsDaMidia({ midia }: { midia: Midia }) {
         </p>
       )}
       {erro ? <p className="mt-3 text-sm text-vermelho">{erro}</p> : null}
-      <button type="button" onClick={criar} disabled={!podeCriar || criando} className="botao-cta mt-4 w-full">
-        <Clapperboard className="size-4" aria-hidden /> {criando ? "Criando..." : projetos?.length ? "Criar outro Reel" : "Criar um Reel"}
-      </button>
+      <div className="mt-4 flex flex-col gap-2">
+        <button type="button" onClick={criar} disabled={!podeCriar || criando} className="botao-cta w-full">
+          <Clapperboard className="size-4" aria-hidden /> {criando ? "Criando..." : "Criar um Reel"}
+        </button>
+        {podeCriar ? (
+          <Link href={`/app/midias/${midia.id}/story?inicio=${Math.floor(tempoAtual)}`} className="botao-contorno w-full">
+            <Sparkles className="size-4 text-amarelo" aria-hidden /> Criar um Story a partir de {formatarTempo(tempoAtual)}
+          </Link>
+        ) : null}
+      </div>
     </section>
   );
 }

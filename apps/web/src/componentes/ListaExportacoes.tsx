@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleAlert, Download, Share2, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
 import { BarraProgresso } from "@/componentes/BarraProgresso";
@@ -18,7 +19,7 @@ function podeCompartilharArquivos(): boolean {
   }
 }
 
-function nomeDoArquivo(nome: string): string {
+function nomeDoArquivo(nome: string, extensao = ".mp4"): string {
   const base = nome
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
@@ -26,7 +27,7 @@ function nomeDoArquivo(nome: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
-  return `${base || "holycut"}.mp4`;
+  return `${base || "holycut"}${extensao}`;
 }
 
 /** Vídeos exportados de um projeto, com progresso ao vivo, download e compartilhamento pelo celular. */
@@ -66,7 +67,7 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
   });
 
   async function excluir(exportacao: Exportacao) {
-    if (!window.confirm("Excluir este vídeo exportado?")) return;
+    if (!window.confirm(exportacao.formato === "imagem" ? "Excluir esta imagem exportada?" : "Excluir este vídeo exportado?")) return;
     try {
       await chamarApi(`/exportacoes/${exportacao.id}`, { metodo: "DELETE" });
       setExportacoes((lista) => lista?.filter((e) => e.id !== exportacao.id) ?? lista);
@@ -77,8 +78,13 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
 
   async function enviarPeloCelular(exportacao: Exportacao) {
     try {
-      const resposta = await fetch(`/api/exportacoes/${exportacao.id}/arquivos/video.mp4`, { credentials: "same-origin" });
-      const arquivo = new File([await resposta.blob()], nomeDoArquivo(exportacao.nome), { type: "video/mp4" });
+      const imagem = exportacao.formato === "imagem";
+      const resposta = await fetch(`/api/exportacoes/${exportacao.id}/arquivos/${imagem ? "imagem.jpg" : "video.mp4"}`, {
+        credentials: "same-origin",
+      });
+      const arquivo = new File([await resposta.blob()], nomeDoArquivo(exportacao.nome, imagem ? ".jpg" : ".mp4"), {
+        type: imagem ? "image/jpeg" : "video/mp4",
+      });
       await navigator.share({ files: [arquivo], title: exportacao.nome });
     } catch (e) {
       if (!(e instanceof DOMException && e.name === "AbortError")) setErro("Não foi possível compartilhar. Use o botão Baixar.");
@@ -87,7 +93,7 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
 
   if (exportacoes === null) return <p className="text-sm text-suave">{erro || "Carregando..."}</p>;
   if (exportacoes.length === 0) {
-    return <p className="text-sm text-suave">Nenhum vídeo exportado ainda. Quando estiver bom, clique em Exportar.</p>;
+    return <p className="text-sm text-suave">Nada exportado ainda. Quando estiver bom, exporte o vídeo ou a imagem.</p>;
   }
 
   return (
@@ -96,9 +102,20 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
       <ul className="grid gap-4 sm:grid-cols-2">
         {exportacoes.map((exportacao) => {
           const base = `/api/exportacoes/${exportacao.id}/arquivos`;
+          const imagem = exportacao.formato === "imagem";
+          const arquivoPrincipal = imagem ? "imagem.jpg" : "video.mp4";
           return (
             <li key={exportacao.id} className="flex flex-col gap-3 rounded-2xl border border-borda bg-surface-2/60 p-3">
-              {exportacao.status === "pronta" ? (
+              {exportacao.status === "pronta" && imagem ? (
+                <Image
+                  src={`${base}/imagem.jpg`}
+                  alt={`Imagem exportada de ${exportacao.nome}`}
+                  width={exportacao.largura}
+                  height={exportacao.altura}
+                  unoptimized
+                  className="mx-auto h-auto max-h-80 w-auto rounded-xl bg-black"
+                />
+              ) : exportacao.status === "pronta" ? (
                 <video
                   src={`${base}/video.mp4`}
                   poster={exportacao.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
@@ -123,6 +140,7 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
               )}
               <div className="flex items-center justify-between gap-2 text-xs text-suave">
                 <span>
+                  {imagem ? "Imagem · " : "Vídeo · "}
                   {formatarData(exportacao.criado_em)}
                   {exportacao.duracao ? ` · ${formatarTempo(exportacao.duracao)}` : ""}
                   {exportacao.tamanho ? ` · ${formatarBytes(exportacao.tamanho)}` : ""}
@@ -133,7 +151,7 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
               </div>
               {exportacao.status === "pronta" ? (
                 <div className="flex gap-2">
-                  <a href={`${base}/video.mp4?baixar=true`} className="botao-cta flex-1 px-3 py-2 text-sm">
+                  <a href={`${base}/${arquivoPrincipal}?baixar=true`} className="botao-cta flex-1 px-3 py-2 text-sm">
                     <Download className="size-4" aria-hidden /> Baixar
                   </a>
                   {compartilhar ? (
