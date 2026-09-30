@@ -7,6 +7,9 @@ Dockerfile text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 
+# Scripts do Windows (o agente do OBS) precisam de CRLF: com LF, o cmd às vezes lê linhas pela metade.
+*.bat text eol=crlf
+
 # Binários
 *.png binary
 *.ico binary

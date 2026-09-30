@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from api.dependencias import obter_db, usuario_atual
+from api.dependencias import obter_db, usuario_ou_chave_envio
 from core.config import ESPACO_MINIMO_LIVRE_BYTES, UPLOAD_MAX_BYTES
 from core.modelos.job import montar_job
 from core.modelos.midia import (
@@ -121,7 +121,7 @@ async def descobrir(upload_id: str | None = None):
 
 
 @router.post("")
-async def criar_envio(request: Request, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def criar_envio(request: Request, usuario=Depends(usuario_ou_chave_envio), db=Depends(obter_db)):
     if erro := versao_invalida(request):
         return erro
     try:
@@ -150,6 +150,8 @@ async def criar_envio(request: Request, usuario=Depends(usuario_atual), db=Depen
                                      "Avise o responsável pelo HolyCut.")
 
     midia = montar_midia(usuario["organizacao_id"], usuario["_id"], nome, total, metadados.get("filetype", ""))
+    if usuario.get("chave_envio"):
+        midia["enviada_pela_chave"] = usuario["chave_envio"]["_id"]
     midia["_id"] = (await db.midias.insert_one(midia)).inserted_id
     if not await run_in_threadpool(storage.salvar_bytes, chave_original(midia), b""):
         await db.midias.delete_one({"_id": midia["_id"]})
@@ -158,7 +160,8 @@ async def criar_envio(request: Request, usuario=Depends(usuario_atual), db=Depen
 
 
 @router.head("/{upload_id}")
-async def consultar_envio(upload_id: str, request: Request, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def consultar_envio(upload_id: str, request: Request, usuario=Depends(usuario_ou_chave_envio),
+                         db=Depends(obter_db)):
     if erro := versao_invalida(request):
         return erro
     midia = await buscar_envio(db, upload_id, usuario)
@@ -170,7 +173,8 @@ async def consultar_envio(upload_id: str, request: Request, usuario=Depends(usua
 
 
 @router.patch("/{upload_id}")
-async def receber_pedaco(upload_id: str, request: Request, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def receber_pedaco(upload_id: str, request: Request, usuario=Depends(usuario_ou_chave_envio),
+                        db=Depends(obter_db)):
     if erro := versao_invalida(request):
         return erro
     if request.headers.get("content-type") != TIPO_CONTEUDO_PATCH:
@@ -237,7 +241,8 @@ async def receber_pedaco(upload_id: str, request: Request, usuario=Depends(usuar
 
 
 @router.delete("/{upload_id}")
-async def cancelar_envio(upload_id: str, request: Request, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def cancelar_envio(upload_id: str, request: Request, usuario=Depends(usuario_ou_chave_envio),
+                        db=Depends(obter_db)):
     if erro := versao_invalida(request):
         return erro
     midia = await buscar_envio(db, upload_id, usuario)

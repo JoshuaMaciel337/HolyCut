@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.rotas import (
     auth,
+    chaves_envio,
     eventos,
     exportacoes,
     identidade,
@@ -122,3 +123,4 @@ app.include_router(exportacoes.router)
 app.include_router(identidade.router)
 app.include_router(modelos.router)
 app.include_router(musicas.router)
+app.include_router(chaves_envio.router)

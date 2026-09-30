@@ -194,6 +194,27 @@ class MusicaSaida(BaseModel):
     criado_em: datetime
 
 
+class ChaveEnvioCriarEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=60, description="Onde a chave vai ser usada, ex.: PC da mídia")
+
+
+class ChaveEnvioSaida(BaseModel):
+    id: str
+    nome: str
+    inicio: str = Field(description="Começo da chave, para reconhecer na lista")
+    criado_em: datetime
+    ultimo_uso_em: datetime | None = None
+
+
+class ChaveEnvioCriadaSaida(ChaveEnvioSaida):
+    chave: str = Field(description="A chave inteira. Só aparece nesta resposta.")
+
+
+class ChaveEnvioConferirSaida(BaseModel):
+    igreja: str
+    chave: str | None = Field(description="Nome da chave, quando a conexão é por chave")
+
+
 class FiltroSaida(BaseModel):
     id: str
     nome: str

@@ -12,6 +12,8 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY core /app/core
 COPY apps/api /app/api
+# O agente do OBS, que a igreja baixa pelo site em .zip
+COPY apps/agente /app/agente
 # Fontes da marca, para desenhar textos e templates (licença OFL)
 COPY brand/fontes /app/brand/fontes
 

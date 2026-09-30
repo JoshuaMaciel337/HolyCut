@@ -47,6 +47,10 @@ INDICES = {
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
         ([("midia_id", 1)], {}),
     ],
+    "chaves_envio": [
+        ([("hash", 1)], {"unique": True}),
+        ([("organizacao_id", 1), ("criado_em", -1)], {}),
+    ],
     # Registro de workers online. O MongoDB apaga sozinho quem sumiu há mais de 1 hora.
     "workers": [
         ([("visto_em", 1)], {"expireAfterSeconds": 3600}),
