@@ -28,7 +28,7 @@ App web que transforma a gravação do culto em Stories, Reels e cortes da prega
 - **Fase 0 (fundação):** pronta.
 - **Fase 1 sem IA:** pronta. Inclui upload retomável (tus), ingestão (proxy 720p, forma de onda, níveis, miniaturas), corte de silêncios, editor de Reel com enquadramento e zoom, render em -14 LUFS, download e compartilhamento.
 - **Fase 2 sem IA:** pronta. Inclui Sua Identidade (logo, cor, @), textos sobre o vídeo, HolyStories com modelos, filtros de cor e biblioteca de músicas com licença e volume que abaixa sob a fala.
-- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes) e agente do OBS com chaves de envio. Próximos: fluxo de aprovação pelo celular e integração com o chat das lives. YouTube e Pexels esperam o dono criar as chaves.
+- **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio e aprovação pelo celular. Próximo: integração com o chat das lives. YouTube e Pexels esperam o dono criar as chaves.
 - **Nenhuma IA real foi implementada ainda.** `MODO_IA=simulado`, e o job `teste` só simula as etapas. O job `diagnostico_gpu` confere a GPU no Nitro.
 
 ### O que espera o Nitro 5 (ordem sugerida)
@@ -55,6 +55,7 @@ Cada etapa de IA vira uma tarefa nova em `apps/worker/tarefas/`, registrada em `
 ## Decisões técnicas que não aparecem de cara no código
 
 - **Agente do OBS:** `apps/agente` é independente do resto (só stdlib e `requests`), porque roda no Windows da igreja. Ele se autentica com uma chave de envio (`hc_...`); o banco guarda só o SHA-256, e a chave só abre as rotas de upload e `/api/chaves-envio/conferir`. A imagem da API copia a pasta para servir o `.zip`, que já vem com o endereço do site no `.bat` (validado com `fullmatch`, para não virar comando). O `.bat` precisa de CRLF (`.gitattributes`).
+- **Aprovação pelo link:** o pedido fica dentro da exportação (`aprovacao`), com o SHA-256 de um token de 256 bits. As rotas `/api/aprovar/{token}` são públicas e só mostram aquele vídeo; a página `/aprovar/[token]` fica fora do `proxy.ts`, com `noindex` e `no-referrer`. Pedir de novo troca o token. Não há convite de equipe ainda: foi uma escolha, para o pastor não precisar de conta.
 - **Linha do tempo:** o projeto guarda `partes` (intervalos da gravação na ordem da lista, que podem se repetir). Projetos antigos só têm `trecho`, e o `partes_do_projeto` os converte na leitura.
 
 - **Render numa passada só.** O FFmpeg abre o original uma vez por parte da linha do tempo, seleciona os trechos de cada parte com `select` e `aselect` e emenda as partes com `concat`. Os cortes ficam alinhados a 1/30 s, o áudio vai em blocos de 1600 amostras a 48 kHz, e os limites caem meio quadro antes de cada borda. Sem isso, perdia-se um quadro por corte e o som saía de sincronia.

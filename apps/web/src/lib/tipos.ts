@@ -220,6 +220,31 @@ export type Projeto = {
   atualizado_em: string;
 };
 
+export type Aprovacao = {
+  status: "pendente" | "aprovado" | "ajustes";
+  /** Para quem o pedido foi feito, ex.: Pr. João. */
+  para: string;
+  pedido_em: string;
+  expira_em: string;
+  /** Pedido sem resposta que passou da validade (7 dias). */
+  expirada: boolean;
+  respondido_por: string | null;
+  comentario: string | null;
+  respondido_em: string | null;
+};
+
+/** O que quem aprova vê pelo link, sem conta. */
+export type AprovacaoPublica = {
+  igreja: string;
+  nome: string;
+  formato: "video" | "imagem";
+  duracao: number | null;
+  largura: number;
+  altura: number;
+  arquivos: string[];
+  aprovacao: Aprovacao;
+};
+
 export type Exportacao = {
   id: string;
   projeto_id: string;
@@ -237,6 +262,7 @@ export type Exportacao = {
   erro: string | null;
   criado_em: string;
   concluido_em: string | null;
+  aprovacao: Aprovacao | null;
 };
 
 export type FormaDeOnda = {

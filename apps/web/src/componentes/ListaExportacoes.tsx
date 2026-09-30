@@ -4,11 +4,15 @@ import { CircleAlert, Download, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
+import { AprovacaoDoVideo } from "@/componentes/AprovacaoDoVideo";
 import { BarraProgresso } from "@/componentes/BarraProgresso";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEventosJobs } from "@/lib/eventos";
 import { formatarBytes, formatarData, formatarTempo } from "@/lib/formatar";
-import type { Exportacao } from "@/lib/tipos";
+import type { Aprovacao, Exportacao } from "@/lib/tipos";
+
+// Enquanto alguém ainda vai responder um pedido de aprovação, a lista confere de tempos em tempos
+const INTERVALO_APROVACAO_MS = 15000;
 
 function podeCompartilharArquivos(): boolean {
   if (typeof navigator === "undefined" || !navigator.canShare) return false;
@@ -51,6 +55,17 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
       .then((atual) => setExportacoes((lista) => lista?.map((e) => (e.id === id ? atual : e)) ?? lista))
       .catch(() => undefined);
   }, []);
+
+  const aguardandoResposta = exportacoes?.some((e) => e.aprovacao?.status === "pendente" && !e.aprovacao.expirada) ?? false;
+  useEffect(() => {
+    if (!aguardandoResposta) return;
+    const intervalo = setInterval(carregar, INTERVALO_APROVACAO_MS);
+    return () => clearInterval(intervalo);
+  }, [aguardandoResposta, carregar]);
+
+  function mudarAprovacao(id: string, aprovacao: Aprovacao | null) {
+    setExportacoes((lista) => lista?.map((e) => (e.id === id ? { ...e, aprovacao } : e)) ?? lista);
+  }
 
   useEventosJobs((job) => {
     const id = job.entrada?.exportacao_id;
@@ -160,6 +175,9 @@ export function ListaExportacoes({ projetoId, nova }: { projetoId: string; nova:
                     </button>
                   ) : null}
                 </div>
+              ) : null}
+              {exportacao.status === "pronta" ? (
+                <AprovacaoDoVideo exportacao={exportacao} aoMudar={(aprovacao) => mudarAprovacao(exportacao.id, aprovacao)} />
               ) : null}
             </li>
           );
