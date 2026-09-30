@@ -141,6 +141,32 @@ export type FiltroCor = {
   operacoes: OperacaoCor[];
 };
 
+export type LicencaMusica = "propria" | "dominio_publico" | "cc_by" | "licenciada";
+
+export type Musica = {
+  id: string;
+  titulo: string;
+  artista: string;
+  licenca: LicencaMusica;
+  licenca_nome: string;
+  atribuicao: string;
+  fonte: string;
+  status: "aguardando_arquivo" | "processando" | "pronta" | "erro";
+  duracao: number | null;
+  erro: string | null;
+  criado_em: string;
+};
+
+export type MusicaProjeto = {
+  /** null: sem música. */
+  id: string | null;
+  /** 0 a 1. */
+  volume: number;
+  abaixar_na_fala: boolean;
+  /** Segundo da música em que o vídeo começa. */
+  inicio: number;
+};
+
 export type Modelo = {
   id: string;
   nome: string;
@@ -167,6 +193,7 @@ export type Projeto = {
   textos: TextoProjeto[];
   fundo: Fundo;
   cor: Cor;
+  musica: MusicaProjeto;
   versao: number;
   criado_em: string;
   atualizado_em: string;

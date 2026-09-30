@@ -186,8 +186,8 @@ O padrão da equipe proíbe tecnologias fora da lista sem aprovação. Um app we
 | `projetos` | tipo, formato, cortes, enquadramento, legenda, áudio, overlays, template, versão | `organizacao_id + atualizado_em` |
 | `sugestoes` | trechos sugeridos pela IA com início, fim, título, gancho, nota e motivo | `midia_id + nota` |
 | `jobs` | tipo, status, prioridade, tentativas, lease, worker, progresso, entrada, saída, erro | `status + tipo + prioridade + criado_em` |
-| `templates` | layout JSON de Stories e Reels, globais ou da igreja | `organizacao_id + tipo` |
-| `biblioteca` | músicas, B-roll, LUTs e fontes, **cada item com licença e atribuição** | `tipo + tags` |
+| `modelos` | visual salvo pela igreja (fundo, cor, logo e textos). Os modelos prontos ficam no código | `organizacao_id + criado_em` |
+| `musicas` | faixas da igreja, **cada uma com licença e atribuição**, status e duração. B-roll entra depois, com licença do mesmo jeito | `organizacao_id + criado_em` |
 | `exportacoes` | projeto, versão, arquivo final, formato, status, texto do post | `projeto_id + criado_em` |
 
 Uma transcrição de 2 horas tem cerca de 20 mil palavras e ocupa perto de 1,5 MB. Cabe com folga no limite de 16 MB por documento.
@@ -569,7 +569,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [ ] Reenquadramento seguindo o rosto e zoom dinâmico nas ênfases
 - [ ] **HolyMoments:** energia do áudio, cenas, picos do chat da live e nota visual opcional
 - [x] **Sua Identidade:** kit da igreja aplicado automaticamente em todo projeto (logo, cor de destaque e @; o logo entra ligado em todo Reel novo)
-- [ ] Biblioteca de músicas com licença registrada e volume que abaixa sob a fala
+- [x] Biblioteca de músicas com licença registrada e volume que abaixa sob a fala (a faixa só entra com a licença; CC BY exige o crédito e o editor lembra de pôr na legenda; a música abaixa cerca de 14 dB quando há voz, pelo sidechaincompress do FFmpeg)
 - [x] Filtros e correção de cor (Natural, Quente, Frio, Cinema, P&B e Vivo, com intensidade; matrizes de cor em vez de LUTs, para a prévia sair igual ao render)
 - [ ] Detecção de versículos com overlay. **Overlay pronto**: título, frase e versículo com referência, digitados, em três estilos; a detecção automática depende da transcrição
 - [x] Sistema de templates editáveis (a igreja salva o visual de qualquer projeto como modelo; fundo com escurecer e desfocar)

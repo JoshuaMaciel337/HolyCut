@@ -8,9 +8,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
+import { MusicaNaPrevia } from "@/componentes/MusicaNaPrevia";
 import { PainelCor } from "@/componentes/PainelCor";
 import { PainelFundo } from "@/componentes/PainelFundo";
 import { PainelMarca } from "@/componentes/PainelMarca";
+import { PainelMusica } from "@/componentes/PainelMusica";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
 import { PainelTextos } from "@/componentes/PainelTextos";
 import { PreviaEnquadrada } from "@/componentes/PreviaEnquadrada";
@@ -18,10 +20,12 @@ import { chamarApi, ErroApi } from "@/lib/api";
 import { cssDoFiltro, FiltroSvg, useFiltros } from "@/lib/filtros";
 import { formatarTempo } from "@/lib/formatar";
 import { PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
-import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Projeto, Proporcao, Silencios } from "@/lib/tipos";
+import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Musica, Projeto, Proporcao, Silencios } from "@/lib/tipos";
 
 const ESPERA_SALVAR_MS = 700;
-type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo" | "cor">;
+// Pico da forma de onda (em % da escala cheia) a partir do qual a prévia considera que há voz
+const PICO_DE_FALA = 4;
+type Edicao = Pick<Projeto, "nome" | "proporcao" | "trecho" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo" | "cor" | "musica">;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
 
 /** Cortes de silêncio que caem dentro do trecho, recortados nas bordas dele. */
@@ -37,6 +41,7 @@ export default function PaginaProjeto() {
   const [edicao, setEdicao] = useState<Edicao | null>(null);
   const [midia, setMidia] = useState<Midia | null>(null);
   const [identidade, setIdentidade] = useState<Identidade | null>(null);
+  const [musicas, setMusicas] = useState<Musica[] | null>(null);
   const [forma, setForma] = useState<DadosFormaDeOnda | null>(null);
   const [silencios, setSilencios] = useState<Silencios | null>(null);
   const [erro, setErro] = useState("");
@@ -72,6 +77,7 @@ export default function PaginaProjeto() {
           marca: carregado.marca,
           fundo: carregado.fundo,
           cor: carregado.cor,
+          musica: carregado.musica,
           textos: carregado.textos,
         };
         edicaoAtual.current = inicial;
@@ -81,6 +87,11 @@ export default function PaginaProjeto() {
         chamarApi<Identidade>("/identidade")
           .then((dados) => {
             if (!cancelado) setIdentidade(dados);
+          })
+          .catch(() => undefined);
+        chamarApi<Musica[]>("/musicas")
+          .then((dados) => {
+            if (!cancelado) setMusicas(dados);
           })
           .catch(() => undefined);
         if (gravacao.arquivos.includes("forma_de_onda.json")) {
@@ -287,6 +298,9 @@ export default function PaginaProjeto() {
   const opcaoCorte: OpcaoCorte = intensidade ?? "desligado";
   const alvo = PROPORCOES[edicao.proporcao];
   const filtroEscolhido = filtros.find((filtro) => filtro.id === edicao.cor.filtro);
+  const musicaEscolhida = musicas?.find((item) => item.id === edicao.musica.id && item.status === "pronta" && item.duracao);
+  const indicePico = forma ? Math.floor(tempo * forma.picos_por_segundo) : -1;
+  const falando = forma ? Math.max(...forma.picos.slice(Math.max(indicePico - 1, 0), indicePico + 2), 0) >= PICO_DE_FALA : false;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -348,6 +362,16 @@ export default function PaginaProjeto() {
                 />
               ))}
           </PreviaEnquadrada>
+          {musicaEscolhida ? (
+            <MusicaNaPrevia
+              src={`/api/musicas/${musicaEscolhida.id}/arquivo`}
+              duracao={musicaEscolhida.duracao ?? 0}
+              musica={edicao.musica}
+              posicaoFinal={posicaoFinal}
+              tocando={tocando}
+              falando={falando}
+            />
+          ) : null}
           <div className="flex items-center gap-3">
             <button type="button" onClick={alternarReproducao} className="botao-cta size-12 p-0" aria-label={tocando ? "Pausar" : "Tocar o trecho"}>
               {tocando ? <Pause className="size-5" aria-hidden /> : <Play className="size-5" aria-hidden />}
@@ -459,6 +483,8 @@ export default function PaginaProjeto() {
             duracaoFinal={duracaoFinal}
             posicaoFinal={posicaoFinal}
           />
+
+          <PainelMusica musica={edicao.musica} musicas={musicas} aoMudar={(musica) => editar({ musica })} />
 
           <PainelCor
             cor={edicao.cor}
