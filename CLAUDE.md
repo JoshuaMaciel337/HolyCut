@@ -13,6 +13,8 @@ O Claude Code lê este arquivo sozinho ao abrir uma conversa nesta pasta. Ele re
 
 App web que transforma a gravação do culto em Stories, Reels e cortes da pregação prontos para postar, com a identidade de cada igreja. Roda em máquina própria (o Nitro 5, com RTX 3070 Ti de 8 GB), com modelos de IA abertos e sem custo por uso.
 
+O que os concorrentes (Cut.Pro e OpusClip) fazem, o que usam e o que vale trazer está em [docs/PESQUISA_MERCADO.md](docs/PESQUISA_MERCADO.md). Use como referência ao desenhar as etapas de IA.
+
 ## Pedidos fixos do dono do projeto
 
 - **Fora do escopo, não propor:** avatar de IA, dublagem, clonagem de voz, lip-sync e correção de olhar.
