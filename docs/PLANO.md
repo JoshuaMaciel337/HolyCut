@@ -579,7 +579,7 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 - [x] Linha do tempo completa com arrastar, dividir e reordenar (o projeto tem partes em qualquer ordem, que podem se repetir; o render emenda as partes sem perder a sincronia, medido com clarão e bipe)
 - [ ] B-roll pelo Pexels, com busca feita pelo LLM a partir da frase
 - [ ] Fluxo de aprovação: o editor manda e o pastor ou líder aprova pelo celular
-- [ ] Agente de pasta monitorada: um script no PC da mídia envia sozinho a gravação do OBS quando o culto termina
+- [x] Agente de pasta monitorada: um script no PC da mídia envia sozinho a gravação do OBS quando o culto termina (`apps/agente`, baixado pelo site em .zip; usa uma chave de envio que só serve para enviar e pode ser revogada)
 - [ ] Integração com o projeto do chat unificado das lives
 - [ ] Publicação direta no YouTube, que é a API mais simples, e depois Instagram e TikTok
 

@@ -15,6 +15,7 @@ IA que transforma a gravação do culto em Stories, Reels e cortes da pregação
 apps/web/       Next.js — landing, login e painel
 apps/api/       FastAPI — sessão, organizações, jobs e eventos ao vivo
 apps/worker/    Worker da fila de jobs (CPU e GPU)
+apps/agente/    Agente que envia sozinho as gravações do OBS (roda no PC da mídia)
 core/           Código Python compartilhado: config, Mongo, fila, storage
 infra/          Dockerfiles e agendador de backup
 brand/          Brand kit gerado por script

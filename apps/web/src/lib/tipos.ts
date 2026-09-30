@@ -141,6 +141,20 @@ export type FiltroCor = {
   operacoes: OperacaoCor[];
 };
 
+export type ChaveEnvio = {
+  id: string;
+  nome: string;
+  /** Começo da chave, para reconhecer na lista. */
+  inicio: string;
+  criado_em: string;
+  ultimo_uso_em: string | null;
+};
+
+export type ChaveEnvioCriada = ChaveEnvio & {
+  /** A chave inteira. Só vem na resposta da criação. */
+  chave: string;
+};
+
 export type LicencaMusica = "propria" | "dominio_publico" | "cc_by" | "licenciada";
 
 export type Musica = {

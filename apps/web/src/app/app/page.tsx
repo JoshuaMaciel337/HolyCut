@@ -103,7 +103,15 @@ export default function PaginaInicio() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex min-w-0 flex-col gap-8">
-          <ZonaDeEnvio />
+          <div>
+            <ZonaDeEnvio />
+            <p className="mt-2 text-sm text-suave">
+              Grava no OBS?{" "}
+              <Link href="/app/envio-automatico" className="text-laranja hover:underline">
+                Faça a gravação chegar sozinha
+              </Link>
+            </p>
+          </div>
 
           {enviosSemMidia.length > 0 ? (
             <ul className="flex flex-col gap-2" aria-label="Envios começando">
