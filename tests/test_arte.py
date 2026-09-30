@@ -138,7 +138,7 @@ def test_marca_padrao_liga_o_logo_so_se_houver_logo():
 
 def test_filtro_com_camadas():
     recorte = {"x": 0, "y": 0, "largura": 1080, "altura": 1920}
-    filtro = montar_filtro([(0.0, 10.0)], recorte, 1080, 1920, tem_audio=False, camadas=[(0.0, 10.0), (2.0, 99.0)])
+    filtro = montar_filtro([[(0.0, 10.0)]], recorte, 1080, 1920, tem_audio=False, camadas=[(0.0, 10.0), (2.0, 99.0)])
     linhas = filtro.split(";\n")
     assert linhas[0].endswith("setsar=1[base0]")
     assert linhas[1] == "[base0][1:v]overlay=0:0:enable='between(t,0.000,10.000)'[base1]"

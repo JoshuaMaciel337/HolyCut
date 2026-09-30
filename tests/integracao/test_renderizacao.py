@@ -80,7 +80,7 @@ def volume_integrado(caminho) -> float:
 
 def test_reel_9_16_com_corte_de_silencios(db_limpo):
     midia = midia_pronta(db_limpo)
-    exportacao, video = exportar(db_limpo, midia, trecho={"inicio": 2.0, "fim": 18.0})
+    exportacao, video = exportar(db_limpo, midia, partes=[{"id": "p1", "inicio": 2.0, "fim": 18.0}])
 
     # 16 s escolhidos menos 4 silêncios de cerca de 0,75 s (perto de 3-4, 7-8, 11-12 e 15-16).
     # O AAC da gravação suaviza as bordas de cada silêncio em alguns milissegundos.
@@ -106,9 +106,70 @@ def test_reel_sem_corte_de_video_gravado_em_pe(db_limpo):
     assert abs(float(fluxo_audio["duration"]) - float(fluxo_video["duration"])) < 0.07
 
 
+def midia_com_marcas(db, duracao=8):
+    """Um clarão na imagem e um bipe no som, juntos, a cada 2 s (em 0, 2, 4, 6...), por 0,1 s."""
+    midia = montar_midia(ObjectId(), ObjectId(), "Marcas.mp4", 1)
+    midia["_id"] = db.midias.insert_one(midia).inserted_id
+    original = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], midia["original"]))
+    original.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "lavfi", "-i", f"color=c=black:s=640x360:r=30:d={duracao},format=yuv420p,"
+                              "geq=lum='if(lt(mod(T,2),0.1),235,16)':cb=128:cr=128",
+         "-f", "lavfi", "-i", f"aevalsrc='0.5*sin(2*PI*1000*t)*lt(mod(t,2),0.1)':s=48000:d={duracao}",
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(original)],
+        check=True, timeout=120)
+    db.midias.update_one({"_id": midia["_id"]}, {"$set": {"status": "processando"}})
+    enfileirar_job(db, montar_job("ingestao", midia["organizacao_id"], {"midia_id": str(midia["_id"])}))
+    rodar(db, "ingestao")
+    return db.midias.find_one({"_id": midia["_id"]})
+
+
+def instantes_dos_claroes(video) -> list[float]:
+    saida = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vf",
+                            "signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-", "-f", "null", "-"],
+                           capture_output=True, text=True, timeout=120).stdout
+    quadros = re.findall(r"pts_time:([\d.]+)\s+lavfi\.signalstats\.YAVG=([\d.]+)", saida)
+    claroes, anterior = [], False
+    for instante, brilho in quadros:
+        aceso = float(brilho) > 100
+        if aceso and not anterior:
+            claroes.append(float(instante))
+        anterior = aceso
+    return claroes
+
+
+def instantes_dos_bipes(video) -> list[float]:
+    saida = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-af",
+                            "silencedetect=n=-30dB:d=0.02", "-f", "null", "-"],
+                           capture_output=True, text=True, timeout=120).stderr
+    return [float(valor) for valor in re.findall(r"silence_end: ([\d.]+)", saida)]
+
+
+def test_partes_fora_de_ordem_emendam_sem_perder_a_sincronia(db_limpo):
+    midia = midia_com_marcas(db_limpo)
+    # Primeiro 3,5-6,5 s (marcas em 4 e 6), depois 0,5-2,5 s (marca em 2): 5 s de vídeo
+    partes = [{"id": "b", "inicio": 3.5, "fim": 6.5}, {"id": "a", "inicio": 0.5, "fim": 2.5}]
+    exportacao, video = exportar(db_limpo, midia, silencios={"intensidade": None}, audio={"normalizar": False},
+                                 partes=partes)
+    assert exportacao["status"] == "pronta" and exportacao["partes"] == 2
+    assert exportacao["duracao"] == pytest.approx(5.0, abs=0.001)
+    claroes = instantes_dos_claroes(video)
+    # O silencedetect também marca o fim do arquivo como "fim de silêncio": essa marca não é bipe
+    bipes = [bipe for bipe in instantes_dos_bipes(video) if bipe < exportacao["duracao"] - 0.1]
+    # Na ordem da gravação, o primeiro clarão cairia em 1,5 s; na ordem escolhida, cai em 0,5 s
+    assert claroes == pytest.approx([0.5, 2.5, 4.5], abs=0.04)
+    # Cada bipe continua junto do seu clarão depois das emendas (tolerância de pouco mais de um quadro)
+    assert len(bipes) == 3
+    assert all(abs(bipe - clarao) < 0.045 for bipe, clarao in zip(bipes, claroes, strict=True))
+    fluxo_video, fluxo_audio = sondar(video)
+    assert abs(float(fluxo_audio["duration"]) - float(fluxo_video["duration"])) < 0.07
+
+
 def test_trecho_todo_em_silencio_falha_sem_novas_tentativas(db_limpo):
     midia = midia_pronta(db_limpo, duracao=8)
-    projeto = {**montar_projeto(midia["organizacao_id"], midia, None), "trecho": {"inicio": 3.2, "fim": 3.8}}
+    projeto = {**montar_projeto(midia["organizacao_id"], midia, None),
+               "partes": [{"id": "p1", "inicio": 3.2, "fim": 3.8}]}
     projeto["_id"] = db_limpo.projetos.insert_one(projeto).inserted_id
     exportacao = montar_exportacao(projeto, None)
     exportacao["_id"] = db_limpo.exportacoes.insert_one(exportacao).inserted_id

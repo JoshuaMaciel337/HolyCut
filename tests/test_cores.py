@@ -60,9 +60,9 @@ def test_contraste_menor_que_um_comprime_a_saida(monkeypatch):
 
 def test_filtro_de_cor_vem_antes_do_fundo_no_render():
     recorte = {"x": 0, "y": 0, "largura": 1080, "altura": 1920}
-    filtro = montar_filtro([(0.0, 5.0)], recorte, 1080, 1920, tem_audio=False,
+    filtro = montar_filtro([[(0.0, 5.0)]], recorte, 1080, 1920, tem_audio=False,
                            fundo={"desfoque": 10, "escurecer": 0.3}, cor={"filtro": "pb", "intensidade": 1})
     cadeia = filtro.split(";\n")[0]
     assert cadeia.index("format=gbrp") < cadeia.index("colorchannelmixer=rr=0.2126") < cadeia.index("gblur")
-    assert "format=gbrp" not in montar_filtro([(0.0, 5.0)], recorte, 1080, 1920, tem_audio=False,
+    assert "format=gbrp" not in montar_filtro([[(0.0, 5.0)]], recorte, 1080, 1920, tem_audio=False,
                                               cor={"filtro": "natural"})

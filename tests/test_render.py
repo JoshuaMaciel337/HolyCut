@@ -94,7 +94,7 @@ def test_recorte_por_proporcao(largura, altura, proporcao, esperado):
 # -----------------------------------------------
 def test_filtro_com_audio():
     recorte = calcular_recorte(1920, 1080, "9:16")
-    filtro = montar_filtro([(0.0, 2.0), (3.0, 5.0)], recorte, 1080, 1920, tem_audio=True)
+    filtro = montar_filtro([[(0.0, 2.0), (3.0, 5.0)]], recorte, 1080, 1920, tem_audio=True)
     video, audio = filtro.split(";\n")
     assert "fps=30,select='gte(t,-0.0167)*lt(t,1.9833)+gte(t,2.9833)*lt(t,4.9833)'" in video
     assert "crop=606:1080:656:0,scale=1080:1920" in video
@@ -106,15 +106,35 @@ def test_filtro_com_audio():
 
 def test_filtro_sem_audio_e_sem_normalizar():
     recorte = calcular_recorte(1080, 1920, "9:16")
-    assert ";" not in montar_filtro([(0.0, 2.0)], recorte, 1080, 1920, tem_audio=False)
-    com_audio = montar_filtro([(0.0, 2.0)], recorte, 1080, 1920, tem_audio=True, normalizar=False)
+    assert ";" not in montar_filtro([[(0.0, 2.0)]], recorte, 1080, 1920, tem_audio=False)
+    com_audio = montar_filtro([[(0.0, 2.0)]], recorte, 1080, 1920, tem_audio=True, normalizar=False)
     assert "loudnorm" not in com_audio
+
+
+def test_filtro_com_duas_partes_emenda_com_concat():
+    recorte = calcular_recorte(1920, 1080, "9:16")
+    partes = [[(0.0, 2.0)], [(0.0, 1.0), (1.5, 3.0)]]     # 2 s + 2,5 s
+    grafo = montar_filtro(partes, recorte, 1080, 1920, tem_audio=True, camadas=[(0, 4)],
+                          musica={"entrada": 3, "volume": 0.3, "abaixar_na_fala": False}).split(";\n")
+    assert grafo[0].startswith("[0:v]setpts=PTS-STARTPTS") and grafo[0].endswith("[p0v]")
+    assert grafo[1].startswith("[0:a]asetpts=PTS-STARTPTS") and grafo[1].endswith("[p0a]")
+    assert grafo[2].startswith("[1:v]") and grafo[3].startswith("[1:a]")
+    assert grafo[4] == "[p0v][p0a][p1v][p1a]concat=n=2:v=1:a=1[pv][pa]"
+    assert grafo[5].startswith("[pv]crop=606:1080:656:0,scale=1080:1920")
+    assert grafo[6].startswith("[base0][2:v]overlay=0:0")      # a camada vem depois das duas partes
+    assert grafo[7] == "[pa]anull,aformat=channel_layouts=stereo[voz]"
+    assert "atrim=0:4.500" in grafo[8]                         # a música tem a duração do vídeo todo
+    assert "afade=t=out:st=4.420" in grafo[-1]
+
+    sem_audio = montar_filtro([[(0.0, 1.0)], [(0.0, 1.0)]], recorte, 1080, 1920, tem_audio=False).split(";\n")
+    assert sem_audio[2] == "[p0v][p1v]concat=n=2:v=1:a=0[pv]"
+    assert sem_audio[-1].endswith("[v]") and "[pa]" not in ";".join(sem_audio)
 
 
 def test_filtro_com_musica_abaixando_sob_a_fala():
     recorte = calcular_recorte(1920, 1080, "9:16")
     musica = {"entrada": 3, "volume": 0.3, "abaixar_na_fala": True}
-    partes = montar_filtro([(0.0, 2.0), (3.0, 5.0)], recorte, 1080, 1920, tem_audio=True,
+    partes = montar_filtro([[(0.0, 2.0), (3.0, 5.0)]], recorte, 1080, 1920, tem_audio=True,
                            camadas=[(0, 4), (1, 2)], musica=musica).split(";\n")
     assert partes[-4].endswith("asplit=2[voz][chave]")        # a voz vai para a mixagem e para a chave
     assert partes[-3] == ("[3:a]aresample=48000,aformat=channel_layouts=stereo,atrim=0:4.000,"
@@ -129,11 +149,11 @@ def test_filtro_com_musica_abaixando_sob_a_fala():
 def test_filtro_com_musica_sem_abaixar_e_sem_audio_na_gravacao():
     recorte = calcular_recorte(1920, 1080, "9:16")
     musica = {"entrada": 1, "volume": 0.5, "abaixar_na_fala": False}
-    sem_abaixar = montar_filtro([(0.0, 2.0)], recorte, 1080, 1920, tem_audio=True, musica=musica)
+    sem_abaixar = montar_filtro([[(0.0, 2.0)]], recorte, 1080, 1920, tem_audio=True, musica=musica)
     assert "sidechaincompress" not in sem_abaixar
     assert "[voz][musica]amix=inputs=2" in sem_abaixar
 
-    so_musica = montar_filtro([(0.0, 2.0)], recorte, 1080, 1920, tem_audio=False, musica=musica).split(";\n")
+    so_musica = montar_filtro([[(0.0, 2.0)]], recorte, 1080, 1920, tem_audio=False, musica=musica).split(";\n")
     assert len(so_musica) == 2 and "[0:a]" not in so_musica[1]   # a gravação muda não entra no áudio
     assert so_musica[1].startswith("[1:a]aresample=48000") and so_musica[1].endswith("[a]")
 
@@ -145,7 +165,7 @@ def test_projeto_e_exportacao_guardam_a_configuracao():
     midia = {"_id": "m1", "nome": "Culto de domingo", "duracao": 2400.456}
     projeto = montar_projeto("org1", midia, "u1")
     assert projeto["nome"] == "Reel · Culto de domingo"
-    assert projeto["trecho"] == {"inicio": 0.0, "fim": 2400.46}
+    assert projeto["partes"] == [{"id": "p1", "inicio": 0.0, "fim": 2400.46}]
     assert projeto["silencios"] == {"intensidade": "media"}
     assert projeto["musica"] == {"id": None, "volume": 0.25, "abaixar_na_fala": True, "inicio": 0.0}
     with pytest.raises(ValueError):
@@ -153,10 +173,10 @@ def test_projeto_e_exportacao_guardam_a_configuracao():
 
     projeto["_id"] = "p1"
     exportacao = montar_exportacao(projeto, "u1")
-    assert exportacao["configuracao"]["trecho"] == projeto["trecho"]
+    assert exportacao["configuracao"]["partes"] == projeto["partes"]
     assert exportacao["configuracao"]["musica"] == projeto["musica"]
     assert (exportacao["largura"], exportacao["altura"]) == (1080, 1920)
-    projeto["trecho"]["fim"] = 30.0            # editar o projeto depois
+    projeto["partes"][0]["fim"] = 30.0         # editar o projeto depois
     projeto["enquadramento"]["zoom"] = 2.0
-    assert exportacao["configuracao"]["trecho"]["fim"] == 2400.46
+    assert exportacao["configuracao"]["partes"][0]["fim"] == 2400.46
     assert exportacao["configuracao"]["enquadramento"]["zoom"] == 1.0

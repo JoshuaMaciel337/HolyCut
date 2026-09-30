@@ -19,6 +19,7 @@ PROPORCOES = {
 }
 INTENSIDADES_CORTE = ("leve", "media", "forte")
 DURACAO_MINIMA_TRECHO = 1.0
+MAXIMO_PARTES = 30
 ZOOM_MAXIMO = 3.0
 
 STATUS_EXPORTACAO_PROCESSANDO = "processando"
@@ -36,8 +37,20 @@ DESFOQUE_MAXIMO = 30
 
 # Campos do projeto que definem o vídeo. A exportação guarda uma cópia deles,
 # então editar o projeto depois não muda um vídeo já exportado.
-CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos", "fundo", "cor",
+CAMPOS_DO_VIDEO = ("proporcao", "partes", "silencios", "enquadramento", "audio", "marca", "textos", "fundo", "cor",
                    "musica")
+
+
+def partes_do_projeto(projeto_ou_config: dict) -> list[dict]:
+    """
+    Partes da gravação que formam o vídeo, na ordem em que aparecem. Podem estar fora da ordem
+    da gravação e até se repetir (a melhor frase no começo, como gancho).
+    Projetos e exportações de antes da linha do tempo só têm um "trecho".
+    """
+    if projeto_ou_config.get("partes"):
+        return projeto_ou_config["partes"]
+    trecho = projeto_ou_config.get("trecho")
+    return [{"id": "p1", "inicio": trecho["inicio"], "fim": trecho["fim"]}] if trecho else []
 
 
 def _id_do_modelo(modelo: dict | None) -> str | None:
@@ -75,7 +88,7 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         "tipo": tipo,
         "modelo_id": _id_do_modelo(modelo),
         "proporcao": proporcao,
-        "trecho": trecho,
+        "partes": [{"id": "p1", **trecho}],
         "silencios": silencios,
         "enquadramento": {"x": 0.5, "y": 0.5, "zoom": 1.0},
         "audio": {"normalizar": True},
@@ -105,7 +118,8 @@ def montar_exportacao(projeto: dict, criado_por, momento: datetime | None = None
         "criado_por": criado_por,
         "nome": projeto["nome"],
         "versao_projeto": projeto["versao"],
-        "configuracao": copy.deepcopy({campo: projeto.get(campo) for campo in CAMPOS_DO_VIDEO}),
+        "configuracao": copy.deepcopy({**{campo: projeto.get(campo) for campo in CAMPOS_DO_VIDEO},
+                                       "partes": partes_do_projeto(projeto)}),
         "status": STATUS_EXPORTACAO_PROCESSANDO,
         "arquivos": [],
         "duracao": None,

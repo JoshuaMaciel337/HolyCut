@@ -101,58 +101,85 @@ def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor
     return cadeia
 
 
-def _sobrepor(camadas: list[tuple[float, float]] | None, duracao: float | None) -> str:
-    """Encadeia um overlay por camada a partir de [base0] e termina em [v]. Sem duração: imagem parada."""
+def _sobrepor(camadas: list[tuple[float, float]] | None, duracao: float | None, primeira_entrada: int = 1) -> str:
+    """
+    Encadeia um overlay por camada a partir de [base0] e termina em [v]. Sem duração: imagem parada.
+    A primeira camada é a entrada primeira_entrada do FFmpeg, e as outras vêm em seguida.
+    """
     if not camadas:
         return ",format=yuv420p[v]"
     grafo, anterior = "[base0]", "base0"
     for indice, (inicio, fim) in enumerate(camadas, start=1):
         saida = "v" if indice == len(camadas) else f"base{indice}"
+        entrada = primeira_entrada + indice - 1
         quando = f":enable='between(t,{inicio:.3f},{min(fim, duracao):.3f})'" if duracao is not None else ""
-        grafo += f";\n[{anterior}][{indice}:v]overlay=0:0{quando}{',format=yuv420p' if saida == 'v' else ''}[{saida}]"
+        grafo += f";\n[{anterior}][{entrada}:v]overlay=0:0{quando}{',format=yuv420p' if saida == 'v' else ''}[{saida}]"
         anterior = saida
     return grafo
 
 
-def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: int, altura: int,
+def _selecionar_video(entrada: int, trechos: list[tuple[float, float]]) -> str:
+    return f"[{entrada}:v]setpts=PTS-STARTPTS,fps={FPS},select='{expressao_selecao(trechos)}',setpts=N/{FPS}/TB"
+
+
+def _selecionar_audio(entrada: int, trechos: list[tuple[float, float]]) -> str:
+    return (f"[{entrada}:a]asetpts=PTS-STARTPTS,aresample={TAXA_AUDIO},asetnsamples=n={AMOSTRAS_POR_QUADRO}:p=0,"
+            f"aselect='{expressao_selecao(trechos)}',asetpts=N/SR/TB")
+
+
+def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largura: int, altura: int,
                   tem_audio: bool, normalizar: bool = True,
                   camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None,
                   cor: dict | None = None, musica: dict | None = None) -> str:
     """
     Grafo de filtros completo, com as saídas [v] e [a].
-    camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. A camada i é a
-    entrada i + 1 do FFmpeg (a entrada 0 é a gravação).
+    partes: os trechos mantidos de cada parte do vídeo, na ordem final. A parte k é a entrada k do
+    FFmpeg (a gravação aberta de novo, a partir do início daquela parte). Com mais de uma parte, elas
+    se emendam com concat. Cada parte tem vídeo e áudio com a mesma duração, em quadros inteiros,
+    então a sincronia não escorrega nas emendas.
+    camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. As camadas vêm
+    logo depois das partes nas entradas do FFmpeg.
     musica: {"entrada": índice da faixa no FFmpeg, "volume": 0 a 1, "abaixar_na_fala": bool}.
     """
-    selecao = expressao_selecao(trechos)
-    duracao = duracao_dos_trechos(trechos)
-    video = (f"[0:v]setpts=PTS-STARTPTS,fps={FPS},select='{selecao}',setpts=N/{FPS}/TB,"
-             f"{_enquadrar(recorte, largura, altura, fundo, cor)}{_sobrepor(camadas, duracao)}")
+    duracao = round(sum(duracao_dos_trechos(trechos) for trechos in partes), 3)
+    grafo = []
+    if len(partes) == 1:
+        fonte_video = f"{_selecionar_video(0, partes[0])},"
+        voz = _selecionar_audio(0, partes[0])
+    else:
+        emenda = ""
+        for indice, trechos in enumerate(partes):
+            grafo.append(f"{_selecionar_video(indice, trechos)}[p{indice}v]")
+            emenda += f"[p{indice}v]"
+            if tem_audio:
+                grafo.append(f"{_selecionar_audio(indice, trechos)}[p{indice}a]")
+                emenda += f"[p{indice}a]"
+        grafo.append(f"{emenda}concat=n={len(partes)}:v=1:a={1 if tem_audio else 0}[pv]{'[pa]' if tem_audio else ''}")
+        fonte_video, voz = "[pv]", "[pa]anull"
+    grafo.append(f"{fonte_video}{_enquadrar(recorte, largura, altura, fundo, cor)}"
+                 f"{_sobrepor(camadas, duracao, primeira_entrada=len(partes))}")
     if not tem_audio and not musica:
-        return video
+        return ";\n".join(grafo)
 
     acabamento = f"loudnorm=I={LUFS_ALVO}:TP={PICO_MAXIMO_DB}:LRA=11,aresample={TAXA_AUDIO}," if normalizar else ""
     acabamento += (f"afade=t=in:d={FADE_ENTRADA},"
                    f"afade=t=out:st={max(duracao - FADE_SAIDA, 0):.3f}:d={FADE_SAIDA}[a]")
-    voz = (f"[0:a]asetpts=PTS-STARTPTS,aresample={TAXA_AUDIO},asetnsamples=n={AMOSTRAS_POR_QUADRO}:p=0,"
-           f"aselect='{selecao}',asetpts=N/SR/TB")
     if not musica:
-        return f"{video};\n{voz},{acabamento}"
+        return ";\n".join([*grafo, f"{voz},{acabamento}"])
 
     faixa = (f"[{musica['entrada']}:a]aresample={TAXA_AUDIO},aformat=channel_layouts=stereo,"
              f"atrim=0:{duracao:.3f},asetpts=PTS-STARTPTS,volume={float(musica['volume']):.3f}")
     if not tem_audio:
-        return f"{video};\n{faixa},{acabamento}"
-    partes = [video]
+        return ";\n".join([*grafo, f"{faixa},{acabamento}"])
     if musica.get("abaixar_na_fala", True):
         # A voz vira a "chave" do compressor: quando alguém fala, a música abaixa sozinha
-        partes += [f"{voz},aformat=channel_layouts=stereo,asplit=2[voz][chave]", f"{faixa}[musica0]",
-                   f"[musica0][chave]sidechaincompress=threshold={LIMIAR_FALA}:ratio={RAZAO_ABAIXAR}"
-                   f":attack={ATAQUE_MS}:release={SOLTURA_MS}[musica]"]
+        grafo += [f"{voz},aformat=channel_layouts=stereo,asplit=2[voz][chave]", f"{faixa}[musica0]",
+                  f"[musica0][chave]sidechaincompress=threshold={LIMIAR_FALA}:ratio={RAZAO_ABAIXAR}"
+                  f":attack={ATAQUE_MS}:release={SOLTURA_MS}[musica]"]
     else:
-        partes += [f"{voz},aformat=channel_layouts=stereo[voz]", f"{faixa}[musica]"]
-    partes.append(f"[voz][musica]amix=inputs=2:duration=first:normalize=0,{acabamento}")
-    return ";\n".join(partes)
+        grafo += [f"{voz},aformat=channel_layouts=stereo[voz]", f"{faixa}[musica]"]
+    grafo.append(f"[voz][musica]amix=inputs=2:duration=first:normalize=0,{acabamento}")
+    return ";\n".join(grafo)
 
 
 def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_camadas: int = 0,
@@ -160,6 +187,17 @@ def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_ca
     """Um quadro só (exportação em imagem): enquadra, aplica cor e fundo e sobrepõe as camadas."""
     camadas = [(0.0, 0.0)] * quantidade_camadas
     return f"[0:v]{_enquadrar(recorte, largura, altura, fundo, cor)}{_sobrepor(camadas, None)}"
+
+
+def localizar_no_video(partes: list[list[tuple[float, float]]], posicao_final: float) -> tuple[int, float]:
+    """(índice da parte, instante relativo ao início dela) de um ponto do vídeo final."""
+    acumulado = 0.0
+    for indice, trechos in enumerate(partes):
+        duracao = duracao_dos_trechos(trechos)
+        if posicao_final < acumulado + duracao or indice == len(partes) - 1:
+            return indice, instante_na_gravacao(trechos, posicao_final - acumulado)
+        acumulado += duracao
+    return 0, 0.0
 
 
 def instante_na_gravacao(trechos: list[tuple[float, float]], posicao_final: float) -> float:

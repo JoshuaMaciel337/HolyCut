@@ -4,7 +4,7 @@ import pytest
 from core.modelos.modelos_story import MODELOS_PADRAO, aplicar_modelo, modelo_padrao, montar_modelo_da_igreja
 from core.modelos.projeto import montar_exportacao, montar_projeto
 from core.utils.arte import camada_texto
-from core.utils.render import instante_na_gravacao, montar_filtro, montar_filtro_imagem
+from core.utils.render import instante_na_gravacao, localizar_no_video, montar_filtro, montar_filtro_imagem
 
 MIDIA = {"_id": "m1", "nome": "Culto de domingo", "duracao": 120.0}
 IDENTIDADE = {"nome_exibicao": "Igreja Viva", "instagram": "@igrejaviva", "cor_destaque": "#7B61FF", "logo": True}
@@ -36,7 +36,7 @@ def test_projeto_story_a_partir_do_modelo():
     assert projeto["tipo"] == "story"
     assert projeto["modelo_id"] == "versiculo"
     assert projeto["proporcao"] == "9:16"
-    assert projeto["trecho"] == {"inicio": 30.46, "fim": 45.46}
+    assert projeto["partes"] == [{"id": "p1", "inicio": 30.46, "fim": 45.46}]
     assert projeto["silencios"] == {"intensidade": None}
     assert projeto["fundo"] == {"escurecer": 0.45, "desfoque": 14}
     assert projeto["textos"][0]["referencia"] == "Filipenses 4:13"
@@ -44,7 +44,7 @@ def test_projeto_story_a_partir_do_modelo():
 
 def test_story_no_fim_da_gravacao_nao_passa_da_duracao():
     projeto = montar_projeto("org1", MIDIA, "u1", tipo="story", inicio=118.0)
-    assert projeto["trecho"] == {"inicio": 118.0, "fim": 120.0}
+    assert projeto["partes"] == [{"id": "p1", "inicio": 118.0, "fim": 120.0}]
     assert projeto["fundo"] == {"escurecer": 0.0, "desfoque": 0}
     with pytest.raises(ValueError):
         montar_projeto("org1", MIDIA, "u1", tipo="carrossel")
@@ -53,7 +53,7 @@ def test_story_no_fim_da_gravacao_nao_passa_da_duracao():
 def test_reel_continua_igual():
     projeto = montar_projeto("org1", MIDIA, "u1", identidade=IDENTIDADE)
     assert projeto["tipo"] == "reel" and projeto["modelo_id"] is None
-    assert projeto["trecho"] == {"inicio": 0.0, "fim": 120.0}
+    assert projeto["partes"] == [{"id": "p1", "inicio": 0.0, "fim": 120.0}]
     assert projeto["silencios"] == {"intensidade": "media"}
     assert projeto["marca"]["logo"] is True
 
@@ -85,12 +85,12 @@ RECORTE = {"x": 0, "y": 0, "largura": 1080, "altura": 1920}
 
 
 def test_fundo_desfocado_e_escurecido_antes_das_camadas():
-    filtro = montar_filtro([(0.0, 5.0)], RECORTE, 1080, 1920, tem_audio=False, camadas=[(0.0, 5.0)],
+    filtro = montar_filtro([[(0.0, 5.0)]], RECORTE, 1080, 1920, tem_audio=False, camadas=[(0.0, 5.0)],
                            fundo={"escurecer": 0.45, "desfoque": 14})
     video = filtro.split(";\n")[0]
     assert video.endswith("scale=1080:1920:flags=lanczos,setsar=1,format=gbrp,gblur=sigma=14.0,"
                           "colorchannelmixer=rr=0.550:gg=0.550:bb=0.550[base0]")
-    sem_fundo = montar_filtro([(0.0, 5.0)], RECORTE, 1080, 1920, tem_audio=False)
+    sem_fundo = montar_filtro([[(0.0, 5.0)]], RECORTE, 1080, 1920, tem_audio=False)
     assert "gblur" not in sem_fundo and "colorchannelmixer" not in sem_fundo and "gbrp" not in sem_fundo
 
 
@@ -109,6 +109,14 @@ def test_instante_do_video_final_na_gravacao():
     assert instante_na_gravacao(trechos, 2.5) == 3.5    # já no segundo trecho, depois do corte
     assert instante_na_gravacao(trechos, 6.0) == 9.0
     assert instante_na_gravacao(trechos, 99) == pytest.approx(10 - 1 / 30)
+
+
+def test_localizar_no_video_com_varias_partes():
+    partes = [[(0.0, 2.0)], [(0.0, 1.0), (3.0, 4.0)]]    # 2 s da primeira parte e 2 s da segunda
+    assert localizar_no_video(partes, 1.0) == (0, 1.0)
+    assert localizar_no_video(partes, 2.5) == (1, 0.5)
+    assert localizar_no_video(partes, 3.5) == (1, 3.5)   # pulou o corte dentro da segunda parte
+    assert localizar_no_video(partes, 99)[0] == 1
 
 
 def test_tamanho_do_texto():

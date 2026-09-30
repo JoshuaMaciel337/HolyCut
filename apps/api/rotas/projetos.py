@@ -94,12 +94,18 @@ async def atualizar_projeto(projeto_id: str, dados: ProjetoAtualizarEntrada,
                             usuario=Depends(usuario_atual), db=Depends(obter_db)):
     projeto = await buscar_projeto(db, projeto_id, usuario)
     campos = dados.model_dump(exclude_unset=True, exclude={"versao"})
-    if dados.trecho is not None:
+    if dados.partes is not None:
         midia = await buscar_midia_do_projeto(db, projeto["midia_id"], usuario)
-        fim = min(dados.trecho.fim, round(midia["duracao"], 2))
-        if fim - dados.trecho.inicio < DURACAO_MINIMA_TRECHO:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O trecho precisa ter pelo menos 1 segundo.")
-        campos["trecho"] = {"inicio": round(dados.trecho.inicio, 2), "fim": fim}
+        partes = []
+        for parte in dados.partes:
+            fim = min(round(parte.fim, 2), round(midia["duracao"], 2))
+            if fim - parte.inicio < DURACAO_MINIMA_TRECHO:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                    "Cada parte precisa ter pelo menos 1 segundo.")
+            partes.append({"id": parte.id, "inicio": round(parte.inicio, 2), "fim": fim})
+        if len({parte["id"] for parte in partes}) != len(partes):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas partes com o mesmo identificador.")
+        campos["partes"] = partes
     for texto in dados.textos or []:
         if texto.fim is not None and texto.fim <= texto.inicio:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O texto precisa terminar depois de começar.")
@@ -111,9 +117,11 @@ async def atualizar_projeto(projeto_id: str, dados: ProjetoAtualizarEntrada,
         return projeto_para_saida(projeto)
 
     campos["atualizado_em"] = agora()
+    # Projetos de antes da linha do tempo guardavam um "trecho" só; as partes substituem
+    sem_trecho = {"$unset": {"trecho": ""}} if "partes" in campos else {}
     resultado = await db.projetos.find_one_and_update(
         {"_id": projeto["_id"], "versao": dados.versao},
-        {"$set": campos, "$inc": {"versao": 1}},
+        {"$set": campos, "$inc": {"versao": 1}, **sem_trecho},
         return_document=ReturnDocument.AFTER,
     )
     if resultado is None:

@@ -1,10 +1,11 @@
 # -----------------------------------------------
 # Tarefa "renderizacao" — gera o vídeo final (ou a imagem) de uma exportação
 #
-#   1. calcula os trechos mantidos: o trecho escolhido menos os silêncios
-#   2. uma passada do FFmpeg a partir do arquivo original: seleciona os
-#      trechos, enquadra, aplica o fundo, sobrepõe logo e textos e normaliza
-#      o áudio em -14 LUFS
+#   1. calcula os trechos mantidos de cada parte: a parte menos os silêncios
+#   2. uma passada do FFmpeg a partir do arquivo original, aberto uma vez por
+#      parte: seleciona os trechos, emenda as partes na ordem escolhida,
+#      enquadra, aplica cor e fundo, sobrepõe logo e textos, mistura a música
+#      e normaliza o áudio em -14 LUFS
 #   3. capa do vídeo exportado
 # No formato "imagem", sai um quadro só em JPG, com as camadas daquele instante.
 # A configuração vem da cópia guardada na exportação, não do projeto atual.
@@ -32,6 +33,7 @@ from core.modelos.projeto import (
     STATUS_EXPORTACAO_PRONTA,
     calcular_recorte,
     chave_exportacao,
+    partes_do_projeto,
 )
 from core.utils import storage
 from core.utils.arte import camada_logo, camada_texto, para_png
@@ -40,7 +42,7 @@ from core.utils.mongo import agora
 from core.utils.render import (
     FPS,
     duracao_dos_trechos,
-    instante_na_gravacao,
+    localizar_no_video,
     montar_filtro,
     montar_filtro_imagem,
     opcao_filtro_em_arquivo,
@@ -122,12 +124,13 @@ def cortes_de_silencio(midia: dict, intensidade: str | None) -> list[tuple[float
     return detectar_silencios(niveis, duracao=midia["duracao"], **INTENSIDADES[intensidade])
 
 
-def exportar_imagem(db, exportacao: dict, config: dict, original, trechos, duracao: float, recorte: dict,
+def exportar_imagem(db, exportacao: dict, config: dict, original, partes: list, duracao: float, recorte: dict,
                     largura: int, altura: int, caminho, reportar: Callable[[int, str], None]) -> dict:
     """Um quadro do vídeo final em JPG, com o fundo e as camadas visíveis naquele instante."""
     organizacao_id, exportacao_id = exportacao["organizacao_id"], exportacao["_id"]
     posicao = min(float(exportacao.get("instante") or 0), max(duracao - 1 / FPS, 0.0))
-    origem = config["trecho"]["inicio"] + instante_na_gravacao(trechos, posicao)
+    indice, relativo = localizar_no_video([trechos for _, trechos in partes], posicao)
+    origem = partes[indice][0]["inicio"] + relativo
 
     reportar(10, "Desenhando o logo e os textos")
     visiveis = [imagem for imagem, inicio, fim in desenhar_camadas(db, organizacao_id, config, largura, altura, duracao)
@@ -189,15 +192,19 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     rotulo = f"[{organizacao_id}] [exportacao {exportacao_id}]"
     config = exportacao["configuracao"]
 
-    # 1. Trechos mantidos
+    # 1. Trechos mantidos de cada parte (uma parte que fica só com silêncio sai do vídeo)
     reportar(2, "Calculando os cortes")
-    inicio, fim = config["trecho"]["inicio"], config["trecho"]["fim"]
     cortes = cortes_de_silencio(midia, (config.get("silencios") or {}).get("intensidade"))
-    trechos = planejar_trechos(inicio, fim, cortes)
-    if not trechos:
-        raise ErroDefinitivo("O trecho escolhido ficou vazio depois do corte de silêncios.")
-    duracao = duracao_dos_trechos(trechos)
-    logging.info(f"{rotulo} {len(trechos)} trechos, {duracao:.1f}s de {fim - inicio:.1f}s escolhidos.")
+    partes = [(parte, planejar_trechos(parte["inicio"], parte["fim"], cortes)) for parte in partes_do_projeto(config)]
+    partes = [(parte, trechos) for parte, trechos in partes if trechos]
+    if not partes:
+        raise ErroDefinitivo("O vídeo ficou vazio depois do corte de silêncios.")
+    grupos = [trechos for _, trechos in partes]
+    duracao = round(sum(duracao_dos_trechos(trechos) for trechos in grupos), 3)
+    escolhido = sum(parte["fim"] - parte["inicio"] for parte, _ in partes)
+    total_trechos = sum(len(trechos) for trechos in grupos)
+    logging.info(f"{rotulo} {len(partes)} partes, {total_trechos} trechos, "
+                 f"{duracao:.1f}s de {escolhido:.1f}s escolhidos.")
 
     # 2. Vídeo final
     largura, altura = PROPORCOES[config["proporcao"]]
@@ -209,7 +216,7 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         return storage.caminho_local(chave_exportacao(organizacao_id, exportacao_id, nome))
 
     if exportacao.get("formato") == "imagem":
-        return exportar_imagem(db, exportacao, config, original, trechos, duracao, recorte, largura, altura,
+        return exportar_imagem(db, exportacao, config, original, partes, duracao, recorte, largura, altura,
                                caminho, reportar)
 
     # Logo e textos: uma imagem PNG por camada, sobreposta só no intervalo dela
@@ -227,18 +234,23 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     if faixa:
         caminho_faixa, ajustes = faixa
         entradas_musica = ["-stream_loop", "-1", "-ss", f"{ajustes['inicio']:.3f}", "-i", str(caminho_faixa)]
-        musica = {"entrada": 1 + len(camadas), "volume": ajustes["volume"],
+        musica = {"entrada": len(partes) + len(camadas), "volume": ajustes["volume"],
                   "abaixar_na_fala": ajustes["abaixar_na_fala"]}
     tem_saida_de_audio = bool(midia.get("audio")) or musica is not None
 
-    filtro = montar_filtro(trechos, recorte, largura, altura, tem_audio=bool(midia.get("audio")),
+    filtro = montar_filtro(grupos, recorte, largura, altura, tem_audio=bool(midia.get("audio")),
                            normalizar=(config.get("audio") or {}).get("normalizar", True),
                            camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas],
                            fundo=config.get("fundo"), cor=config.get("cor"), musica=musica)
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
     saida = caminho(ARQUIVO_VIDEO_EXPORTADO)
+    # A gravação entra uma vez por parte, já a partir do início dela
+    entradas_partes = []
+    for parte, _ in partes:
+        entradas_partes += ["-ss", f"{parte['inicio']:.3f}", "-t", f"{parte['fim'] - parte['inicio']:.3f}",
+                            "-i", str(original)]
     argumentos = [
-        "-ss", f"{inicio:.3f}", "-t", f"{fim - inicio:.3f}", "-i", str(original),
+        *entradas_partes,
         *entradas_camadas,
         *entradas_musica,
         *opcao_filtro_em_arquivo(str(caminho(ARQUIVO_FILTRO))),
@@ -263,7 +275,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         "arquivos": [ARQUIVO_VIDEO_EXPORTADO, ARQUIVO_CAPA_EXPORTADA],
         "duracao": duracao,
         "tamanho": tamanho,
-        "trechos": len(trechos),
+        "trechos": total_trechos,
+        "partes": len(partes),
         "erro": None,
         "concluido_em": momento,
         "atualizado_em": momento,

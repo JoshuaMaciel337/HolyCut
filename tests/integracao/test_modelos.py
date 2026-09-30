@@ -43,7 +43,7 @@ def test_criar_story_com_modelo(cliente, db_limpo):
                                                 "modelo_id": "culto-de-hoje", "inicio": 20}).json()
     assert story["tipo"] == "story"
     assert story["nome"] == "Story · Culto de domingo"
-    assert story["trecho"] == {"inicio": 20.0, "fim": 35.0}
+    assert story["partes"] == [{"id": "p1", "inicio": 20.0, "fim": 35.0}]
     assert story["modelo_id"] == "culto-de-hoje"
     assert [t["texto"] for t in story["textos"]] == ["Culto de hoje", "Domingo · 19h", "@igreja.modelo"]
     assert story["marca"]["logo"] is False   # a igreja ainda não enviou logo

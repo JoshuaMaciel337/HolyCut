@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
+from core.modelos.projeto import MAXIMO_PARTES, partes_do_projeto
 
 
 class CadastroEntrada(BaseModel):
@@ -208,7 +209,9 @@ class CamadaEntrada(BaseModel):
     texto: TextoEntrada | None = None
 
 
-class TrechoEntrada(BaseModel):
+class ParteEntrada(BaseModel):
+    """Uma parte da gravação que entra no vídeo. As partes seguem a ordem da lista."""
+    id: str = Field(min_length=1, max_length=20)
     inicio: float = Field(ge=0)
     fim: float = Field(gt=0)
 
@@ -240,7 +243,7 @@ class ProjetoAtualizarEntrada(BaseModel):
     versao: int = Field(description="Versão que a tela editou. Se o projeto mudou depois, a API responde 409.")
     nome: str | None = Field(default=None, min_length=1, max_length=120)
     proporcao: Proporcao | None = None
-    trecho: TrechoEntrada | None = None
+    partes: list[ParteEntrada] | None = Field(default=None, min_length=1, max_length=MAXIMO_PARTES)
     silencios: SilenciosProjetoEntrada | None = None
     enquadramento: EnquadramentoEntrada | None = None
     audio: AudioProjetoEntrada | None = None
@@ -257,7 +260,7 @@ class ProjetoSaida(BaseModel):
     nome: str
     tipo: str
     proporcao: str
-    trecho: TrechoEntrada
+    partes: list[ParteEntrada]
     silencios: SilenciosProjetoEntrada
     enquadramento: EnquadramentoEntrada
     audio: AudioProjetoEntrada
@@ -313,7 +316,8 @@ class ExportacaoSaida(BaseModel):
 
 
 def projeto_para_saida(doc: dict) -> ProjetoSaida:
-    return ProjetoSaida.model_validate({**doc, "id": str(doc["_id"]), "midia_id": str(doc["midia_id"])})
+    return ProjetoSaida.model_validate({**doc, "id": str(doc["_id"]), "midia_id": str(doc["midia_id"]),
+                                        "partes": partes_do_projeto(doc)})
 
 
 def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida:

@@ -83,8 +83,8 @@ def gravacao_e_musica(db_limpo):
 
 def reel_com_musica(db, midia, musica_id, abaixar):
     # Sem normalizar: o loudnorm muda o ganho ao longo do tempo e atrapalharia a medida
-    exportacao, video = exportar(db, midia, trecho={"inicio": 0.0, "fim": 8.0}, silencios={"intensidade": None},
-                                 audio={"normalizar": False},
+    exportacao, video = exportar(db, midia, partes=[{"id": "p1", "inicio": 0.0, "fim": 8.0}],
+                                 silencios={"intensidade": None}, audio={"normalizar": False},
                                  musica={"id": musica_id, "volume": 0.5, "abaixar_na_fala": abaixar, "inicio": 1.0})
     assert exportacao["status"] == "pronta"
     return video

@@ -41,15 +41,15 @@ def test_criar_e_editar_projeto(cliente, db_limpo):
     projeto = criado.json()
     assert projeto["nome"] == "Reel · Culto de domingo"
     assert projeto["proporcao"] == "9:16"
-    assert projeto["trecho"] == {"inicio": 0.0, "fim": 120.0}
+    assert projeto["partes"] == [{"id": "p1", "inicio": 0.0, "fim": 120.0}]
     assert projeto["versao"] == 1
 
     editado = cliente.patch(f"/api/projetos/{projeto['id']}", json={
-        "versao": 1, "trecho": {"inicio": 30.5, "fim": 500}, "enquadramento": {"x": 0.3, "y": 0.5, "zoom": 1.2},
-        "silencios": {"intensidade": None}, "proporcao": "4:5"})
+        "versao": 1, "partes": [{"id": "p1", "inicio": 30.5, "fim": 500}],
+        "enquadramento": {"x": 0.3, "y": 0.5, "zoom": 1.2}, "silencios": {"intensidade": None}, "proporcao": "4:5"})
     assert editado.status_code == 200
     corpo = editado.json()
-    assert corpo["trecho"] == {"inicio": 30.5, "fim": 120.0}   # o fim não passa da gravação
+    assert corpo["partes"] == [{"id": "p1", "inicio": 30.5, "fim": 120.0}]   # o fim não passa da gravação
     assert corpo["silencios"] == {"intensidade": None}
     assert corpo["proporcao"] == "4:5"
     assert corpo["versao"] == 2
@@ -72,15 +72,42 @@ def test_validacoes_do_projeto(cliente, db_limpo):
 
     projeto = cliente.post("/api/projetos", json={"midia_id": criar_midia(db_limpo, cliente)}).json()
     rota = f"/api/projetos/{projeto['id']}"
-    assert cliente.patch(rota, json={"versao": 1, "trecho": {"inicio": 10, "fim": 10.5}}).status_code == 422
+    curta = [{"id": "p1", "inicio": 10, "fim": 10.5}]
+    assert cliente.patch(rota, json={"versao": 1, "partes": curta}).status_code == 422
     assert cliente.patch(rota, json={"versao": 1, "enquadramento": {"x": 1.5, "y": 0.5, "zoom": 1}}).status_code == 422
     assert cliente.patch(rota, json={"versao": 1, "proporcao": "3:2"}).status_code == 422
     assert cliente.patch(rota, json={"versao": 1, "silencios": {"intensidade": "maxima"}}).status_code == 422
 
 
+def test_linha_do_tempo_com_varias_partes(cliente, db_limpo):
+    projeto = cliente.post("/api/projetos", json={"midia_id": criar_midia(db_limpo, cliente)}).json()
+    rota = f"/api/projetos/{projeto['id']}"
+    # A ordem é a da lista, e a mesma parte da gravação pode entrar de novo (como gancho no começo)
+    partes = [{"id": "b", "inicio": 50, "fim": 60}, {"id": "a", "inicio": 10, "fim": 20},
+              {"id": "c", "inicio": 50, "fim": 55}]
+    salvo = cliente.patch(rota, json={"versao": 1, "partes": partes}).json()
+    assert [(p["id"], p["inicio"]) for p in salvo["partes"]] == [("b", 50.0), ("a", 10.0), ("c", 50.0)]
+
+    repetido = [{"id": "a", "inicio": 0, "fim": 5}, {"id": "a", "inicio": 9, "fim": 15}]
+    assert cliente.patch(rota, json={"versao": 2, "partes": repetido}).status_code == 422
+    demais = [{"id": f"p{i}", "inicio": i, "fim": i + 2} for i in range(31)]
+    assert cliente.patch(rota, json={"versao": 2, "partes": demais}).status_code == 422
+    assert cliente.patch(rota, json={"versao": 2, "partes": []}).status_code == 422
+
+    # Projeto de antes da linha do tempo, só com "trecho": vira uma parte, e o trecho sai ao salvar
+    db_limpo.projetos.update_one({"_id": ObjectId(projeto["id"])},
+                                 {"$set": {"trecho": {"inicio": 5.0, "fim": 9.0}}, "$unset": {"partes": ""}})
+    antigo = cliente.get(rota).json()
+    assert antigo["partes"] == [{"id": "p1", "inicio": 5.0, "fim": 9.0}]
+    cliente.patch(rota, json={"versao": antigo["versao"], "partes": [{"id": "p1", "inicio": 5, "fim": 12}]})
+    documento = db_limpo.projetos.find_one({"_id": ObjectId(projeto["id"])})
+    assert "trecho" not in documento and documento["partes"][0]["fim"] == 12.0
+
+
 def test_exportar_guarda_a_configuracao_e_poe_o_render_na_fila(cliente, db_limpo):
     projeto = cliente.post("/api/projetos", json={"midia_id": criar_midia(db_limpo, cliente)}).json()
-    cliente.patch(f"/api/projetos/{projeto['id']}", json={"versao": 1, "trecho": {"inicio": 10, "fim": 40}})
+    rota = f"/api/projetos/{projeto['id']}"
+    cliente.patch(rota, json={"versao": 1, "partes": [{"id": "p1", "inicio": 10, "fim": 40}]})
 
     exportacao = cliente.post(f"/api/projetos/{projeto['id']}/exportar").json()
     assert exportacao["status"] == "processando"
@@ -89,9 +116,9 @@ def test_exportar_guarda_a_configuracao_e_poe_o_render_na_fila(cliente, db_limpo
     job = db_limpo.jobs.find_one({"entrada.exportacao_id": exportacao["id"]})
     assert job["tipo"] == "renderizacao"
 
-    cliente.patch(f"/api/projetos/{projeto['id']}", json={"versao": 2, "trecho": {"inicio": 0, "fim": 5}})
+    cliente.patch(f"/api/projetos/{projeto['id']}", json={"versao": 2, "partes": [{"id": "p1", "inicio": 0, "fim": 5}]})
     salvo = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
-    assert salvo["configuracao"]["trecho"] == {"inicio": 10.0, "fim": 40.0}
+    assert salvo["configuracao"]["partes"] == [{"id": "p1", "inicio": 10.0, "fim": 40.0}]
     assert salvo["versao_projeto"] == 2
 
     listadas = cliente.get("/api/exportacoes", params={"projeto_id": projeto["id"]}).json()
