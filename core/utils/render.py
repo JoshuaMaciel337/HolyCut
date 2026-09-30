@@ -70,9 +70,41 @@ def expressao_selecao(trechos: list[tuple[float, float]]) -> str:
     return "+".join(f"gte(t,{a - meio:.4f})*lt(t,{b - meio:.4f})" for a, b in trechos)
 
 
+def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None) -> str:
+    """Recorta, redimensiona e aplica o fundo (desfoque e escurecimento), antes das camadas de arte."""
+    cadeia = (f"crop={recorte['largura']}:{recorte['altura']}:{recorte['x']}:{recorte['y']},"
+              f"scale={largura}:{altura}:flags=lanczos,setsar=1")
+    fundo = fundo or {}
+    desfoque, escurecer = float(fundo.get("desfoque") or 0), float(fundo.get("escurecer") or 0)
+    if desfoque <= 0 and escurecer <= 0:
+        return cadeia
+    # Em RGB, como o navegador faz na prévia (blur e preto translúcido por cima). O drawbox escurecia
+    # no espaço YUV e tirava a saturação: o amarelo virava bege (medido comparando com a prévia).
+    cadeia += ",format=gbrp"
+    if desfoque > 0:
+        cadeia += f",gblur=sigma={desfoque:.1f}"
+    if escurecer > 0:
+        fator = 1 - escurecer
+        cadeia += f",colorchannelmixer=rr={fator:.3f}:gg={fator:.3f}:bb={fator:.3f}"
+    return cadeia
+
+
+def _sobrepor(camadas: list[tuple[float, float]] | None, duracao: float | None) -> str:
+    """Encadeia um overlay por camada a partir de [base0] e termina em [v]. Sem duração: imagem parada."""
+    if not camadas:
+        return ",format=yuv420p[v]"
+    grafo, anterior = "[base0]", "base0"
+    for indice, (inicio, fim) in enumerate(camadas, start=1):
+        saida = "v" if indice == len(camadas) else f"base{indice}"
+        quando = f":enable='between(t,{inicio:.3f},{min(fim, duracao):.3f})'" if duracao is not None else ""
+        grafo += f";\n[{anterior}][{indice}:v]overlay=0:0{quando}{',format=yuv420p' if saida == 'v' else ''}[{saida}]"
+        anterior = saida
+    return grafo
+
+
 def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: int, altura: int,
                   tem_audio: bool, normalizar: bool = True,
-                  camadas: list[tuple[float, float]] | None = None) -> str:
+                  camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None) -> str:
     """
     Grafo de filtros completo, com as saídas [v] e [a].
     camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. A camada i é a
@@ -80,19 +112,8 @@ def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: in
     """
     selecao = expressao_selecao(trechos)
     duracao = duracao_dos_trechos(trechos)
-    video = (
-        f"[0:v]setpts=PTS-STARTPTS,fps={FPS},select='{selecao}',setpts=N/{FPS}/TB,"
-        f"crop={recorte['largura']}:{recorte['altura']}:{recorte['x']}:{recorte['y']},"
-        f"scale={largura}:{altura}:flags=lanczos,setsar=1"
-    )
-    anterior = "base0"
-    video += f"[{anterior}]" if camadas else ",format=yuv420p[v]"
-    for indice, (inicio, fim) in enumerate(camadas or [], start=1):
-        saida = "v" if indice == len(camadas) else f"base{indice}"
-        formato = ",format=yuv420p" if saida == "v" else ""
-        video += (f";\n[{anterior}][{indice}:v]overlay=0:0:enable='between(t,{inicio:.3f},{min(fim, duracao):.3f})'"
-                  f"{formato}[{saida}]")
-        anterior = saida
+    video = (f"[0:v]setpts=PTS-STARTPTS,fps={FPS},select='{selecao}',setpts=N/{FPS}/TB,"
+             f"{_enquadrar(recorte, largura, altura, fundo)}{_sobrepor(camadas, duracao)}")
     if not tem_audio:
         return video
     audio = (
@@ -104,6 +125,26 @@ def montar_filtro(trechos: list[tuple[float, float]], recorte: dict, largura: in
     audio += (f",afade=t=in:d={FADE_ENTRADA},"
               f"afade=t=out:st={max(duracao - FADE_SAIDA, 0):.3f}:d={FADE_SAIDA}[a]")
     return f"{video};\n{audio}"
+
+
+def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_camadas: int = 0,
+                         fundo: dict | None = None) -> str:
+    """Um quadro só (exportação em imagem): enquadra, aplica o fundo e sobrepõe as camadas."""
+    camadas = [(0.0, 0.0)] * quantidade_camadas
+    return f"[0:v]{_enquadrar(recorte, largura, altura, fundo)}{_sobrepor(camadas, None)}"
+
+
+def instante_na_gravacao(trechos: list[tuple[float, float]], posicao_final: float) -> float:
+    """
+    Converte um ponto do vídeo final (já sem os cortes) no ponto correspondente da gravação,
+    relativo ao início do trecho escolhido.
+    """
+    acumulado = 0.0
+    for inicio, fim in trechos:
+        if posicao_final < acumulado + (fim - inicio):
+            return inicio + max(posicao_final - acumulado, 0.0)
+        acumulado += fim - inicio
+    return max(trechos[-1][1] - 1 / FPS, 0.0) if trechos else 0.0
 
 
 @lru_cache(maxsize=1)

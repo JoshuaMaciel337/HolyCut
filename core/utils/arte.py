@@ -109,7 +109,7 @@ def _hex_para_rgb(cor: str) -> tuple[int, int, int]:
 
 
 def camada_texto(largura: int, altura: int, texto: str, estilo: str = "destaque", posicao: str = "base",
-                 cor_destaque: str = "#FF8A00", referencia: str = "") -> Image.Image:
+                 cor_destaque: str = "#FF8A00", referencia: str = "", escala: float = 1.0) -> Image.Image:
     """
     Bloco de texto centralizado, com sombra suave para ler sobre qualquer imagem.
     No estilo "destaque", cada linha ganha uma faixa na cor da igreja.
@@ -120,7 +120,7 @@ def camada_texto(largura: int, altura: int, texto: str, estilo: str = "destaque"
     if caixa_alta:
         texto = texto.upper()
     largura_maxima = int(largura * LARGURA_TEXTO)
-    tamanho = max(int(largura * fracao), 12)
+    tamanho = max(int(largura * fracao * min(max(escala, 0.5), 2.0)), 12)
     while True:
         fonte = carregar_fonte(familia, peso, tamanho)
         linhas = quebrar_linhas(texto, fonte, largura_maxima)

@@ -152,3 +152,63 @@ def test_reel_com_logo_e_texto_da_igreja(db_limpo):
     centro_antes = [antes.getpixel((x, 960)) for x in range(300, 780, 5)]
     centro_depois = [depois.getpixel((x, 960)) for x in range(300, 780, 5)]
     assert centro_antes != centro_depois                              # o texto do centro só aparece no primeiro segundo
+
+
+def brilho_e_nitidez(caminho_ou_imagem):
+    """Brilho médio e uma medida simples de nitidez (diferença entre pixels vizinhos)."""
+    imagem = (caminho_ou_imagem if isinstance(caminho_ou_imagem, Image.Image) else Image.open(caminho_ou_imagem))
+    cinza = imagem.convert("L").resize((270, 480))
+    pixels = list(cinza.get_flattened_data())
+    brilho = sum(pixels) / len(pixels)
+    nitidez = sum(abs(pixels[i] - pixels[i + 1]) for i in range(len(pixels) - 1)) / len(pixels)
+    return brilho, nitidez
+
+
+def quadro_do_video(video, segundos=2.0):
+    bruto = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(segundos), "-i", str(video), "-frames:v", "1",
+                            "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+    return Image.frombytes("RGB", (1080, 1920), bruto)
+
+
+def test_story_com_fundo_escurecido_e_desfocado(db_limpo):
+    midia = midia_pronta(db_limpo, duracao=6)
+    _, sem_fundo = exportar(db_limpo, midia, silencios={"intensidade": None})
+    exportacao, com_fundo = exportar(db_limpo, midia, silencios={"intensidade": None}, tipo="story",
+                                     fundo={"escurecer": 0.6, "desfoque": 12})
+    assert exportacao["status"] == "pronta"
+    brilho_normal, nitidez_normal = brilho_e_nitidez(quadro_do_video(sem_fundo))
+    brilho_story, nitidez_story = brilho_e_nitidez(quadro_do_video(com_fundo))
+    assert brilho_story < brilho_normal * 0.55          # escurecido em 60%
+    assert nitidez_story < nitidez_normal * 0.5         # desfocado
+    # Escurecer em RGB preserva a cor, como na prévia do navegador: amarelo continua amarelo
+    r, g, b = quadro_do_video(com_fundo).crop((60, 1200, 300, 1400)).resize((1, 1)).getpixel((0, 0))
+    assert r > 80 and g > 80 and b < 30
+
+
+def test_exportar_imagem_do_story(db_limpo):
+    midia = midia_pronta(db_limpo, duracao=8)
+    projeto = {**montar_projeto(midia["organizacao_id"], midia, None), "silencios": {"intensidade": None},
+               "fundo": {"escurecer": 0.5, "desfoque": 0},
+               "textos": [
+                   {"id": "t", "texto": "Culto de hoje", "estilo": "limpo", "posicao": "centro", "inicio": 0, "fim": 3},
+                   {"id": "u", "texto": "Depois", "estilo": "limpo", "posicao": "topo", "inicio": 5, "fim": None},
+               ]}
+    projeto["_id"] = db_limpo.projetos.insert_one(projeto).inserted_id
+    exportacao = montar_exportacao(projeto, None, formato="imagem", instante=2.0)
+    exportacao["_id"] = db_limpo.exportacoes.insert_one(exportacao).inserted_id
+    enfileirar_job(db_limpo, montar_job("renderizacao", midia["organizacao_id"],
+                                        {"exportacao_id": str(exportacao["_id"])}))
+    rodar(db_limpo, "renderizacao")
+
+    salvo = db_limpo.exportacoes.find_one({"_id": exportacao["_id"]})
+    assert salvo["status"] == "pronta"
+    assert set(salvo["arquivos"]) == {"imagem.jpg", "capa.jpg"}
+    pasta = storage.caminho_local(f"org_{salvo['organizacao_id']}/exportacoes/{salvo['_id']}")
+    imagem = Image.open(pasta / "imagem.jpg")
+    assert imagem.size == (1080, 1920)
+    assert Image.open(pasta / "capa.jpg").size[0] == 540
+    centro = [imagem.getpixel((x, 960)) for x in range(300, 780, 4)]
+    assert any(min(p) > 225 for p in centro)                 # o texto do centro (0 a 3 s) aparece aos 2 s
+    topo = [imagem.getpixel((x, y)) for x in range(300, 780, 6) for y in range(230, 300, 5)]
+    assert not any(min(p) > 235 for p in topo)               # o texto de depois dos 5 s não aparece
+    assert sorted(p.name for p in pasta.iterdir()) == ["capa.jpg", "imagem.jpg"]   # sem sobras

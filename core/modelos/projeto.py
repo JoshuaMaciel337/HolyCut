@@ -8,6 +8,7 @@ from datetime import datetime
 
 from core.config import TZ
 from core.modelos.identidade import marca_padrao
+from core.modelos.modelos_story import DURACAO_PADRAO_STORY, aplicar_modelo
 
 PROPORCOES = {
     "9:16": (1080, 1920),   # Reels, Stories, TikTok, Shorts
@@ -24,40 +25,75 @@ STATUS_EXPORTACAO_PRONTA = "pronta"
 STATUS_EXPORTACAO_ERRO = "erro"
 ARQUIVO_VIDEO_EXPORTADO = "video.mp4"
 ARQUIVO_CAPA_EXPORTADA = "capa.jpg"
-ARQUIVOS_EXPORTACAO = {ARQUIVO_VIDEO_EXPORTADO, ARQUIVO_CAPA_EXPORTADA}
+ARQUIVO_IMAGEM_EXPORTADA = "imagem.jpg"
+ARQUIVOS_EXPORTACAO = {ARQUIVO_VIDEO_EXPORTADO, ARQUIVO_CAPA_EXPORTADA, ARQUIVO_IMAGEM_EXPORTADA}
+FORMATOS_EXPORTACAO = ("video", "imagem")
+FUNDO_PADRAO = {"escurecer": 0.0, "desfoque": 0}
+ESCURECER_MAXIMO = 0.8
+DESFOQUE_MAXIMO = 30
 
 # Campos do projeto que definem o vídeo. A exportação guarda uma cópia deles,
 # então editar o projeto depois não muda um vídeo já exportado.
-CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos")
+CAMPOS_DO_VIDEO = ("proporcao", "trecho", "silencios", "enquadramento", "audio", "marca", "textos", "fundo")
+
+
+def _id_do_modelo(modelo: dict | None) -> str | None:
+    """Modelos prontos têm "id"; os da igreja vêm do banco com "_id"."""
+    if not modelo:
+        return None
+    return str(modelo.get("id") or modelo.get("_id"))
 
 
 def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = None,
-                   proporcao: str = "9:16", momento: datetime | None = None, identidade: dict | None = None) -> dict:
+                   proporcao: str = "9:16", momento: datetime | None = None, identidade: dict | None = None,
+                   tipo: str = "reel", modelo: dict | None = None, inicio: float = 0.0) -> dict:
+    """
+    Reel: a gravação inteira, com corte de silêncios médio.
+    Story: 15 s a partir de inicio, sem corte de silêncios, com o visual do modelo escolhido.
+    """
     if proporcao not in PROPORCOES:
         raise ValueError(f"Proporção desconhecida: {proporcao}")
+    if tipo not in ("reel", "story"):
+        raise ValueError(f"Tipo de projeto desconhecido: {tipo}")
     momento = momento or datetime.now(TZ)
+    duracao = round(float(midia["duracao"]), 2)
+    if tipo == "story":
+        inicio = min(max(round(inicio, 2), 0.0), max(duracao - DURACAO_MINIMA_TRECHO, 0.0))
+        trecho = {"inicio": inicio, "fim": round(min(inicio + DURACAO_PADRAO_STORY, duracao), 2)}
+        rotulo, proporcao, silencios = "Story", "9:16", {"intensidade": None}
+    else:
+        trecho, rotulo, silencios = {"inicio": 0.0, "fim": duracao}, "Reel", {"intensidade": "media"}
+    visual = aplicar_modelo(modelo, identidade or {}) if modelo else {}
     return {
         "organizacao_id": organizacao_id,
         "midia_id": midia["_id"],
         "criado_por": criado_por,
-        "nome": (nome or f"Reel · {midia['nome']}")[:120],
-        "tipo": "reel",
+        "nome": (nome or f"{rotulo} · {midia['nome']}")[:120],
+        "tipo": tipo,
+        "modelo_id": _id_do_modelo(modelo),
         "proporcao": proporcao,
-        "trecho": {"inicio": 0.0, "fim": round(float(midia["duracao"]), 2)},
-        "silencios": {"intensidade": "media"},
+        "trecho": trecho,
+        "silencios": silencios,
         "enquadramento": {"x": 0.5, "y": 0.5, "zoom": 1.0},
         "audio": {"normalizar": True},
-        "marca": marca_padrao(identidade),
-        "textos": [],
+        "marca": visual.get("marca") or marca_padrao(identidade),
+        "textos": visual.get("textos", []),
+        "fundo": {**FUNDO_PADRAO, **visual.get("fundo", {})},
         "versao": 1,
         "criado_em": momento,
         "atualizado_em": momento,
     }
 
 
-def montar_exportacao(projeto: dict, criado_por, momento: datetime | None = None) -> dict:
+def montar_exportacao(projeto: dict, criado_por, momento: datetime | None = None,
+                      formato: str = "video", instante: float = 0.0) -> dict:
+    """formato "imagem": um quadro só, no instante dado (segundos do vídeo final), em JPG."""
+    if formato not in FORMATOS_EXPORTACAO:
+        raise ValueError(f"Formato desconhecido: {formato}")
     momento = momento or datetime.now(TZ)
     return {
+        "formato": formato,
+        "instante": max(float(instante), 0.0),
         "organizacao_id": projeto["organizacao_id"],
         "projeto_id": projeto["_id"],
         "midia_id": projeto["midia_id"],

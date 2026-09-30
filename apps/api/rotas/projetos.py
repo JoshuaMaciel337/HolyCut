@@ -11,6 +11,7 @@ from pymongo import ReturnDocument
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     ExportacaoSaida,
+    ExportarEntrada,
     ProjetoAtualizarEntrada,
     ProjetoCriarEntrada,
     ProjetoSaida,
@@ -18,6 +19,8 @@ from api.esquemas import (
     projeto_para_saida,
 )
 from api.rotas.exportacoes import apagar_exportacoes
+from api.rotas.identidade import carregar_identidade
+from api.rotas.modelos import buscar_modelo
 from core.modelos.job import montar_job
 from core.modelos.midia import STATUS_PRONTA
 from core.modelos.projeto import DURACAO_MINIMA_TRECHO, montar_exportacao, montar_projeto
@@ -62,9 +65,10 @@ async def criar_projeto(dados: ProjetoCriarEntrada, usuario=Depends(usuario_atua
         raise HTTPException(status.HTTP_409_CONFLICT, "A gravação ainda está sendo preparada.")
     if not midia.get("video"):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Para criar um Reel, a gravação precisa ter vídeo.")
-    organizacao = await db.organizacoes.find_one({"_id": usuario["organizacao_id"]}, {"identidade": 1})
+    modelo = await buscar_modelo(db, dados.modelo_id, usuario) if dados.modelo_id else None
     projeto = montar_projeto(usuario["organizacao_id"], midia, usuario["_id"], dados.nome, dados.proporcao,
-                             identidade=(organizacao or {}).get("identidade"))
+                             identidade=await carregar_identidade(db, usuario["organizacao_id"]),
+                             tipo=dados.tipo, modelo=modelo, inicio=dados.inicio)
     projeto["_id"] = (await db.projetos.insert_one(projeto)).inserted_id
     return projeto_para_saida(projeto)
 
@@ -123,10 +127,12 @@ async def excluir_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=De
 
 
 @router.post("/{projeto_id}/exportar", response_model=ExportacaoSaida, status_code=status.HTTP_201_CREATED)
-async def exportar_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def exportar_projeto(projeto_id: str, dados: ExportarEntrada | None = None,
+                           usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    dados = dados or ExportarEntrada()
     projeto = await buscar_projeto(db, projeto_id, usuario)
     await buscar_midia_do_projeto(db, projeto["midia_id"], usuario)
-    exportacao = montar_exportacao(projeto, usuario["_id"])
+    exportacao = montar_exportacao(projeto, usuario["_id"], formato=dados.formato, instante=dados.instante)
     exportacao["_id"] = (await db.exportacoes.insert_one(exportacao)).inserted_id
     job = montar_job("renderizacao", usuario["organizacao_id"], {"exportacao_id": str(exportacao["_id"])},
                      prioridade=PRIORIDADE_RENDER, criado_por=usuario["_id"])

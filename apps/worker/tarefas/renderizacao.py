@@ -1,10 +1,12 @@
 # -----------------------------------------------
-# Tarefa "renderizacao" — gera o vídeo final de uma exportação
+# Tarefa "renderizacao" — gera o vídeo final (ou a imagem) de uma exportação
 #
 #   1. calcula os trechos mantidos: o trecho escolhido menos os silêncios
 #   2. uma passada do FFmpeg a partir do arquivo original: seleciona os
-#      trechos, enquadra, redimensiona e normaliza o áudio em -14 LUFS
+#      trechos, enquadra, aplica o fundo, sobrepõe logo e textos e normaliza
+#      o áudio em -14 LUFS
 #   3. capa do vídeo exportado
+# No formato "imagem", sai um quadro só em JPG, com as camadas daquele instante.
 # A configuração vem da cópia guardada na exportação, não do projeto atual.
 # -----------------------------------------------
 import logging
@@ -20,6 +22,7 @@ from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import ARQUIVO_NIVEIS, chave_arquivo
 from core.modelos.projeto import (
     ARQUIVO_CAPA_EXPORTADA,
+    ARQUIVO_IMAGEM_EXPORTADA,
     ARQUIVO_VIDEO_EXPORTADO,
     PROPORCOES,
     STATUS_EXPORTACAO_ERRO,
@@ -34,7 +37,9 @@ from core.utils.mongo import agora
 from core.utils.render import (
     FPS,
     duracao_dos_trechos,
+    instante_na_gravacao,
     montar_filtro,
+    montar_filtro_imagem,
     opcao_filtro_em_arquivo,
     planejar_trechos,
 )
@@ -82,7 +87,8 @@ def desenhar_camadas(db, organizacao_id, config: dict, largura: int, altura: int
         if not (texto.get("texto") or "").strip() or fim_texto <= inicio_texto:
             continue
         imagem = camada_texto(largura, altura, texto["texto"], texto.get("estilo", "destaque"),
-                              texto.get("posicao", "base"), identidade["cor_destaque"], texto.get("referencia", ""))
+                              texto.get("posicao", "base"), identidade["cor_destaque"], texto.get("referencia", ""),
+                              float(texto.get("tamanho") or 1.0))
         camadas.append((imagem, inicio_texto, fim_texto))
     return camadas
 
@@ -93,6 +99,52 @@ def cortes_de_silencio(midia: dict, intensidade: str | None) -> list[tuple[float
     caminho = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_NIVEIS))
     niveis = np.fromfile(caminho, dtype=np.int8)
     return detectar_silencios(niveis, duracao=midia["duracao"], **INTENSIDADES[intensidade])
+
+
+def exportar_imagem(db, exportacao: dict, config: dict, original, trechos, duracao: float, recorte: dict,
+                    largura: int, altura: int, caminho, reportar: Callable[[int, str], None]) -> dict:
+    """Um quadro do vídeo final em JPG, com o fundo e as camadas visíveis naquele instante."""
+    organizacao_id, exportacao_id = exportacao["organizacao_id"], exportacao["_id"]
+    posicao = min(float(exportacao.get("instante") or 0), max(duracao - 1 / FPS, 0.0))
+    origem = config["trecho"]["inicio"] + instante_na_gravacao(trechos, posicao)
+
+    reportar(10, "Desenhando o logo e os textos")
+    visiveis = [imagem for imagem, inicio, fim in desenhar_camadas(db, organizacao_id, config, largura, altura, duracao)
+                if inicio <= posicao < fim]
+    entradas = []
+    for indice, imagem in enumerate(visiveis):
+        nome = f"camada_{indice}.png"
+        storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, nome), para_png(imagem))
+        entradas += ["-i", str(caminho(nome))]
+    filtro = montar_filtro_imagem(recorte, largura, altura, len(visiveis), config.get("fundo"))
+    storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
+
+    reportar(40, "Gerando a imagem")
+    saida = caminho(ARQUIVO_IMAGEM_EXPORTADA)
+    executar_ffmpeg(["-ss", f"{origem:.3f}", "-i", str(original), *entradas,
+                     *opcao_filtro_em_arquivo(str(caminho(ARQUIVO_FILTRO))),
+                     "-map", "[v]", "-frames:v", "1", "-q:v", "2", "-update", "1", str(saida)])
+    with Image.open(saida) as imagem:
+        capa = imagem.copy()
+    capa.thumbnail((LARGURA_CAPA, LARGURA_CAPA * 4))
+    capa.save(caminho(ARQUIVO_CAPA_EXPORTADA), quality=85)
+    for nome in [ARQUIVO_FILTRO, *(f"camada_{indice}.png" for indice in range(len(visiveis)))]:
+        storage.remover(chave_exportacao(organizacao_id, exportacao_id, nome))
+
+    momento = agora()
+    tamanho = saida.stat().st_size
+    db.exportacoes.update_one({"_id": exportacao_id}, {"$set": {
+        "status": STATUS_EXPORTACAO_PRONTA,
+        "arquivos": [ARQUIVO_IMAGEM_EXPORTADA, ARQUIVO_CAPA_EXPORTADA],
+        "duracao": None,
+        "instante": posicao,
+        "tamanho": tamanho,
+        "erro": None,
+        "concluido_em": momento,
+        "atualizado_em": momento,
+    }})
+    reportar(100, "Pronta para postar")
+    return {"exportacao_id": str(exportacao_id), "formato": "imagem", "tamanho": tamanho}
 
 
 # -----------------------------------------------
@@ -135,6 +187,10 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     def caminho(nome: str):
         return storage.caminho_local(chave_exportacao(organizacao_id, exportacao_id, nome))
 
+    if exportacao.get("formato") == "imagem":
+        return exportar_imagem(db, exportacao, config, original, trechos, duracao, recorte, largura, altura,
+                               caminho, reportar)
+
     # Logo e textos: uma imagem PNG por camada, sobreposta só no intervalo dela
     reportar(4, "Desenhando o logo e os textos")
     camadas = desenhar_camadas(db, organizacao_id, config, largura, altura, duracao)
@@ -146,7 +202,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
 
     filtro = montar_filtro(trechos, recorte, largura, altura, tem_audio=bool(midia.get("audio")),
                            normalizar=(config.get("audio") or {}).get("normalizar", True),
-                           camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas])
+                           camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas],
+                           fundo=config.get("fundo"))
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
     saida = caminho(ARQUIVO_VIDEO_EXPORTADO)
     argumentos = [

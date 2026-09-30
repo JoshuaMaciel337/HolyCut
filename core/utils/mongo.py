@@ -35,6 +35,9 @@ INDICES = {
         ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
         ([("midia_id", 1)], {}),
     ],
+    "modelos": [
+        ([("organizacao_id", 1), ("criado_em", -1)], {}),
+    ],
     "exportacoes": [
         ([("projeto_id", 1), ("criado_em", -1)], {}),
         ([("organizacao_id", 1), ("criado_em", -1)], {}),

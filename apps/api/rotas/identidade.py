@@ -112,6 +112,6 @@ async def desenhar_camada(dados: CamadaEntrada, usuario=Depends(usuario_atual), 
         if texto is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Informe o texto.")
         imagem = await run_in_threadpool(camada_texto, dados.largura, dados.altura, texto.texto, texto.estilo,
-                                         texto.posicao, identidade["cor_destaque"], texto.referencia)
+                                         texto.posicao, identidade["cor_destaque"], texto.referencia, texto.tamanho)
     png = await run_in_threadpool(para_png, imagem)
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})

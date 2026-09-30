@@ -15,7 +15,7 @@ from api.esquemas import ExportacaoSaida, exportacao_para_saida
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE
 from core.modelos.projeto import (
-    ARQUIVO_VIDEO_EXPORTADO,
+    ARQUIVO_CAPA_EXPORTADA,
     ARQUIVOS_EXPORTACAO,
     STATUS_EXPORTACAO_PROCESSANDO,
     chave_exportacao,
@@ -32,11 +32,11 @@ TIPOS_ARQUIVO = {".mp4": "video/mp4", ".jpg": "image/jpeg"}
 # -----------------------------------------------
 # FUNÇÕES AUXILIARES
 # -----------------------------------------------
-def nome_de_arquivo(nome: str) -> str:
+def nome_de_arquivo(nome: str, extensao: str = ".mp4") -> str:
     """'Reel · Culto de Domingo!' → 'reel-culto-de-domingo.mp4'."""
     sem_acento = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
     base = re.sub(r"[^a-z0-9]+", "-", sem_acento.lower()).strip("-")[:60].strip("-")
-    return f"{base or 'holycut'}.mp4"
+    return f"{base or 'holycut'}{extensao}"
 
 
 async def para_saida(db, exportacoes: list[dict]) -> list[ExportacaoSaida]:
@@ -104,10 +104,12 @@ async def baixar_arquivo(exportacao_id: str, nome: str, baixar: bool = False,
     caminho = storage.caminho_local(chave_exportacao(exportacao["organizacao_id"], exportacao["_id"], nome))
     if not caminho.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
+    baixar_com_nome = baixar and nome != ARQUIVO_CAPA_EXPORTADA
+    nome_download = nome_de_arquivo(exportacao["nome"], caminho.suffix) if baixar_com_nome else None
     return FileResponse(
         caminho,
         media_type=TIPOS_ARQUIVO.get(caminho.suffix, "application/octet-stream"),
-        filename=nome_de_arquivo(exportacao["nome"]) if baixar and nome == ARQUIVO_VIDEO_EXPORTADO else None,
+        filename=nome_download,
         content_disposition_type="attachment" if baixar else "inline",
         headers={"Cache-Control": "private, max-age=86400"},
     )

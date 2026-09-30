@@ -142,6 +142,12 @@ class TextoEntrada(BaseModel):
     posicao: PosicaoTexto = "base"
     inicio: float = Field(default=0, ge=0, description="Segundos no vídeo final")
     fim: float | None = Field(default=None, gt=0, description="None: até o fim do vídeo")
+    tamanho: float = Field(default=1.0, ge=0.5, le=2.0, description="Escala da fonte")
+
+
+class FundoEntrada(BaseModel):
+    escurecer: float = Field(default=0.0, ge=0, le=0.8)
+    desfoque: float = Field(default=0, ge=0, le=30)
 
 
 class CamadaEntrada(BaseModel):
@@ -176,6 +182,9 @@ class ProjetoCriarEntrada(BaseModel):
     midia_id: str
     nome: str | None = Field(default=None, max_length=120)
     proporcao: Proporcao = "9:16"
+    tipo: Literal["reel", "story"] = "reel"
+    modelo_id: str | None = Field(default=None, max_length=40)
+    inicio: float = Field(default=0, ge=0, description="Story: de onde começam os 15 s")
 
 
 class ProjetoAtualizarEntrada(BaseModel):
@@ -188,6 +197,7 @@ class ProjetoAtualizarEntrada(BaseModel):
     audio: AudioProjetoEntrada | None = None
     marca: MarcaEntrada | None = None
     textos: list[TextoEntrada] | None = Field(default=None, max_length=6)
+    fundo: FundoEntrada | None = None
 
 
 class ProjetoSaida(BaseModel):
@@ -202,9 +212,31 @@ class ProjetoSaida(BaseModel):
     audio: AudioProjetoEntrada
     marca: MarcaEntrada = MarcaEntrada()
     textos: list[TextoEntrada] = []
+    fundo: FundoEntrada = FundoEntrada()
+    modelo_id: str | None = None
     versao: int
     criado_em: datetime
     atualizado_em: datetime
+
+
+class ExportarEntrada(BaseModel):
+    formato: Literal["video", "imagem"] = "video"
+    instante: float = Field(default=0, ge=0, description="Imagem: segundos do vídeo final")
+
+
+class ModeloSaida(BaseModel):
+    id: str
+    nome: str
+    descricao: str = ""
+    pronto: bool = Field(description="Modelo que vem com o HolyCut (não pode ser apagado)")
+    fundo: FundoEntrada = FundoEntrada()
+    marca: MarcaEntrada = MarcaEntrada()
+    textos: list[TextoEntrada] = []
+
+
+class ModeloCriarEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=60)
+    projeto_id: str
 
 
 class ExportacaoSaida(BaseModel):
@@ -212,6 +244,8 @@ class ExportacaoSaida(BaseModel):
     projeto_id: str
     midia_id: str
     nome: str
+    formato: str = "video"
+    instante: float = 0
     status: str
     processamento: ProcessamentoSaida | None = None
     duracao: float | None = None
