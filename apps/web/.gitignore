@@ -46,3 +46,7 @@ next-env.d.ts
 /src/app/icon.svg
 /src/app/apple-icon.png
 /src/estilos/design-tokens.css
+
+# Gerados pelo "next dev" 16 (instruções para agentes); voltam sempre que ele roda
+/AGENTS.md
+/CLAUDE.md
