@@ -38,7 +38,7 @@ export function PainelDoApp() {
   return (
     <div className="grid grid-cols-[110px_1fr] overflow-hidden rounded-2xl border border-white/10 bg-[#0e0e12] text-left shadow-[0_40px_120px_rgba(0,0,0,.7)]" aria-hidden>
       <aside className="flex flex-col gap-1 border-r border-white/5 p-3">
-        <Logo altura={18} className="mb-4" />
+        <Logo fundo="escuro" altura={18} className="mb-4" />
         {MENU.map(({ icone: Icone, rotulo, ativo }) => (
           <span
             key={rotulo}

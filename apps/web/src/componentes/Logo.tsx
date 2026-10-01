@@ -1,10 +1,10 @@
 import Image from "next/image";
 
-// Proporções dos SVGs gerados em brand/logo
+// Proporções dos SVGs gerados em brand/logo. "claro" é a versão para fundo claro.
 const VARIANTES = {
-  horizontal: { arquivo: "holycut-horizontal.svg", proporcao: 2119.1 / 591.4 },
-  slogan: { arquivo: "holycut-horizontal-slogan.svg", proporcao: 2119.1 / 725.0 },
-  simbolo: { arquivo: "holycut-simbolo.svg", proporcao: 1 },
+  horizontal: { escuro: "holycut-horizontal.svg", claro: "holycut-horizontal-fundo-claro.svg", proporcao: 2119.1 / 591.4 },
+  slogan: { escuro: "holycut-horizontal-slogan.svg", claro: "holycut-horizontal-slogan-fundo-claro.svg", proporcao: 2119.1 / 725.0 },
+  simbolo: { escuro: "holycut-simbolo.svg", claro: "holycut-simbolo-fundo-claro.svg", proporcao: 1 },
 } as const;
 
 type Props = {
@@ -12,19 +12,30 @@ type Props = {
   altura?: number;
   className?: string;
   prioridade?: boolean;
+  /** "escuro" fixa a versão para fundo escuro, como dentro dos celulares desenhados na home. */
+  fundo?: "tema" | "escuro";
 };
 
-export function Logo({ variante = "horizontal", altura = 36, className, prioridade = false }: Props) {
-  const { arquivo, proporcao } = VARIANTES[variante];
-  return (
+/** O logo acompanha o tema: as duas versões vão no HTML e o CSS mostra a certa, sem piscar. */
+export function Logo({ variante = "horizontal", altura = 36, className = "", prioridade = false, fundo = "tema" }: Props) {
+  const { escuro, claro, proporcao } = VARIANTES[variante];
+  const largura = Math.round(altura * proporcao);
+  const imagem = (arquivo: string, classe: string) => (
     <Image
       src={`/brand/logo/${arquivo}`}
       alt="HolyCut"
-      width={Math.round(altura * proporcao)}
+      width={largura}
       height={altura}
-      className={className}
+      className={`${classe} ${className}`}
       priority={prioridade}
       unoptimized
     />
+  );
+  if (fundo === "escuro") return imagem(escuro, "");
+  return (
+    <>
+      {imagem(escuro, "so-escuro")}
+      {imagem(claro, "so-claro")}
+    </>
   );
 }

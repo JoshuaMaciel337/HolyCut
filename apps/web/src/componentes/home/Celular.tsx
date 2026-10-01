@@ -50,7 +50,7 @@ export function Celular({ imagem, enquadramento = "cheia", posicao = "center", c
               <span className="h-[3px] flex-1 rounded-full bg-white/25" />
             </div>
             <div className="mt-3 flex items-center gap-2 text-[11px]">
-              <Logo variante="simbolo" altura={18} />
+              <Logo fundo="escuro" variante="simbolo" altura={18} />
               <span className="font-semibold text-white/95">HolyCut</span>
               <span className="text-white/55">2h</span>
               <Ellipsis className="ml-auto size-4 text-white/70" />

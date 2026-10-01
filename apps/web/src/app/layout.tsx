@@ -18,13 +18,22 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B0B0F",
-  colorScheme: "dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#070709" },
+    { media: "(prefers-color-scheme: light)", color: "#F8F6F2" },
+  ],
+  colorScheme: "dark light",
 };
+
+// Roda antes da página aparecer: sem escolha salva, segue o sistema. Assim o tema não pisca.
+const SCRIPT_TEMA = `try{var t=localStorage.getItem("holycut-tema");if(t==="claro"||(!t&&matchMedia("(prefers-color-scheme: light)").matches))document.documentElement.dataset.tema="claro"}catch(e){}`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={`${montserrat.variable} ${inter.variable} ${caveat.variable}`}>
+    <html lang="pt-BR" className={`${montserrat.variable} ${inter.variable} ${caveat.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
+      </head>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

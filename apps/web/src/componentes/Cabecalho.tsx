@@ -3,6 +3,7 @@
 import { Library, LogOut, Music, Palette } from "lucide-react";
 import Link from "next/link";
 
+import { BotaoTema } from "@/componentes/BotaoTema";
 import { Logo } from "@/componentes/Logo";
 import { useSessao } from "@/lib/sessao";
 
@@ -28,6 +29,7 @@ export function Cabecalho() {
             <p className="text-sm font-medium">{sessao.organizacao.nome}</p>
             <p className="text-xs text-suave">{sessao.usuario.nome}</p>
           </div>
+          <BotaoTema />
           <button type="button" onClick={sair} className="botao-contorno px-4 py-2 text-sm">
             <LogOut className="size-4" aria-hidden /> Sair
           </button>

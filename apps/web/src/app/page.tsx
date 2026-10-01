@@ -24,6 +24,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
+import { BotaoTema } from "@/componentes/BotaoTema";
 import { Celular, Cruz, StoryDigno, StoryFrase } from "@/componentes/home/Celular";
 import { EditorNoNotebook } from "@/componentes/home/EditorNoNotebook";
 import { PainelDoApp } from "@/componentes/home/PainelDoApp";
@@ -112,7 +113,7 @@ function Rotulo({ children }: { children: React.ReactNode }) {
 /** A frase manuscrita com o traço laranja embaixo, como nos materiais da marca. */
 function Manuscrito({ linhas, className = "" }: { linhas: string[]; className?: string }) {
   return (
-    <p className={`rotate-[-8deg] font-script text-3xl leading-[1.1] text-white/90 ${className}`} aria-hidden>
+    <p className={`rotate-[-8deg] font-script text-3xl leading-[1.1] text-texto/90 ${className}`} aria-hidden>
       {linhas.map((linha) => (
         <span key={linha} className="block">
           {linha}
@@ -125,7 +126,7 @@ function Manuscrito({ linhas, className = "" }: { linhas: string[]; className?: 
 
 function Cabecalho() {
   return (
-    <header className="sticky top-0 z-30 border-b border-white/5 bg-ink/75 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-borda/60 bg-ink/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <Link href="/" aria-label="HolyCut, início">
           <Logo altura={30} prioridade />
@@ -138,6 +139,7 @@ function Cabecalho() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <BotaoTema />
           <Link href="/entrar" className="botao-contorno px-4 py-2 text-sm">
             Entrar
           </Link>
@@ -159,7 +161,7 @@ function Hero() {
         style={{ maskImage: "linear-gradient(to left, black 35%, transparent 95%)" }}
         aria-hidden
       >
-        <Image src="/marketing/louvor-maos.jpg" alt="" fill priority sizes="62vw" className="object-cover opacity-45 blur-xl" />
+        <Image src="/marketing/louvor-maos.jpg" alt="" fill priority sizes="62vw" className="foto-palco object-cover blur-xl" />
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-ink/70" />
       </div>
       <div
@@ -217,7 +219,7 @@ function Hero() {
 
 function Recursos() {
   return (
-    <section id="recursos" className="scroll-mt-20 border-t border-white/5 bg-gradient-to-b from-surface/40 to-ink" aria-labelledby="titulo-recursos">
+    <section id="recursos" className="scroll-mt-20 border-t border-borda/60 bg-gradient-to-b from-surface/40 to-ink" aria-labelledby="titulo-recursos">
       <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:py-28">
         <div>
           <Rotulo>Principais recursos</Rotulo>
@@ -280,7 +282,7 @@ function Recursos() {
 
 function PorQue() {
   return (
-    <section id="por-que" className="scroll-mt-20 border-t border-white/5" aria-labelledby="titulo-por-que">
+    <section id="por-que" className="scroll-mt-20 border-t border-borda/60" aria-labelledby="titulo-por-que">
       <div className="mx-auto grid max-w-6xl items-center gap-16 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:py-28">
         <div className="relative order-2 lg:order-1">
           <div className="absolute -inset-10 -z-10 rounded-full bg-laranja/10 blur-3xl" aria-hidden />
@@ -325,7 +327,7 @@ function PorQue() {
 
 function ComoFunciona() {
   return (
-    <section id="como-funciona" className="scroll-mt-20 border-t border-white/5 bg-gradient-to-b from-ink via-surface/40 to-ink" aria-labelledby="titulo-como">
+    <section id="como-funciona" className="scroll-mt-20 border-t border-borda/60 bg-gradient-to-b from-ink via-surface/40 to-ink" aria-labelledby="titulo-como">
       <div className="mx-auto grid max-w-6xl items-center gap-16 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:py-28">
         <div>
           <Rotulo>Como funciona</Rotulo>
@@ -337,7 +339,7 @@ function ComoFunciona() {
           <ol className="mt-10 grid gap-8 sm:grid-cols-3">
             {PASSOS.map(({ nome, texto }, indice) => (
               <li key={nome} className="sm:border-l sm:border-borda sm:pl-5 sm:first:border-0 sm:first:pl-0">
-                <span className="flex size-10 items-center justify-center rounded-full border border-white/25 font-display font-bold">
+                <span className="flex size-10 items-center justify-center rounded-full border border-borda font-display font-bold">
                   {indice + 1}
                 </span>
                 <h3 className="mt-4 font-semibold">{nome}</h3>
@@ -381,7 +383,7 @@ function Chamada() {
     <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6" aria-labelledby="titulo-chamada">
       {/* A borda em degradê: o fundo do cartão por cima do degradê, com 1 px de folga */}
       <div className="rounded-[26px] p-px" style={{ backgroundImage: "linear-gradient(120deg, rgba(168,85,247,.8), rgba(255,138,0,.6))" }}>
-        <div className="relative grid gap-10 overflow-hidden rounded-[25px] bg-[#0f0f13] px-6 py-12 sm:px-12 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center">
+        <div className="relative grid gap-10 overflow-hidden rounded-[25px] bg-surface px-6 py-12 sm:px-12 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center">
           <div
             className="absolute inset-0"
             style={{ background: "radial-gradient(circle at 85% 50%, rgba(255,138,0,.12), transparent 45%), radial-gradient(circle at 10% 0%, rgba(168,85,247,.14), transparent 40%)" }}
@@ -405,7 +407,7 @@ function Chamada() {
             </Link>
           </div>
           <div className="relative hidden flex-col items-center gap-3 border-l border-borda pl-10 text-center text-sm text-suave lg:flex">
-            <Cruz className="h-10 text-white/80" />
+            <Cruz className="h-10 text-texto/80" />
             <p>
               Juntos, levando
               <br />o evangelho mais longe.
@@ -419,7 +421,7 @@ function Chamada() {
 
 function Perguntas() {
   return (
-    <section id="perguntas" className="scroll-mt-20 border-t border-white/5" aria-labelledby="titulo-perguntas">
+    <section id="perguntas" className="scroll-mt-20 border-t border-borda/60" aria-labelledby="titulo-perguntas">
       <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr]">
         <div>
           <Rotulo>Perguntas</Rotulo>
@@ -458,7 +460,7 @@ function Perguntas() {
 
 function Rodape() {
   return (
-    <footer className="relative overflow-hidden border-t border-white/5">
+    <footer className="relative overflow-hidden border-t border-borda/60">
       {/* As linhas de luz da marca, em SVG para ficarem nítidas em qualquer tamanho */}
       <svg className="pointer-events-none absolute -bottom-10 left-0 h-56 w-full opacity-60" viewBox="0 0 1200 220" preserveAspectRatio="none" aria-hidden>
         <defs>
@@ -529,7 +531,7 @@ function Rodape() {
 
 export default function PaginaInicial() {
   return (
-    <div className="relative bg-ink">
+    <div className="relative">
       <Cabecalho />
       <main>
         <Hero />

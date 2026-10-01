@@ -26,6 +26,30 @@
   color-scheme: dark;
 }
 
+:root[data-tema="claro"] {
+  color-scheme: light;
+}
+
+/* As duas versões do logo e dos ícones de tema vão no HTML; o tema mostra a certa */
+:root:not([data-tema="claro"]) .so-claro,
+:root[data-tema="claro"] .so-escuro {
+  display: none !important;
+}
+
+/* A foto do palco atrás do hero: no claro ela só tinge o fundo */
+.foto-palco {
+  opacity: 0.45;
+}
+:root[data-tema="claro"] .foto-palco {
+  opacity: 0.14;
+}
+
+/* No claro, a grade de pontinhos do fundo, como no Cut.Pro */
+:root[data-tema="claro"] body {
+  background-image: radial-gradient(rgba(23, 23, 27, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
 body {
   background: var(--hc-ink);
   color: var(--hc-text);
