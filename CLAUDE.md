@@ -96,4 +96,5 @@ Cada etapa de IA vira uma tarefa nova em `apps/worker/tarefas/`, registrada em `
 - Python: `ruff check .` e `pytest`. Os testes de integração criam um banco `holycut_teste_*` e o apagam no fim, e o `conftest` recusa qualquer outro banco.
 - Os testes com FFmpeg são pulados quando ele não está instalado. Em Windows sem FFmpeg, rode-os dentro da imagem do worker, com o repositório montado em `/repo`.
 - Site: `npm run lint`, `npm run typecheck` e `npm run build`, dentro de `apps/web`.
+- Acervo de exemplo: `docker compose exec worker-cpu python -m worker.semear_exemplos --agora --igreja "Nome da igreja"` cria 5 cultos fictícios (vídeo de 40 s feito pelo FFmpeg, capas, transcrição com versículo, estudo e 3 cortes renderizados), marcados com `exemplo: true`. `--remover` apaga só eles.
 - O CI (GitHub Actions) roda lint e testes do Python, com FFmpeg, e lint, tipos e build do site. Todo push precisa terminar verde.
