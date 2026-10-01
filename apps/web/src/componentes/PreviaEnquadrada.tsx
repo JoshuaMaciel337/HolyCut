@@ -64,7 +64,7 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
   return (
     <div ref={recipiente} className="w-full">
       <div
-        className="relative mx-auto touch-none overflow-hidden rounded-[1.75rem] bg-black shadow-[0_30px_80px_rgba(0,0,0,.5)] ring-4 ring-[#1c1f29]"
+        className="relative mx-auto touch-none overflow-hidden rounded-[1.75rem] bg-black shadow-[0_30px_80px_rgba(0,0,0,.5)] ring-4 ring-[#1c1f29] [container-type:size]"
         style={{ width: quadroLargura, height: quadroAltura }}
       >
         <video

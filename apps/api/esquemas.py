@@ -8,7 +8,9 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from core.modelos.aprovacao import expirada
 from core.modelos.culto import ficha_do_culto
+from core.modelos.fala import conferir_edicoes, conferir_ids
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
+from core.modelos.legenda import legenda_do_projeto
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
 from core.modelos.projeto import MAXIMO_PARTES, partes_do_projeto
 
@@ -177,6 +179,7 @@ class IdentidadeSaida(BaseModel):
     instagram: str
     cor_destaque: str
     logo: bool
+    estrategia: str = ""
     atualizado_em: datetime | None = None
 
 
@@ -184,6 +187,7 @@ class IdentidadeAtualizarEntrada(BaseModel):
     nome_exibicao: str | None = Field(default=None, min_length=1, max_length=80)
     instagram: str | None = Field(default=None, max_length=80)
     cor_destaque: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+    estrategia: str | None = Field(default=None, max_length=400)
 
 
 class MarcaEntrada(BaseModel):
@@ -303,10 +307,13 @@ class EnquadramentoEntrada(BaseModel):
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
     zoom: float = Field(ge=1, le=3)
+    seguir_rosto: bool = False
 
 
 class AudioProjetoEntrada(BaseModel):
     normalizar: bool = True
+    # Desligada por padrão: a exportação antiga continua com o áudio original.
+    limpeza: bool = False
 
 
 class ProjetoCriarEntrada(BaseModel):
@@ -316,6 +323,62 @@ class ProjetoCriarEntrada(BaseModel):
     tipo: Literal["reel", "story"] = "reel"
     modelo_id: str | None = Field(default=None, max_length=40)
     inicio: float = Field(default=0, ge=0, description="Story: de onde começam os 15 s")
+
+
+class LegendaEntrada(BaseModel):
+    ativa: bool = True
+    preset: Literal["clean", "karaoke", "destaque", "digno"] = "destaque"
+    palavras_por_bloco: int = Field(default=3, ge=1, le=8)
+    posicao: Literal["base", "centro"] = "base"
+    vicios: Literal["leve", "media", "forte"] | None = None
+    edicoes: dict[str, str] = Field(default_factory=dict)
+    apagadas: list[str] = Field(default_factory=list)
+    mantidas: list[str] = Field(default_factory=list)
+
+    @field_validator("edicoes")
+    @classmethod
+    def limpar_edicoes(cls, valor: dict) -> dict:
+        return conferir_edicoes(valor)
+
+    @field_validator("apagadas", "mantidas")
+    @classmethod
+    def limpar_ids(cls, valor: list) -> list:
+        return conferir_ids(valor)
+
+
+class PalavraLegendaSaida(BaseModel):
+    id: str = ""
+    texto: str
+    inicio: float
+    fim: float
+    destaque: bool = False
+
+
+class BlocoLegendaSaida(BaseModel):
+    inicio: float
+    fim: float
+    palavras: list[PalavraLegendaSaida]
+
+
+class PalavraFalaSaida(BaseModel):
+    id: str
+    texto: str
+    inicio: float
+    fim: float
+    vicio: Literal["leve", "media", "forte"] | None = None
+    segmento: str = ""
+
+
+class LegendaPreviaSaida(BaseModel):
+    ativa: bool
+    preset: Literal["clean", "karaoke", "destaque", "digno"]
+    posicao: Literal["base", "centro"]
+    palavras_por_bloco: int
+    cor_destaque: str
+    cor_dourada: str
+    tem_transcricao: bool
+    blocos: list[BlocoLegendaSaida]
+    palavras: list[PalavraFalaSaida] = []
 
 
 class ProjetoAtualizarEntrada(BaseModel):
@@ -331,6 +394,13 @@ class ProjetoAtualizarEntrada(BaseModel):
     fundo: FundoEntrada | None = None
     cor: CorEntrada | None = None
     musica: MusicaProjetoEntrada | None = None
+    legenda: LegendaEntrada | None = None
+
+
+class PublicacaoSaida(BaseModel):
+    legenda: str = ""
+    hashtags: list[str] = []
+    gerado_por_ia: bool = True
 
 
 class ProjetoSaida(BaseModel):
@@ -348,7 +418,9 @@ class ProjetoSaida(BaseModel):
     fundo: FundoEntrada = FundoEntrada()
     cor: CorEntrada = CorEntrada()
     musica: MusicaProjetoEntrada = MusicaProjetoEntrada()
+    legenda: LegendaEntrada = LegendaEntrada()
     modelo_id: str | None = None
+    publicacao: PublicacaoSaida | None = None
     versao: int
     criado_em: datetime
     atualizado_em: datetime
@@ -357,6 +429,7 @@ class ProjetoSaida(BaseModel):
 class ExportarEntrada(BaseModel):
     formato: Literal["video", "imagem"] = "video"
     instante: float = Field(default=0, ge=0, description="Imagem: segundos do vídeo final")
+    encoder: Literal["cpu", "nvenc"] = "cpu"
 
 
 class ModeloSaida(BaseModel):
@@ -441,7 +514,7 @@ class ExportacaoSaida(BaseModel):
 
 def projeto_para_saida(doc: dict) -> ProjetoSaida:
     return ProjetoSaida.model_validate({**doc, "id": str(doc["_id"]), "midia_id": str(doc["midia_id"]),
-                                        "partes": partes_do_projeto(doc)})
+                                        "partes": partes_do_projeto(doc), "legenda": legenda_do_projeto(doc)})
 
 
 def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida:
@@ -480,6 +553,105 @@ class SistemaSaida(BaseModel):
     mongo: bool
     modo_ia: str
     workers: list[WorkerSaida]
+
+
+class PalavraTranscricaoSaida(BaseModel):
+    id: str
+    texto: str
+    inicio: float
+    fim: float
+    confianca: float | None = None
+
+
+class SegmentoTranscricaoSaida(BaseModel):
+    id: str
+    inicio: float
+    fim: float
+    texto: str
+    palavras: list[PalavraTranscricaoSaida] = []
+
+
+class ParteSugestaoSaida(BaseModel):
+    inicio: float
+    fim: float
+
+
+class CorteSugestaoSaida(BaseModel):
+    id: str
+    titulo: str
+    motivo: str
+    nota: float
+    partes: list[ParteSugestaoSaida]
+    legenda_post: str = ""
+    hashtags: list[str] = []
+
+
+class SugestoesSaida(BaseModel):
+    status: str
+    progresso: int = 0
+    mensagem: str = ""
+    erro: str | None = None
+    gerado_por_ia: bool = False
+    cortes: list[CorteSugestaoSaida] = []
+
+
+class LimpezaSaida(BaseModel):
+    status: str
+    progresso: int = 0
+    mensagem: str = ""
+    erro: str | None = None
+
+
+class VersiculoSaida(BaseModel):
+    referencia: str
+    citacao: str
+    inicio: float
+    fim: float
+
+
+class TranscricaoSaida(BaseModel):
+    status: str
+    progresso: int = 0
+    mensagem: str = ""
+    erro: str | None = None
+    gerado_por_ia: bool = False
+    idioma: str | None = None
+    modelo: str | None = None
+    segmentos: list[SegmentoTranscricaoSaida] = []
+    versiculos: list[VersiculoSaida] = []
+
+
+class QuadroRostoSaida(BaseModel):
+    t: float
+    x: float
+    y: float
+    zoom: float = 1
+
+
+class RostoSaida(BaseModel):
+    status: str
+    progresso: int = 0
+    mensagem: str = ""
+    erro: str | None = None
+    quadros: list[QuadroRostoSaida] = []
+
+
+class MomentoSaida(BaseModel):
+    inicio: float
+    fim: float
+    energia: float
+    nota: float | None = None
+    assunto: str | None = None
+
+
+class MomentosSaida(BaseModel):
+    status: str
+    progresso: int = 0
+    mensagem: str = ""
+    erro: str | None = None
+    gerado_por_ia: bool = False
+    momentos: list[MomentoSaida] = []
+    cenas: list[float] = []
 
 
 def job_para_saida(doc: dict) -> JobSaida:

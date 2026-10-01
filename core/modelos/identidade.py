@@ -33,6 +33,7 @@ def identidade_padrao(nome_igreja: str) -> dict:
         "instagram": "",
         "cor_destaque": COR_PADRAO,
         "logo": False,
+        "estrategia": "",
     }
 
 

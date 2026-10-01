@@ -32,19 +32,17 @@ O que os concorrentes (Cut.Pro, OpusClip, FeedChurch, Doxus e Bíblia IA) fazem,
 
 - **Fase 0 (fundação):** pronta.
 - **Fase 1 sem IA:** pronta. Inclui upload retomável (tus), ingestão (proxy 720p, forma de onda, níveis, miniaturas), corte de silêncios, editor de Reel com enquadramento e zoom, render em -14 LUFS, download e compartilhamento.
+- **Transcrição:** pronta no worker de GPU. faster-whisper `large-v3-turbo` em int8, alinhamento por palavra com WhisperX, em português. A ingestão enfileira o job quando `MODO_IA=real`. O texto não corrige o português do pregador e aparece marcado como gerado por IA.
+- **Legendas animadas:** quatro presets (Clean, Karaokê, Destaque e Digno) no editor e queimadas no vídeo. Os blocos saem da transcrição, no tempo do vídeo final (partes, silêncios e palavras tiradas). A prévia e o ASS leem os mesmos blocos.
+- **Edição pelo texto:** no editor, a fala da transcrição aparece palavra por palavra. Corrigir uma palavra só muda a legenda; tirar uma palavra (ou uma frase) corta esse instante do vídeo. Vícios de fala (leve, médio e forte) saem sozinhos, e qualquer palavra dá para devolver. A transcrição original não é alterada.
+- **Limpeza de áudio:** opcional, por projeto. O job `limpeza_audio` (GPU, DeepFilterNet3) gera `audio_limpo.wav` em 48 kHz da gravação inteira e um `proxy_limpo.mp4` para a prévia. Desligada por padrão, e a ingestão não enfileira. Com o interruptor ligado, a prévia e a exportação usam essa faixa; desligado, voltam ao áudio original. O modelo é descarregado no fim do job.
 - **Fase 2 sem IA:** pronta. Inclui Sua Identidade (logo, cor, @), textos sobre o vídeo, HolyStories com modelos, filtros de cor e biblioteca de músicas com licença e volume que abaixa sob a fala.
 - **Fase 3 sem IA:** em andamento. Pronto: linha do tempo (dividir, apagar, mover e arrastar partes), agente do OBS com chaves de envio, aprovação pelo celular e o **Acervo** no estilo de streaming (ficha do culto, capas geradas, fileiras e a página do culto com abas). Depois, sem IA: importar pelo link do YouTube, monitorar o canal pelo RSS, marcar a pregação e exportar em 16:9, exportar para DaVinci. Esperam o dono: publicar no YouTube (credenciais OAuth do Google) e B-roll do Pexels (chave da API).
-- **Nenhuma IA real foi implementada ainda.** `MODO_IA=simulado`, e o job `teste` só simula as etapas. O job `diagnostico_gpu` confere a GPU no Nitro.
+- **IA no Nitro** (`MODO_IA=real`): transcrição, HolySermon (`gemma3:4b` no Ollama), HolyMoments e limpeza de áudio. O reenquadramento do rosto roda na CPU (MediaPipe). O render padrão continua no processador; NVENC é opção. O job `teste` continua só simulando a fila. Na máquina de desenvolvimento, `MODO_IA=simulado` e a ingestão não enfileira esses jobs de GPU.
 
-### O que espera o Nitro 5 (ordem sugerida)
+### O que espera o dono
 
-1. Seguir [docs/SETUP_NITRO.md](docs/SETUP_NITRO.md), subir com `docker compose --profile gpu up --build -d` e rodar o Diagnóstico no painel Sistema.
-2. **Transcrição** com faster-whisper e WhisperX, modelo `large-v3-turbo` em int8, em português e com tempo por palavra. Ela destrava o resto da Fase 1: legendas animadas (4 presets), vícios de fala e edição pelo texto.
-3. Limpeza de áudio opcional com DeepFilterNet.
-4. **HolySermon:** um LLM no Ollama (Qwen3 ou Gemma 3, com saída em JSON Schema) sugere de 5 a 10 cortes. Depois, títulos, legendas de post e hashtags.
-5. Reenquadramento seguindo o rosto (MediaPipe) e zoom nas ênfases.
-6. HolyMoments (energia do áudio, cenas, nota visual) e detecção de versículos. O overlay de versículo já existe.
-7. NVENC no render como opção (hoje o libx264 roda na CPU).
+Publicar no YouTube (credenciais OAuth do Google) e B-roll do Pexels (chave da API). Sem isso, o HolyCut não publica nem baixa imagens de banco.
 
 Cada etapa de IA vira uma tarefa nova em `apps/worker/tarefas/`, registrada em `REGISTRO` (`apps/worker/tarefas/__init__.py`) e em `TAREFAS` com recurso `gpu` (`core/modelos/job.py`). Com 8 GB de VRAM, o worker carrega **um modelo por vez** e descarrega antes de trocar (no Ollama, pelo `keep_alive`).
 
@@ -67,6 +65,13 @@ Cada etapa de IA vira uma tarefa nova em `apps/worker/tarefas/`, registrada em `
 - **Arte:** logo e textos são desenhados uma vez pelo `core/utils/arte.py`, com Pillow e as fontes da marca. O mesmo PNG vai para a prévia (`/api/arte/camada`) e para o overlay do FFmpeg. O layout é fixo em `Layout.BASIC`, porque o worker tem libraqm e a API não.
 - **Cor e fundo em RGB** (`format=gbrp`). Os filtros de cor são matrizes 3×3 e contraste, não LUTs. No navegador viram `feColorMatrix` com `colorInterpolationFilters="sRGB"`, e a prévia sai igual ao render (medido).
 - **Música:** o `sidechaincompress` baixa cerca de 14 dB quando há voz (medido). Com `-stream_loop`, a faixa recomeça do 0, não do ponto escolhido. A prévia imita isso pelos picos da forma de onda, de forma aproximada.
+- **Legenda:** os blocos (palavras, tempos e qual delas é o destaque) são calculados uma vez em `core/modelos/legenda.py`. A prévia pede esses blocos e o render queima o ASS gerado deles, com as fontes da marca. O destaque é a palavra mais longa do bloco: ainda não há um modelo escolhendo a palavra-chave. No Digno essa palavra vai em Caveat, dourada (`#FFD24D`); no Destaque e no Karaokê, na cor da igreja. O Karaokê acende só a palavra do momento, não vai preenchendo as anteriores. O desenho da fonte no navegador e no libass não é o mesmo pixel; os tempos e a palavra acesa, sim.
+- **Fala:** corrigir, apagar e os vícios ficam no projeto (`edicoes`, `apagadas`, `mantidas`, `vicios`), e a transcrição original continua na coleção. O corte de uma palavra é mais um intervalo, junto com os silêncios, na mesma conta do render. "é", "amém" e "Jesus" não são vício. A intensidade forte também tira "então", "assim" e "aí".
+- **Limpeza de áudio:** uma faixa por gravação, compartilhada pelos projetos. O interruptor fica no projeto (`audio.limpeza`, desligado por padrão). O wav limpo entra no FFmpeg depois da música, para não deslocar as camadas. A prévia troca o `proxy.mp4` pelo `proxy_limpo.mp4` só com o interruptor ligado e o arquivo pronto. Exportar antes disso responde 409. Os cortes de silêncio continuam medidos no áudio original.
+- **HolySermon:** o Gemma 3 4B lê a transcrição em janelas e só fica o corte cujo título é uma sequência de palavras que o pregador disse. A legenda do post segue a mesma regra; a hashtag só entra se a palavra aparece na fala. A estratégia da igreja é um texto opcional em Sua Identidade.
+- **Rosto:** MediaPipe na CPU, para não disputar os 8 GB com o Whisper. A prévia e o render seguram o último quadro até o próximo. O sendcmd usa o tempo do vídeo final; a prévia usa o tempo da gravação. O interruptor `enquadramento.seguir_rosto` nasce desligado. Exportar ligado, sem a trilha, responde 409.
+- **HolyMoments e versículos:** a energia sai dos níveis de áudio e as cenas do FFmpeg. A nota visual só aceita pregador, plateia, luz ou outro. O versículo é a referência dita (livro, capítulo e versículo); o texto mostrado é a fala, não uma tradução.
+- **NVENC:** job à parte (`renderizacao_nvenc`, recurso `gpu`), para o worker de CPU não pedir a placa. O botão padrão continua no libx264. Se a placa recusar, o job falha e pede para exportar pelo processador.
 - **Next.js 16:** o middleware agora é `proxy.ts`, e `useSearchParams` precisa de `Suspense`. O Next guarda na memória o corpo de toda requisição, inclusive a que vai para `/api`, e cortava em 10 MB. Por isso o `proxyClientMaxBodySize` está em 45 MB, para a música de até 40 MB.
 - **FFmpeg 6 e 7:** o arquivo de filtros é passado com `-/filter_complex` no 7 e com `-filter_complex_script` no 6. O CI usa o 6.1.
 - **Espaço em disco:** a API recusa um envio que deixaria menos de 2 GB livres (`ESPACO_MINIMO_LIVRE_GB`).

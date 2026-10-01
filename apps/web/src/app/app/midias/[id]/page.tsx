@@ -8,9 +8,13 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { BarraProgresso } from "@/componentes/BarraProgresso";
 import { AbaGravacao } from "@/componentes/culto/AbaGravacao";
+import { AbaTranscricao } from "@/componentes/culto/AbaTranscricao";
 import { CapaDoCulto } from "@/componentes/culto/CapaDoCulto";
 import { EmBreveComIA } from "@/componentes/culto/EmBreveComIA";
 import { FichaDoCulto } from "@/componentes/culto/FichaDoCulto";
+import { MomentosDoCulto } from "@/componentes/culto/MomentosDoCulto";
+import { SugestoesDoCulto } from "@/componentes/culto/SugestoesDoCulto";
+import { VersiculosDoCulto } from "@/componentes/culto/VersiculosDoCulto";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
 import { ReelsDaMidia } from "@/componentes/ReelsDaMidia";
 import { dataDoCulto, urlBanner } from "@/lib/acervo";
@@ -36,7 +40,9 @@ function abaValida(valor: string | null): AbaId {
 
 function AbaCortes({ midia }: { midia: Midia }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    <div className="flex flex-col gap-6">
+      <SugestoesDoCulto midiaId={midia.id} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <section className="cartao p-6" aria-labelledby="titulo-cortes-prontos">
         <h2 id="titulo-cortes-prontos" className="font-display text-lg font-bold">
           Cortes prontos
@@ -49,6 +55,7 @@ function AbaCortes({ midia }: { midia: Midia }) {
         </div>
       </section>
       <ReelsDaMidia midia={midia} />
+      </div>
     </div>
   );
 }
@@ -60,6 +67,7 @@ function ConteudoDaAba({ aba, midia, aoMudar }: { aba: AbaId; midia: Midia; aoMu
         <div className="flex flex-col gap-6">
           <FichaDoCulto midia={midia} aoSalvar={aoMudar} />
           <CapaDoCulto midia={midia} aoMudar={aoMudar} />
+          <MomentosDoCulto midiaId={midia.id} />
           <EmBreveComIA
             idSecao="resumo"
             icone={BookOpen}
@@ -72,15 +80,7 @@ function ConteudoDaAba({ aba, midia, aoMudar }: { aba: AbaId; midia: Midia; aoMu
     case "cortes":
       return <AbaCortes midia={midia} />;
     case "versiculos":
-      return (
-        <EmBreveComIA
-          idSecao="versiculos"
-          icone={Quote}
-          titulo="Versículos da pregação"
-          descricao="Cada versículo citado na mensagem aparece aqui, com o momento exato do vídeo. Um toque leva ao trecho."
-          itens={["Lista dos versículos citados, com a referência", "O instante da gravação em que cada um aparece", "Abrir o trecho no player com um clique"]}
-        />
-      );
+      return <VersiculosDoCulto midiaId={midia.id} />;
     case "estudo":
       return (
         <EmBreveComIA
@@ -92,15 +92,7 @@ function ConteudoDaAba({ aba, midia, aoMudar }: { aba: AbaId; midia: Midia; aoMu
         />
       );
     case "transcricao":
-      return (
-        <EmBreveComIA
-          idSecao="transcricao"
-          icone={FileText}
-          titulo="Transcrição"
-          descricao="O texto da pregação, sincronizado com o vídeo. Dá para acompanhar, buscar e baixar em SRT e TXT. O português do pregador fica como ele falou."
-          itens={["Texto sincronizado com o player", "Download em SRT (legendas) e TXT", "Edição pelo texto, no editor do Reel"]}
-        />
-      );
+      return <AbaTranscricao midiaId={midia.id} pronta={midia.status === "pronta"} temAudio={midia.audio != null} />;
     case "gravacao":
       return <AbaGravacao key={midia.id} midia={midia} aoMudar={aoMudar} />;
   }

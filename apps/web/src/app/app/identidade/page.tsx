@@ -15,7 +15,7 @@ const SUGESTOES_COR = ["#FF8A00", "#FFD24D", "#FF5A5F", "#F05BFF", "#7B61FF", "#
 
 export default function PaginaIdentidade() {
   const [identidade, setIdentidade] = useState<Identidade | null>(null);
-  const [rascunho, setRascunho] = useState({ nome_exibicao: "", instagram: "", cor_destaque: "#FF8A00" });
+  const [rascunho, setRascunho] = useState({ nome_exibicao: "", instagram: "", cor_destaque: "#FF8A00", estrategia: "" });
   const [versaoLogo, setVersaoLogo] = useState(0);
   const [estado, setEstado] = useState<"" | "salvando" | "salvo">("");
   const [erro, setErro] = useState("");
@@ -25,7 +25,7 @@ export default function PaginaIdentidade() {
     chamarApi<Identidade>("/identidade")
       .then((dados) => {
         setIdentidade(dados);
-        setRascunho({ nome_exibicao: dados.nome_exibicao, instagram: dados.instagram, cor_destaque: dados.cor_destaque });
+        setRascunho({ nome_exibicao: dados.nome_exibicao, instagram: dados.instagram, cor_destaque: dados.cor_destaque, estrategia: dados.estrategia ?? "" });
       })
       .catch((e) => setErro(e instanceof ErroApi ? e.message : "Não foi possível carregar a identidade."));
   }, []);
@@ -43,7 +43,7 @@ export default function PaginaIdentidade() {
     try {
       const dados = await chamarApi<Identidade>("/identidade", { metodo: "PATCH", corpo: rascunho });
       setIdentidade(dados);
-      setRascunho({ nome_exibicao: dados.nome_exibicao, instagram: dados.instagram, cor_destaque: dados.cor_destaque });
+      setRascunho({ nome_exibicao: dados.nome_exibicao, instagram: dados.instagram, cor_destaque: dados.cor_destaque, estrategia: dados.estrategia ?? "" });
       setEstado("salvo");
     } catch (e) {
       setErro(e instanceof ErroApi ? e.message : "Não foi possível salvar.");
@@ -83,7 +83,8 @@ export default function PaginaIdentidade() {
     identidade !== null &&
     (rascunho.nome_exibicao !== identidade.nome_exibicao ||
       rascunho.instagram !== identidade.instagram ||
-      rascunho.cor_destaque.toUpperCase() !== identidade.cor_destaque);
+      rascunho.cor_destaque.toUpperCase() !== identidade.cor_destaque ||
+      rascunho.estrategia !== (identidade.estrategia ?? ""));
   const corValida = /^#[0-9A-Fa-f]{6}$/.test(rascunho.cor_destaque);
 
   return (
@@ -199,6 +200,19 @@ export default function PaginaIdentidade() {
               </div>
               {!corValida ? <span className="text-xs text-vermelho">Use o formato #RRGGBB, por exemplo #FF8A00.</span> : null}
             </div>
+            <label className="mt-6 block text-sm" htmlFor="estrategia">
+              O que priorizar nos cortes
+              <textarea
+                id="estrategia"
+                value={rascunho.estrategia}
+                maxLength={400}
+                rows={3}
+                placeholder="Priorize o apelo e a oração."
+                onChange={(evento) => setRascunho({ ...rascunho, estrategia: evento.target.value })}
+                className="mt-2 w-full rounded-xl border border-borda bg-ink px-3 py-2"
+              />
+            </label>
+            <p className="mt-1 text-xs text-suave">A sugestão de cortes lê isso. O título continua sendo uma frase dita na pregação.</p>
             <div className="mt-auto flex items-center gap-3">
               <button type="button" onClick={salvar} disabled={!alterado || !corValida || estado === "salvando"} className="botao-cta px-5 py-2 text-sm">
                 {estado === "salvando" ? "Salvando..." : "Salvar"}

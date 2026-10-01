@@ -51,6 +51,8 @@ async def atualizar_identidade(dados: IdentidadeAtualizarEntrada, usuario=Depend
         campos["cor_destaque"] = campos["cor_destaque"].upper()
     if "nome_exibicao" in campos:
         campos["nome_exibicao"] = " ".join(campos["nome_exibicao"].split())
+    if "estrategia" in campos:
+        campos["estrategia"] = " ".join(campos["estrategia"].split())[:400]
     if campos:
         campos["atualizado_em"] = agora()
         await db.organizacoes.update_one({"_id": usuario["organizacao_id"]},

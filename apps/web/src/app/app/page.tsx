@@ -21,8 +21,8 @@ const LIMITE_MIDIAS = 30;
 const MODULOS = [
   { icone: Sparkles, nome: "HolyStories", cor: "var(--hc-yellow)", disponivel: true },
   { icone: Clapperboard, nome: "HolyReels", cor: "var(--hc-violet)", disponivel: true },
-  { icone: Mic, nome: "HolySermon", cor: "#5B8CFF", disponivel: false },
-  { icone: ScanFace, nome: "HolyMoments", cor: "var(--hc-cyan)", disponivel: false },
+  { icone: Mic, nome: "HolySermon", cor: "#5B8CFF", disponivel: true },
+  { icone: ScanFace, nome: "HolyMoments", cor: "var(--hc-cyan)", disponivel: true },
 ];
 
 export default function PaginaInicio() {
@@ -170,8 +170,7 @@ export default function PaginaInicio() {
               Módulos
             </h2>
             <p className="mt-1 text-sm text-suave">
-              Reels e Stories já funcionam: abra uma gravação e escolha Criar um Reel ou Criar um Story. Os outros chegam
-              com a IA.
+              Abra uma gravação para criar um Reel ou um Story, ver os cortes sugeridos e os momentos do culto.
             </p>
             <ul className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
               {MODULOS.map(({ icone: Icone, nome, cor, disponivel }) => (

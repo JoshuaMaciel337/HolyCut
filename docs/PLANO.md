@@ -558,7 +558,7 @@ As estimativas consideram 1 pessoa desenvolvendo em tempo integral. Com duas, ca
 - [x] Brand kit recriado em `brand/`, com símbolo redesenhado em vetor
 - [ ] Preparar o Nitro 5: driver NVIDIA atualizado, WSL2, Docker Desktop e ajustes de energia da seção 11
 - [x] Docker Compose com Mongo em replica set, Ollama com GPU e FFmpeg nos containers (rodando na máquina de desenvolvimento; o Ollama sobe só no Nitro)
-- [ ] Confirmar a GPU no Docker via WSL2 com `nvidia-smi` dentro do container. Já funciona na máquina de desenvolvimento (RTX 3050); falta repetir no Nitro
+- [x] Confirmar a GPU no Docker via WSL2 com `nvidia-smi` dentro do container. No Nitro, o diagnóstico viu a RTX 3070 Ti de 8 GB e o Ollama 0.35.0
 - [x] Cloudflare Quick Tunnel para acessar o notebook de fora durante o desenvolvimento (testado; o painel consulta a API a cada 3 s, porque esse túnel não entrega eventos ao vivo)
 - [x] Agendador de backup diário do Mongo
 - [x] Pacote `core` com conexão ao Mongo, índices, fila de jobs e storage
@@ -576,17 +576,17 @@ As estimativas consideram 1 pessoa desenvolvendo em tempo integral. Com duas, ca
 - Botão "Testar GPU": o worker de GPU achou a RTX 3050 dentro do container.
 - CI do GitHub passando a cada push.
 
-Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
+O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou. Falta o ajuste de energia da seção 11 (não suspender na tomada).
 
 ### Fase 1 — MVP: AutoCut + legendas (4 a 6 semanas)
 
 - [x] Upload retomável com barra de progresso, pausa e retomada depois de queda de internet
 - [x] Ingestão: proxy, waveform e miniaturas (cerca de 21 s para 90 s de vídeo 1080p na CPU da máquina de desenvolvimento)
-- [ ] Transcrição com WhisperX em português, com o vocabulário da igreja (nome do pastor, da igreja e dos ministérios, livros bíblicos) por `hotwords` e `initial_prompt`
-- [ ] Limpeza de áudio opcional
-- [ ] Corte automático de silêncios e vícios de fala, com ajuste de intensidade. **Silêncios prontos** (leve, médio e forte, com prévia pulando os cortes); os vícios de fala dependem da transcrição
-- [ ] Editor com prévia, edição pelo texto e linha do tempo simples. **Prévia enquadrada e linha do tempo com o trecho prontas**; a edição pelo texto depende da transcrição
-- [ ] Legendas animadas com 4 presets, com a palavra-chave destacada na cor da igreja
+- [x] Transcrição com WhisperX em português, com o vocabulário da igreja (nome do pastor, da igreja e dos ministérios, livros bíblicos) por `hotwords` e `initial_prompt`. faster-whisper `large-v3-turbo` em int8, alinhamento por palavra, SRT e TXT na aba do culto. A separação de falantes continua de fora (o modelo pede aceite de termos)
+- [x] Limpeza de áudio opcional. DeepFilterNet3, por projeto e desligada por padrão. A faixa limpa cobre a gravação inteira; a prévia usa `proxy_limpo.mp4` e a exportação usa `audio_limpo.wav`
+- [x] Corte automático de silêncios e vícios de fala, com ajuste de intensidade. Silêncios em leve, médio e forte. Vícios na mesma escala (né e ah no leve; tipo, sabe, tá e ok no médio; então, assim e aí no forte). A pessoa devolve qualquer palavra. "é", "amém" e "Jesus" não saem sozinhos
+- [x] Editor com prévia, edição pelo texto e linha do tempo. Corrigir uma palavra só muda a legenda; tirar uma palavra ou uma frase corta esse instante do vídeo. A transcrição original fica intacta
+- [x] Legendas animadas com 4 presets (Clean, Karaokê, Destaque e Digno). A palavra em destaque é a mais longa do bloco, na cor da igreja (dourada e manuscrita no Digno). A prévia e o ASS saem dos mesmos blocos
 - [x] Reenquadramento 9:16 com recorte central e ponto ajustável (também 4:5, 1:1 e 16:9, com zoom)
 - [x] HolyStories: 3 templates de story com frase de destaque e logo (Culto de hoje, Frase da pregação e Versículo; exporta vídeo ou imagem)
 - [x] Exportação 1080x1920 com download e compartilhamento pelo celular (27 s escolhidos viraram 22 s de Reel em 17 s de render na CPU de desenvolvimento)
@@ -597,18 +597,19 @@ Falta preparar o Nitro 5 e repetir nele o teste da GPU, agora com o Ollama.
 
 ### Fase 2 — IA de conteúdo (4 a 6 semanas)
 
-- [ ] **HolySermon:** o LLM sugere de 5 a 10 cortes por pregação, e cada um abre no editor com um clique. Cada sugestão traz título, motivo, nota e as partes (pode juntar trechos de lugares diferentes da pregação, na linha do tempo que já existe). Segue a estratégia da igreja, escrita uma vez em linguagem natural ("priorize o apelo e a oração")
+- [x] **HolySermon:** o LLM sugere de 5 a 10 cortes por pregação, e cada um abre no editor com um clique. Cada sugestão traz título, motivo, nota e as partes (pode juntar trechos de lugares diferentes da pregação, na linha do tempo que já existe). Segue a estratégia da igreja, escrita uma vez em linguagem natural ("priorize o apelo e a oração"). Gemma 3 4B no Ollama. O título e a legenda do post precisam ser frases ditas; a hashtag só entra se a palavra aparece na fala
 - [ ] Separar o culto em blocos (louvor, avisos, oração, oferta e pregação), para cortar só a pregação: detecção de música e fala e o LLM para nomear os blocos
 - [ ] **HolyStudy:** resumo, temas, palavras-chave, personagens bíblicos e versículos citados de cada pregação, e um guia de estudo para células (perguntas, versículos-chave, aplicação e oração), com PDF
 - [ ] Busca no acervo por versículo, tema ou pergunta, com embeddings locais
 - [ ] Tradução da transcrição e das legendas para espanhol e inglês (só texto, sem dublagem)
-- [ ] Títulos, legendas de post e hashtags gerados por rede
-- [ ] Reenquadramento seguindo o rosto e zoom dinâmico nas ênfases
-- [ ] **HolyMoments:** energia do áudio, cenas e nota visual opcional
+- [x] Títulos, legendas de post e hashtags gerados por rede. Saem no mesmo job do HolySermon e ficam no corte e no projeto, marcados como gerados por IA
+- [x] Reenquadramento seguindo o rosto e zoom dinâmico nas ênfases. MediaPipe na CPU, desligado por padrão. A prévia e o render usam o mesmo degrau de quadro
+- [x] **HolyMoments:** energia do áudio, cenas e nota visual opcional. A nota só aceita pregador, plateia, luz ou outro
+- [x] NVENC opcional no render. O botão padrão continua no processador (libx264). O job `renderizacao_nvenc` só roda no worker de GPU; se a placa recusar, o job falha sem cair no processador em silêncio
 - [x] **Sua Identidade:** kit da igreja aplicado automaticamente em todo projeto (logo, cor de destaque e @; o logo entra ligado em todo Reel novo)
 - [x] Biblioteca de músicas com licença registrada e volume que abaixa sob a fala (a faixa só entra com a licença; CC BY exige o crédito e o editor lembra de pôr na legenda; a música abaixa cerca de 14 dB quando há voz, pelo sidechaincompress do FFmpeg)
 - [x] Filtros e correção de cor (Natural, Quente, Frio, Cinema, P&B e Vivo, com intensidade; matrizes de cor em vez de LUTs, para a prévia sair igual ao render)
-- [ ] Detecção de versículos com overlay. **Overlay pronto**: título, frase e versículo com referência, digitados, em três estilos; a detecção automática depende da transcrição
+- [x] Detecção de versículos. A referência (livro, capítulo e versículo) sai da fala e aparece na aba do culto; o texto é o que foi dito, não uma tradução. **Overlay pronto**: título, frase e versículo com referência, digitados, em três estilos
 - [x] Sistema de templates editáveis (a igreja salva o visual de qualquer projeto como modelo; fundo com escurecer e desfocar)
 
 ### Fase 3 — Produto completo (4 a 6 semanas)

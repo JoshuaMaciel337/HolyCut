@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.rotas import (
     acervo,
+    analise,
     aprovar,
     auth,
     chaves_envio,
@@ -22,11 +23,14 @@ from api.rotas import (
     exportacoes,
     identidade,
     jobs,
+    limpeza,
     midias,
     modelos,
     musicas,
     projetos,
     sistema,
+    sugestoes,
+    transcricoes,
     uploads,
 )
 from core.config import COOKIE_SEGURO, DATABASE_NAME, JWT_SEGREDO, VERSAO
@@ -120,6 +124,10 @@ app.include_router(jobs.router)
 app.include_router(eventos.router)
 app.include_router(uploads.router)
 app.include_router(midias.router)
+app.include_router(limpeza.router)
+app.include_router(transcricoes.router)
+app.include_router(sugestoes.router)
+app.include_router(analise.router)
 app.include_router(projetos.router)
 app.include_router(exportacoes.router)
 app.include_router(identidade.router)

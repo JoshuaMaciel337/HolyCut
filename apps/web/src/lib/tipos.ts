@@ -20,6 +20,32 @@ export type Sessao = {
 
 export type StatusJob = "pendente" | "executando" | "concluido" | "erro";
 
+export type Limpeza = {
+  status: string;
+  progresso: number;
+  mensagem: string;
+  erro: string | null;
+};
+
+export type CorteSugestao = {
+  id: string;
+  titulo: string;
+  motivo: string;
+  nota: number;
+  partes: { inicio: number; fim: number }[];
+  legenda_post: string;
+  hashtags: string[];
+};
+
+export type Sugestoes = {
+  status: string;
+  progresso: number;
+  mensagem: string;
+  erro: string | null;
+  gerado_por_ia: boolean;
+  cortes: CorteSugestao[];
+};
+
 export type Job = {
   id: string;
   tipo: string;
@@ -74,6 +100,51 @@ export type Midia = {
   enviado_em: string | null;
 };
 
+export type Transcricao = {
+  status: "ausente" | "pendente" | "executando" | "pronta" | "erro";
+  progresso: number;
+  mensagem: string;
+  erro: string | null;
+  gerado_por_ia: boolean;
+  idioma: string | null;
+  modelo: string | null;
+  segmentos: {
+    id: string;
+    inicio: number;
+    fim: number;
+    texto: string;
+  }[];
+  versiculos: { referencia: string; citacao: string; inicio: number; fim: number }[];
+};
+
+export type QuadroRosto = { t: number; x: number; y: number; zoom: number };
+
+export type Rosto = {
+  status: string;
+  progresso: number;
+  mensagem: string;
+  erro: string | null;
+  quadros: QuadroRosto[];
+};
+
+export type Momento = {
+  inicio: number;
+  fim: number;
+  energia: number;
+  nota: number | null;
+  assunto: string | null;
+};
+
+export type Momentos = {
+  status: string;
+  progresso: number;
+  mensagem: string;
+  erro: string | null;
+  gerado_por_ia: boolean;
+  momentos: Momento[];
+  cenas: number[];
+};
+
 export type FichaCulto = {
   /** AAAA-MM-DD */
   data: string;
@@ -121,6 +192,7 @@ export type Identidade = {
   instagram: string;
   cor_destaque: string;
   logo: boolean;
+  estrategia: string;
   atualizado_em: string | null;
 };
 
@@ -232,6 +304,63 @@ export type Parte = {
   fim: number;
 };
 
+export type PresetLegenda = "clean" | "karaoke" | "destaque" | "digno";
+export type PosicaoLegenda = "base" | "centro";
+
+export type NivelVicio = "leve" | "media" | "forte";
+
+export type Legenda = {
+  ativa: boolean;
+  preset: PresetLegenda;
+  palavras_por_bloco: number;
+  posicao: PosicaoLegenda;
+  /** Desligado quando null. Leve, médio ou forte tiram vícios de fala sozinhos. */
+  vicios: NivelVicio | null;
+  /** Palavra → texto da legenda. A transcrição original não muda. */
+  edicoes: Record<string, string>;
+  /** Palavras tiradas do vídeo. */
+  apagadas: string[];
+  /** Vícios que a pessoa devolveu para o vídeo. */
+  mantidas: string[];
+};
+
+/** Palavra da transcrição, no tempo da gravação, para editar pelo texto. */
+export type PalavraFala = {
+  id: string;
+  texto: string;
+  inicio: number;
+  fim: number;
+  vicio: NivelVicio | null;
+  segmento: string;
+};
+
+export type PalavraLegenda = {
+  id: string;
+  texto: string;
+  inicio: number;
+  fim: number;
+  destaque: boolean;
+};
+
+export type BlocoLegenda = {
+  inicio: number;
+  fim: number;
+  palavras: PalavraLegenda[];
+};
+
+/** Blocos no tempo do vídeo final. Os mesmos que o render queima no ASS. */
+export type PreviaLegenda = {
+  ativa: boolean;
+  preset: PresetLegenda;
+  posicao: PosicaoLegenda;
+  palavras_por_bloco: number;
+  cor_destaque: string;
+  cor_dourada: string;
+  tem_transcricao: boolean;
+  blocos: BlocoLegenda[];
+  palavras: PalavraFala[];
+};
+
 export type Projeto = {
   id: string;
   midia_id: string;
@@ -241,13 +370,15 @@ export type Projeto = {
   proporcao: Proporcao;
   partes: Parte[];
   silencios: { intensidade: Intensidade | null };
-  enquadramento: { x: number; y: number; zoom: number };
-  audio: { normalizar: boolean };
+  enquadramento: { x: number; y: number; zoom: number; seguir_rosto: boolean };
+  audio: { normalizar: boolean; limpeza: boolean };
   marca: Marca;
   textos: TextoProjeto[];
   fundo: Fundo;
   cor: Cor;
   musica: MusicaProjeto;
+  legenda: Legenda;
+  publicacao?: { legenda: string; hashtags: string[]; gerado_por_ia: boolean } | null;
   versao: number;
   criado_em: string;
   atualizado_em: string;

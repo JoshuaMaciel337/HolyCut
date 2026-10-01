@@ -7,11 +7,13 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pymongo import ReturnDocument
+from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     ExportacaoSaida,
     ExportarEntrada,
+    LegendaPreviaSaida,
     ProjetoAtualizarEntrada,
     ProjetoCriarEntrada,
     ProjetoSaida,
@@ -22,10 +24,13 @@ from api.rotas.exportacoes import apagar_exportacoes
 from api.rotas.identidade import carregar_identidade
 from api.rotas.modelos import buscar_modelo
 from api.rotas.musicas import buscar_musica
+from core.modelos.fala import cortes_da_fala, fundir_cortes, palavras_para_edicao, palavras_visiveis
 from core.modelos.job import montar_job
-from core.modelos.midia import STATUS_PRONTA
-from core.modelos.projeto import DURACAO_MINIMA_TRECHO, montar_exportacao, montar_projeto
+from core.modelos.legenda import COR_DOURADA, legenda_do_projeto, montar_blocos, palavras_da_transcricao
+from core.modelos.midia import ARQUIVO_AUDIO_LIMPO, STATUS_PRONTA
+from core.modelos.projeto import DURACAO_MINIMA_TRECHO, montar_exportacao, montar_projeto, partes_do_projeto
 from core.utils.mongo import agora
+from core.utils.silencios import cortes_da_gravacao
 
 router = APIRouter(prefix="/api/projetos", tags=["projetos"])
 PRIORIDADE_RENDER = 3
@@ -89,6 +94,28 @@ async def ver_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depend
     return projeto_para_saida(await buscar_projeto(db, projeto_id, usuario))
 
 
+@router.get("/{projeto_id}/legenda", response_model=LegendaPreviaSaida)
+async def ver_legenda(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Blocos da legenda no tempo do vídeo final. A prévia e o render usam esta mesma conta."""
+    projeto = await buscar_projeto(db, projeto_id, usuario)
+    midia = await buscar_midia_do_projeto(db, projeto["midia_id"], usuario)
+    transcricao = await db.transcricoes.find_one({
+        "midia_id": projeto["midia_id"], "organizacao_id": usuario["organizacao_id"],
+    })
+    palavras = palavras_da_transcricao(transcricao)
+    intensidade = (projeto.get("silencios") or {}).get("intensidade")
+    cortes_silencio = await run_in_threadpool(cortes_da_gravacao, midia, intensidade)
+    legenda = legenda_do_projeto(projeto)
+    partes = partes_do_projeto(projeto)
+    cortes = fundir_cortes([*cortes_silencio, *cortes_da_fala(palavras, legenda)])
+    blocos = montar_blocos(palavras_visiveis(palavras, legenda), partes, cortes, legenda["palavras_por_bloco"])
+    identidade = await carregar_identidade(db, usuario["organizacao_id"])
+    return LegendaPreviaSaida(
+        cor_destaque=identidade["cor_destaque"], cor_dourada=COR_DOURADA, tem_transcricao=bool(palavras),
+        blocos=blocos, palavras=palavras_para_edicao(palavras, partes), **legenda,
+    )
+
+
 @router.patch("/{projeto_id}", response_model=ProjetoSaida)
 async def atualizar_projeto(projeto_id: str, dados: ProjetoAtualizarEntrada,
                             usuario=Depends(usuario_atual), db=Depends(obter_db)):
@@ -142,10 +169,21 @@ async def exportar_projeto(projeto_id: str, dados: ExportarEntrada | None = None
                            usuario=Depends(usuario_atual), db=Depends(obter_db)):
     dados = dados or ExportarEntrada()
     projeto = await buscar_projeto(db, projeto_id, usuario)
-    await buscar_midia_do_projeto(db, projeto["midia_id"], usuario)
-    exportacao = montar_exportacao(projeto, usuario["_id"], formato=dados.formato, instante=dados.instante)
+    midia = await buscar_midia_do_projeto(db, projeto["midia_id"], usuario)
+    if (dados.formato == "video" and (projeto.get("audio") or {}).get("limpeza")
+            and ARQUIVO_AUDIO_LIMPO not in (midia.get("arquivos") or [])):
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "A limpeza do áudio ainda está em andamento. Espere ela terminar para exportar.")
+    if (projeto.get("enquadramento") or {}).get("seguir_rosto"):
+        trilha = await db.rostos.find_one({"midia_id": midia["_id"], "organizacao_id": projeto["organizacao_id"]})
+        if not trilha or not trilha.get("quadros"):
+            raise HTTPException(status.HTTP_409_CONFLICT,
+                                "O acompanhamento do rosto ainda não ficou pronto. Espere e exporte de novo.")
+    exportacao = montar_exportacao(projeto, usuario["_id"], formato=dados.formato, instante=dados.instante,
+                                   encoder=dados.encoder)
     exportacao["_id"] = (await db.exportacoes.insert_one(exportacao)).inserted_id
-    job = montar_job("renderizacao", usuario["organizacao_id"], {"exportacao_id": str(exportacao["_id"])},
+    tipo_render = "renderizacao_nvenc" if dados.formato == "video" and dados.encoder == "nvenc" else "renderizacao"
+    job = montar_job(tipo_render, usuario["organizacao_id"], {"exportacao_id": str(exportacao["_id"])},
                      prioridade=PRIORIDADE_RENDER, criado_por=usuario["_id"])
     job["_id"] = (await db.jobs.insert_one(job)).inserted_id
     await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"job_id": job["_id"]}})

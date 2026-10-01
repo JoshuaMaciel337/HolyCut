@@ -23,17 +23,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
+import { LegendaNaPrevia } from "@/componentes/LegendaNaPrevia";
 import { LinhaDoTempo } from "@/componentes/LinhaDoTempo";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
 import { MusicaNaPrevia } from "@/componentes/MusicaNaPrevia";
+import { PainelAudio } from "@/componentes/PainelAudio";
 import { PainelCor } from "@/componentes/PainelCor";
+import { PainelFala } from "@/componentes/PainelFala";
 import { PainelFundo } from "@/componentes/PainelFundo";
+import { PainelLegenda } from "@/componentes/PainelLegenda";
 import { PainelMarca } from "@/componentes/PainelMarca";
 import { PainelMusica } from "@/componentes/PainelMusica";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
 import { PainelTextos } from "@/componentes/PainelTextos";
 import { PreviaEnquadrada } from "@/componentes/PreviaEnquadrada";
 import { chamarApi, ErroApi } from "@/lib/api";
+import { quadroEm } from "@/lib/rosto";
+import { useEventosJobs } from "@/lib/eventos";
+import { cortesDaFala, fundirCortes } from "@/lib/fala";
 import { cssDoFiltro, FiltroSvg, useFiltros } from "@/lib/filtros";
 import { formatarTempo } from "@/lib/formatar";
 import {
@@ -48,12 +55,26 @@ import {
   posicaoNaParte,
 } from "@/lib/partes";
 import { PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
-import type { Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Midia, Musica, Parte, Projeto, Proporcao, Silencios } from "@/lib/tipos";
+import type { BlocoLegenda, Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Job, Limpeza, Midia, Musica, PalavraFala, Parte, PreviaLegenda, Projeto, Proporcao, QuadroRosto, Rosto, Silencios } from "@/lib/tipos";
 
 const ESPERA_SALVAR_MS = 700;
 // Pico da forma de onda (em % da escala cheia) a partir do qual a prévia considera que há voz
 const PICO_DE_FALA = 4;
-type Edicao = Pick<Projeto, "nome" | "proporcao" | "partes" | "silencios" | "enquadramento" | "marca" | "textos" | "fundo" | "cor" | "musica">;
+type Edicao = Pick<
+  Projeto,
+  | "nome"
+  | "proporcao"
+  | "partes"
+  | "silencios"
+  | "enquadramento"
+  | "marca"
+  | "textos"
+  | "fundo"
+  | "cor"
+  | "musica"
+  | "legenda"
+  | "audio"
+>;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
 
 export default function PaginaProjeto() {
@@ -75,7 +96,14 @@ export default function PaginaProjeto() {
   const [avisoParte, setAvisoParte] = useState("");
   // Parte em que a prévia está (a que as alças e os botões da linha do tempo editam)
   const [indiceAtual, setIndiceAtual] = useState(0);
+  const [blocosLegenda, setBlocosLegenda] = useState<BlocoLegenda[]>([]);
+  const [palavrasFala, setPalavrasFala] = useState<PalavraFala[]>([]);
+  const [temTranscricao, setTemTranscricao] = useState(false);
+  const [estadoLimpeza, setEstadoLimpeza] = useState<Limpeza | null>(null);
+  const [trilhaRosto, setTrilhaRosto] = useState<QuadroRosto[]>([]);
   const indiceRef = useRef(0);
+  const tempoRef = useRef(0);
+  const midiaIdRef = useRef<string | null>(null);
   const player = useRef<HTMLVideoElement>(null);
   const filtros = useFiltros();
 
@@ -98,12 +126,19 @@ export default function PaginaProjeto() {
           proporcao: carregado.proporcao,
           partes: carregado.partes,
           silencios: carregado.silencios,
-          enquadramento: carregado.enquadramento,
+          enquadramento: {
+            x: carregado.enquadramento.x,
+            y: carregado.enquadramento.y,
+            zoom: carregado.enquadramento.zoom,
+            seguir_rosto: carregado.enquadramento.seguir_rosto ?? false,
+          },
           marca: carregado.marca,
           fundo: carregado.fundo,
           cor: carregado.cor,
           musica: carregado.musica,
           textos: carregado.textos,
+          legenda: carregado.legenda,
+          audio: { normalizar: carregado.audio.normalizar, limpeza: carregado.audio.limpeza ?? false },
         };
         edicaoAtual.current = inicial;
         setProjeto(carregado);
@@ -131,6 +166,28 @@ export default function PaginaProjeto() {
       cancelado = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!projeto) return;
+    let cancelado = false;
+    chamarApi<PreviaLegenda>(`/projetos/${projeto.id}/legenda`)
+      .then((dados) => {
+        if (cancelado) return;
+        setBlocosLegenda(dados.blocos);
+        setPalavrasFala(dados.palavras);
+        setTemTranscricao(dados.tem_transcricao);
+      })
+      .catch(() => {
+        if (!cancelado) {
+          setBlocosLegenda([]);
+          setPalavrasFala([]);
+          setTemTranscricao(false);
+        }
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [projeto]);
 
   const intensidade = edicao?.silencios.intensidade ?? null;
   useEffect(() => {
@@ -181,14 +238,20 @@ export default function PaginaProjeto() {
     [salvar],
   );
 
+  const legendaEdicao = edicao?.legenda;
+  const cortesFala = useMemo(
+    () => (legendaEdicao ? cortesDaFala(palavrasFala, legendaEdicao) : []),
+    [palavrasFala, legendaEdicao],
+  );
   const partes = useMemo(() => edicao?.partes ?? [], [edicao]);
   const indice = Math.min(indiceAtual, Math.max(partes.length - 1, 0));
   const parteAtual = partes[indice];
   // Cortes de silêncio de cada parte, e quanto cada uma dura no vídeo final
   const cortesPorParte = useMemo(() => {
-    const ativos = intensidade && silencios?.intensidade === intensidade ? silencios.silencios : [];
+    const deSilencio = intensidade && silencios?.intensidade === intensidade ? silencios.silencios : [];
+    const ativos = fundirCortes([...deSilencio, ...cortesFala]);
     return partes.map((parte) => cortesNaParte(ativos, parte));
-  }, [partes, intensidade, silencios]);
+  }, [partes, intensidade, silencios, cortesFala]);
   const duracoes = partes.map((parte, i) => duracaoFinalDaParte(parte, cortesPorParte[i] ?? []));
   const duracaoFinal = duracoes.reduce((soma, duracao) => soma + duracao, 0);
   // Onde a prévia está no vídeo final: as partes anteriores inteiras mais o ponto dentro da atual
@@ -201,6 +264,13 @@ export default function PaginaProjeto() {
     indiceRef.current = novo;
     setIndiceAtual(novo);
   }, []);
+
+  const irParaInstante = useCallback((instante: number) => {
+    const lista = edicaoAtual.current?.partes ?? [];
+    const encontrada = lista.findIndex((parte) => instante >= parte.inicio && instante < parte.fim);
+    if (encontrada >= 0) irParaParte(encontrada);
+    if (player.current) player.current.currentTime = instante;
+  }, [irParaParte]);
 
   // A prévia toca as partes na ordem, pulando os cortes, como vai ficar no vídeo final
   const regras = useRef({ partes: [] as Parte[], cortes: [] as [number, number][][] });
@@ -231,6 +301,7 @@ export default function PaginaProjeto() {
         if (corte) elemento.currentTime = corte[1];
         if (elemento.currentTime >= parte.fim && avancar() === 0) elemento.pause();
       }
+      tempoRef.current = elemento.currentTime;
       setTempo(elemento.currentTime);
       if (!elemento.paused) quadro = requestAnimationFrame(acompanhar);
     };
@@ -245,11 +316,15 @@ export default function PaginaProjeto() {
     };
     const aoPausar = () => {
       setTocando(false);
+      tempoRef.current = elemento.currentTime;
       setTempo(elemento.currentTime);
     };
     // Os saltos da própria prévia (início do trecho, silêncios pulados) também disparam "seeked":
     // só atualizam o tempo, sem mexer no botão de tocar.
-    const aoSaltar = () => setTempo(elemento.currentTime);
+    const aoSaltar = () => {
+      tempoRef.current = elemento.currentTime;
+      setTempo(elemento.currentTime);
+    };
     elemento.addEventListener("play", aoTocar);
     elemento.addEventListener("pause", aoPausar);
     elemento.addEventListener("seeked", aoSaltar);
@@ -284,6 +359,7 @@ export default function PaginaProjeto() {
 
   function levarPreviaPara(segundos: number) {
     if (player.current) player.current.currentTime = segundos;
+    tempoRef.current = segundos;
     setTempo(segundos);
   }
 
@@ -368,7 +444,7 @@ export default function PaginaProjeto() {
     levarPreviaPara(restantes[novo].inicio);
   }
 
-  async function exportar(formato: "video" | "imagem") {
+  async function exportar(formato: "video" | "imagem", encoder: "cpu" | "nvenc" = "cpu") {
     const atual = edicaoAtual.current;
     if (!atual) return;
     setExportando(true);
@@ -377,7 +453,7 @@ export default function PaginaProjeto() {
       // Garante que o vídeo sai com a última edição: salva e espera a fila terminar
       clearTimeout(espera.current);
       if (!(await salvar(atual))) return;
-      const corpo = { formato, instante: Math.round(posicaoFinal * 100) / 100 };
+      const corpo = { formato, instante: Math.round(posicaoFinal * 100) / 100, encoder };
       setUltimaExportacao(await chamarApi<Exportacao>(`/projetos/${id}/exportar`, { metodo: "POST", corpo }));
     } catch (e) {
       setErro(e instanceof ErroApi ? e.message : "Não foi possível exportar.");
@@ -400,6 +476,91 @@ export default function PaginaProjeto() {
     }
   }
 
+  useEffect(() => {
+    midiaIdRef.current = midia?.id ?? null;
+  }, [midia?.id]);
+
+  const limpezaLigada = edicao?.audio.limpeza ?? false;
+  const previaLimpa = Boolean(midia?.arquivos.includes("proxy_limpo.mp4"));
+  const srcPrevia = midia
+    ? `/api/midias/${midia.id}/arquivos/${limpezaLigada && previaLimpa ? "proxy_limpo.mp4" : "proxy.mp4"}`
+    : "";
+
+  useEventosJobs((job) => {
+    if (job.tipo !== "limpeza_audio" || job.entrada.midia_id !== midiaIdRef.current) return;
+    setEstadoLimpeza({ status: job.status, progresso: job.progresso, mensagem: job.mensagem, erro: job.erro });
+    if (job.status === "concluido" && midiaIdRef.current) {
+      chamarApi<Midia>(`/midias/${midiaIdRef.current}`).then(setMidia).catch(() => undefined);
+    }
+  });
+
+  useEffect(() => {
+    if (!midia || !limpezaLigada || previaLimpa) return;
+    let cancelado = false;
+    chamarApi<Limpeza>(`/midias/${midia.id}/limpeza`)
+      .then((dados) => {
+        if (!cancelado) setEstadoLimpeza(dados);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, [midia, limpezaLigada, previaLimpa]);
+
+  useEffect(() => {
+    if (!midia?.video) return;
+    let cancelado = false;
+    chamarApi<Rosto>(`/midias/${midia.id}/rosto`)
+      .then((dados) => {
+        if (!cancelado) setTrilhaRosto(dados.quadros ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, [midia?.id, midia?.video]);
+
+  useEventosJobs((job) => {
+    if (job.tipo !== "enquadramento_rosto" || job.entrada.midia_id !== midiaIdRef.current || job.status !== "concluido") return;
+    if (!midiaIdRef.current) return;
+    chamarApi<Rosto>(`/midias/${midiaIdRef.current}/rosto`)
+      .then((dados) => setTrilhaRosto(dados.quadros ?? []))
+      .catch(() => undefined);
+  });
+
+  useEffect(() => {
+    const video = player.current;
+    if (!video || !srcPrevia) return;
+    const instante = tempoRef.current;
+    const aplicar = () => {
+      if (instante > 0.05 && Math.abs(video.currentTime - instante) > 0.25) video.currentTime = instante;
+    };
+    if (video.readyState >= 2) aplicar();
+    video.addEventListener("loadeddata", aplicar);
+    return () => video.removeEventListener("loadeddata", aplicar);
+  }, [srcPrevia]);
+
+  async function pedirLimpeza() {
+    if (!midia) return;
+    try {
+      const job = await chamarApi<Job>(`/midias/${midia.id}/limpeza`, { metodo: "POST" });
+      setEstadoLimpeza({ status: job.status, progresso: job.progresso, mensagem: job.mensagem, erro: job.erro });
+    } catch (e) {
+      if (e instanceof ErroApi && e.status === 409) {
+        const atual = await chamarApi<Midia>(`/midias/${midia.id}`).catch(() => null);
+        if (atual) setMidia(atual);
+        return;
+      }
+      setErro(e instanceof ErroApi ? e.message : "Não foi possível limpar o áudio.");
+    }
+  }
+
+  function mudarLimpeza(ligada: boolean) {
+    if (!edicao) return;
+    editar({ audio: { ...edicao.audio, limpeza: ligada } });
+    if (ligada && !midia?.arquivos.includes("proxy_limpo.mp4")) void pedirLimpeza();
+  }
+
   const voltar = midia ? (
     <Link href={`/app/midias/${midia.id}`} className="inline-flex items-center gap-2 text-sm text-suave hover:text-texto">
       <ArrowLeft className="size-4" aria-hidden /> {midia.nome}
@@ -420,6 +581,10 @@ export default function PaginaProjeto() {
   }
 
   const base = `/api/midias/${midia.id}/arquivos`;
+  const quadroSeguido = edicao.enquadramento.seguir_rosto ? quadroEm(trilhaRosto, tempo) : null;
+  const enquadramentoPrevia = quadroSeguido
+    ? { ...edicao.enquadramento, x: quadroSeguido.x, y: quadroSeguido.y, zoom: quadroSeguido.zoom }
+    : edicao.enquadramento;
   const opcaoCorte: OpcaoCorte = intensidade ?? "desligado";
   const alvo = PROPORCOES[edicao.proporcao];
   const filtroEscolhido = filtros.find((filtro) => filtro.id === edicao.cor.filtro);
@@ -464,13 +629,13 @@ export default function PaginaProjeto() {
           <FiltroSvg id="cor-previa" filtro={filtroEscolhido} intensidade={edicao.cor.intensidade} />
           <PreviaEnquadrada
             player={player}
-            src={`${base}/proxy.mp4`}
+            src={srcPrevia}
             poster={midia.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
             largura={midia.video.largura}
             altura={midia.video.altura}
             proporcao={edicao.proporcao}
-            enquadramento={edicao.enquadramento}
-            aoMudar={(enquadramento) => editar({ enquadramento })}
+            enquadramento={enquadramentoPrevia}
+            aoMudar={(enquadramento) => editar({ enquadramento: { ...edicao.enquadramento, ...enquadramento } })}
             fundo={edicao.fundo}
             filtroCor={cssDoFiltro("cor-previa", filtroEscolhido, edicao.cor.intensidade)}
           >
@@ -486,6 +651,12 @@ export default function PaginaProjeto() {
                   visivel={posicaoFinal >= texto.inicio && (texto.fim === null || posicaoFinal < texto.fim)}
                 />
               ))}
+            <LegendaNaPrevia
+              blocos={blocosLegenda}
+              instante={posicaoFinal}
+              legenda={edicao.legenda}
+              corDestaque={identidade?.cor_destaque ?? "#FF8A00"}
+            />
           </PreviaEnquadrada>
           {musicaEscolhida ? (
             <MusicaNaPrevia
@@ -539,15 +710,36 @@ export default function PaginaProjeto() {
                 min={1}
                 max={ZOOM_MAXIMO}
                 step={0.05}
-                value={edicao.enquadramento.zoom}
+                value={quadroSeguido ? quadroSeguido.zoom : edicao.enquadramento.zoom}
+                disabled={edicao.enquadramento.seguir_rosto}
                 onChange={(evento) => editar({ enquadramento: { ...edicao.enquadramento, zoom: Number(evento.target.value) } })}
                 className="w-full accent-[var(--hc-orange)]"
               />
               <span className="w-12 text-right tabular-nums">{edicao.enquadramento.zoom.toFixed(2)}x</span>
             </label>
+            <label className="mt-4 flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={edicao.enquadramento.seguir_rosto}
+                onChange={(evento) => {
+                  const ligado = evento.target.checked;
+                  editar({ enquadramento: { ...edicao.enquadramento, seguir_rosto: ligado } });
+                  if (ligado && trilhaRosto.length === 0) {
+                    chamarApi<Job>(`/midias/${midia.id}/rosto`, { metodo: "POST" }).catch((e) => {
+                      setErro(e instanceof ErroApi ? e.message : "Não foi possível acompanhar o rosto.");
+                    });
+                  }
+                }}
+                className="size-4 accent-[var(--hc-orange)]"
+              />
+              Seguir o rosto e aproximar nas ênfases
+            </label>
+            {edicao.enquadramento.seguir_rosto && trilhaRosto.length === 0 ? (
+              <p className="mt-2 text-sm text-suave">O acompanhamento do rosto ainda está sendo preparado.</p>
+            ) : null}
             <button
               type="button"
-              onClick={() => editar({ enquadramento: { x: 0.5, y: 0.5, zoom: 1 } })}
+              onClick={() => editar({ enquadramento: { x: 0.5, y: 0.5, zoom: 1, seguir_rosto: false } })}
               className="mt-3 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto"
             >
               <RotateCcw className="size-4" aria-hidden /> Centralizar
@@ -637,6 +829,15 @@ export default function PaginaProjeto() {
             </div>
           </section>
 
+          <PainelAudio
+            ligada={edicao.audio.limpeza}
+            pronta={previaLimpa || estadoLimpeza?.status === "pronta"}
+            temAudio={Boolean(midia.audio)}
+            estado={estadoLimpeza}
+            aoMudar={mudarLimpeza}
+            aoTentarDeNovo={() => void pedirLimpeza()}
+          />
+
           <PainelSilencios
             opcao={opcaoCorte}
             aoMudar={(opcao) => editar({ silencios: { intensidade: opcao === "desligado" ? null : opcao } })}
@@ -650,6 +851,22 @@ export default function PaginaProjeto() {
             pular
             aoMudarPular={() => undefined}
             semOpcaoPular
+          />
+
+          <PainelFala
+            palavras={palavrasFala}
+            legenda={edicao.legenda}
+            tempo={tempo}
+            midiaId={midia.id}
+            aoMudar={(legenda) => editar({ legenda })}
+            aoSaltar={irParaInstante}
+          />
+
+          <PainelLegenda
+            legenda={edicao.legenda}
+            temTranscricao={temTranscricao}
+            midiaId={midia.id}
+            aoMudar={(legenda) => editar({ legenda })}
           />
 
           <PainelTextos
@@ -686,11 +903,19 @@ export default function PaginaProjeto() {
                 <button type="button" onClick={() => exportar("video")} disabled={exportando} className="botao-cta">
                   <Clapperboard className="size-4" aria-hidden /> {exportando ? "Enviando para a fila..." : "Exportar vídeo"}
                 </button>
+                <button type="button" onClick={() => exportar("video", "nvenc")} disabled={exportando} className="botao-contorno">
+                  <Clapperboard className="size-4" aria-hidden /> Exportar pela placa de vídeo
+                </button>
                 <button type="button" onClick={() => exportar("imagem")} disabled={exportando} className="botao-contorno">
                   <ImageIcon className="size-4" aria-hidden /> Exportar imagem
                 </button>
               </div>
             </div>
+            {projeto.publicacao ? (
+              <p className="mt-3 text-sm text-suave">
+                Legenda do post: {projeto.publicacao.legenda} {projeto.publicacao.hashtags.join(" ")}. Gerado por IA.
+              </p>
+            ) : null}
             <button type="button" onClick={salvarComoModelo} className="mt-4 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto">
               <BookmarkPlus className="size-4" aria-hidden /> Salvar o visual como modelo
             </button>
