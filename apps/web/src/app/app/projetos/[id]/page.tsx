@@ -2,6 +2,16 @@
 
 import {
   ArrowLeft,
+  AudioLines,
+  BadgeCheck,
+  Captions,
+  Crop,
+  Download,
+  FileText,
+  Layers,
+  Music,
+  SwatchBook,
+  Type,
   BookmarkPlus,
   Check,
   ChevronLeft,
@@ -78,6 +88,22 @@ type Edicao = Pick<
 >;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
 
+type Ferramenta = "fala" | "formato" | "legenda" | "textos" | "musica" | "cor" | "fundo" | "marca" | "audio" | "exportar";
+
+// A barra de ferramentas do editor. A fala só aparece na barra do celular: no computador ela fica fixa à esquerda.
+const FERRAMENTAS: { id: Ferramenta; rotulo: string; icone: typeof Crop; soCelular?: boolean }[] = [
+  { id: "fala", rotulo: "Fala", icone: FileText, soCelular: true },
+  { id: "formato", rotulo: "Formato", icone: Crop },
+  { id: "legenda", rotulo: "Legenda", icone: Captions },
+  { id: "textos", rotulo: "Texto", icone: Type },
+  { id: "musica", rotulo: "Música", icone: Music },
+  { id: "cor", rotulo: "Filtros", icone: SwatchBook },
+  { id: "fundo", rotulo: "Fundo", icone: Layers },
+  { id: "marca", rotulo: "Logo", icone: BadgeCheck },
+  { id: "audio", rotulo: "Áudio", icone: AudioLines },
+  { id: "exportar", rotulo: "Exportar", icone: Download },
+];
+
 export default function PaginaProjeto() {
   const { id } = useParams<{ id: string }>();
   const [projeto, setProjeto] = useState<Projeto | null>(null);
@@ -89,6 +115,9 @@ export default function PaginaProjeto() {
   const [silencios, setSilencios] = useState<Silencios | null>(null);
   const [erro, setErro] = useState("");
   const [estadoSalvar, setEstadoSalvar] = useState<EstadoSalvar>("salvo");
+  const [ferramenta, setFerramenta] = useState<Ferramenta>("legenda");
+  // No celular o painel é uma gaveta que abre ao tocar na ferramenta; no computador ele fica sempre à vista
+  const [folhaAberta, setFolhaAberta] = useState(false);
   const [tempo, setTempo] = useState(0);
   const [tocando, setTocando] = useState(false);
   const [exportando, setExportando] = useState(false);
@@ -593,10 +622,213 @@ export default function PaginaProjeto() {
   const indicePico = forma ? Math.floor(tempo * forma.picos_por_segundo) : -1;
   const falando = forma ? Math.max(...forma.picos.slice(Math.max(indicePico - 1, 0), indicePico + 2), 0) >= PICO_DE_FALA : false;
 
+  const painel = (qual: Ferramenta) => {
+    switch (qual) {
+    case "formato":
+      return (
+      <section className="cartao p-6" aria-labelledby="titulo-formato">
+        <h2 id="titulo-formato" className="font-display text-lg font-bold">
+          Formato
+        </h2>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Proporção">
+          {(Object.keys(PROPORCOES) as Proporcao[]).map((valor) => {
+            const escolhido = edicao.proporcao === valor;
+            return (
+              <button
+                key={valor}
+                type="button"
+                role="radio"
+                aria-checked={escolhido}
+                onClick={() => editar({ proporcao: valor })}
+                className={`flex flex-col items-center gap-1 rounded-2xl border px-3 py-3 transition ${
+                  escolhido ? "border-laranja bg-laranja/10" : "border-borda hover:border-suave"
+                }`}
+              >
+                <span className="font-display font-bold">{valor}</span>
+                <span className="text-xs text-suave">{PROPORCOES[valor].rotulo}</span>
+              </button>
+            );
+          })}
+        </div>
+        <label className="mt-5 flex items-center gap-4 text-sm">
+          <span className="shrink-0 text-suave">Zoom</span>
+          <input
+            type="range"
+            min={1}
+            max={ZOOM_MAXIMO}
+            step={0.05}
+            value={quadroSeguido ? quadroSeguido.zoom : edicao.enquadramento.zoom}
+            disabled={edicao.enquadramento.seguir_rosto}
+            onChange={(evento) => editar({ enquadramento: { ...edicao.enquadramento, zoom: Number(evento.target.value) } })}
+            className="w-full accent-[var(--hc-orange)]"
+          />
+          <span className="w-12 text-right tabular-nums">{edicao.enquadramento.zoom.toFixed(2)}x</span>
+        </label>
+        <label className="mt-4 flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={edicao.enquadramento.seguir_rosto}
+            onChange={(evento) => {
+              const ligado = evento.target.checked;
+              editar({ enquadramento: { ...edicao.enquadramento, seguir_rosto: ligado } });
+              if (ligado && trilhaRosto.length === 0) {
+                chamarApi<Job>(`/midias/${midia.id}/rosto`, { metodo: "POST" }).catch((e) => {
+                  setErro(e instanceof ErroApi ? e.message : "Não foi possível acompanhar o rosto.");
+                });
+              }
+            }}
+            className="size-4 accent-[var(--hc-orange)]"
+          />
+          Seguir o rosto e aproximar nas ênfases
+        </label>
+        {edicao.enquadramento.seguir_rosto && trilhaRosto.length === 0 ? (
+          <p className="mt-2 text-sm text-suave">O acompanhamento do rosto ainda está sendo preparado.</p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => editar({ enquadramento: { x: 0.5, y: 0.5, zoom: 1, seguir_rosto: false } })}
+          className="mt-3 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto"
+        >
+          <RotateCcw className="size-4" aria-hidden /> Centralizar
+        </button>
+      </section>
+      );
+    case "audio":
+      return (
+        <div className="flex flex-col gap-4">
+        <PainelAudio
+          ligada={edicao.audio.limpeza}
+          pronta={previaLimpa || estadoLimpeza?.status === "pronta"}
+          temAudio={Boolean(midia.audio)}
+          estado={estadoLimpeza}
+          aoMudar={mudarLimpeza}
+          aoTentarDeNovo={() => void pedirLimpeza()}
+        />
+        <PainelSilencios
+          opcao={opcaoCorte}
+          aoMudar={(opcao) => editar({ silencios: { intensidade: opcao === "desligado" ? null : opcao } })}
+          dados={
+            silencios && intensidade && silencios.intensidade === intensidade
+              ? { ...silencios, silencios: cortesPorParte.flat(), tempo_cortado: duracaoDasPartes(partes) - duracaoFinal, duracao_final: duracaoFinal }
+              : null
+          }
+          carregando={Boolean(intensidade) && silencios?.intensidade !== intensidade}
+          duracao={duracaoDasPartes(partes)}
+          pular
+          aoMudarPular={() => undefined}
+          semOpcaoPular
+        />
+        </div>
+      );
+    case "fala":
+      return (
+      <PainelFala
+        palavras={palavrasFala}
+        legenda={edicao.legenda}
+        tempo={tempo}
+        midiaId={midia.id}
+        aoMudar={(legenda) => editar({ legenda })}
+        aoSaltar={irParaInstante}
+      />
+      );
+    case "legenda":
+      return (
+      <PainelLegenda
+        legenda={edicao.legenda}
+        temTranscricao={temTranscricao}
+        midiaId={midia.id}
+        aoMudar={(legenda) => editar({ legenda })}
+      />
+      );
+    case "textos":
+      return (
+      <PainelTextos
+        textos={edicao.textos}
+        aoMudar={(textos) => editar({ textos })}
+        duracaoFinal={duracaoFinal}
+        posicaoFinal={posicaoFinal}
+      />
+      );
+    case "musica":
+      return (
+      <PainelMusica musica={edicao.musica} musicas={musicas} aoMudar={(musica) => editar({ musica })} />
+      );
+    case "cor":
+      return (
+      <PainelCor
+        cor={edicao.cor}
+        aoMudar={(cor) => editar({ cor })}
+        capa={midia.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
+      />
+      );
+    case "fundo":
+      return (
+      <PainelFundo fundo={edicao.fundo} aoMudar={(fundo) => editar({ fundo })} />
+      );
+    case "marca":
+      return (
+      <PainelMarca marca={edicao.marca} temLogo={Boolean(identidade?.logo)} aoMudar={(marca) => editar({ marca })} />
+      );
+    case "exportar":
+      return (
+      <section className="cartao p-6" aria-labelledby="titulo-exportar">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 id="titulo-exportar" className="font-display text-lg font-bold">
+              Exportar
+            </h2>
+            <p className="mt-1 text-sm text-suave">
+              {PROPORCOES[edicao.proporcao].largura}×{PROPORCOES[edicao.proporcao].altura}. O vídeo sai com o áudio no volume das
+              redes (-14 LUFS); a imagem é o quadro em que a prévia está ({formatarTempo(posicaoFinal)}).
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => exportar("video")} disabled={exportando} className="botao-cta">
+              <Clapperboard className="size-4" aria-hidden /> {exportando ? "Enviando para a fila..." : "Exportar vídeo"}
+            </button>
+            <button type="button" onClick={() => exportar("video", "nvenc")} disabled={exportando} className="botao-contorno">
+              <Clapperboard className="size-4" aria-hidden /> Exportar pela placa de vídeo
+            </button>
+            <button type="button" onClick={() => exportar("imagem")} disabled={exportando} className="botao-contorno">
+              <ImageIcon className="size-4" aria-hidden /> Exportar imagem
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-borda pt-4">
+          <a
+            href={`/api/projetos/${projeto.id}/pacote-edicao`}
+            download
+            aria-disabled={estadoSalvar !== "salvo"}
+            className={`botao-contorno px-4 py-2 text-sm ${estadoSalvar !== "salvo" ? "pointer-events-none opacity-50" : ""}`}
+          >
+            <FileArchive className="size-4" aria-hidden /> Baixar para DaVinci ou Premiere
+          </a>
+          <p className="min-w-0 flex-1 text-xs text-suave">
+            Um .zip com os cortes (XML) e a legenda (SRT), que apontam para a gravação original. Enquadramento, textos e
+            música ficam por conta do editor.
+          </p>
+        </div>
+        {projeto.publicacao ? (
+          <p className="mt-3 text-sm text-suave">
+            Legenda do post: {projeto.publicacao.legenda} {projeto.publicacao.hashtags.join(" ")}. Gerado por IA.
+          </p>
+        ) : null}
+        <button type="button" onClick={salvarComoModelo} className="mt-4 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto">
+          <BookmarkPlus className="size-4" aria-hidden /> Salvar o visual como modelo
+        </button>
+        {aviso ? <p className="mt-2 text-sm text-ciano">{aviso}</p> : null}
+        <div className="mt-5">
+          <ListaExportacoes projetoId={projeto.id} nova={ultimaExportacao} />
+        </div>
+      </section>
+      );
+    }
+  };
+
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <main className="mx-auto max-w-[1600px] px-3 pb-28 pt-4 sm:px-6 lg:pb-8">
       {voltar}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <input
           value={edicao.nome}
           onChange={(evento) => editar({ nome: evento.target.value.slice(0, 120) })}
@@ -618,6 +850,16 @@ export default function PaginaProjeto() {
             </>
           )}
         </span>
+        <button
+          type="button"
+          onClick={() => {
+            setFerramenta("exportar");
+            setFolhaAberta(true);
+          }}
+          className="botao-cta px-5 py-2 text-sm"
+        >
+          <Download className="size-4" aria-hidden /> Exportar
+        </button>
       </div>
       {erro ? (
         <p role="alert" className="mt-4 rounded-xl border border-vermelho/40 bg-vermelho/10 px-4 py-3 text-sm text-vermelho">
@@ -625,8 +867,24 @@ export default function PaginaProjeto() {
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr]">
-        <section className="flex flex-col items-center gap-4" aria-label="Prévia">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(240px,1fr)_minmax(280px,400px)_minmax(320px,380px)_auto] lg:items-start">
+        {/* Computador: a fala fica sempre à esquerda, como no Opus. No celular ela é uma ferramenta da barra. */}
+        <aside className="hidden max-h-[calc(100dvh-330px)] overflow-y-auto lg:block" aria-label="Fala">
+        <PainelFala
+          palavras={palavrasFala}
+          legenda={edicao.legenda}
+          tempo={tempo}
+          midiaId={midia.id}
+          aoMudar={(legenda) => editar({ legenda })}
+          aoSaltar={irParaInstante}
+        />
+        </aside>
+
+        <section
+          className="mx-auto flex w-full max-w-[var(--largura-previa)] flex-col items-center gap-3 lg:sticky lg:top-4 lg:max-w-none lg:gap-4"
+          style={{ "--largura-previa": `calc(46dvh * ${alvo.largura / alvo.altura})` } as React.CSSProperties}
+          aria-label="Prévia"
+        >
           <FiltroSvg id="cor-previa" filtro={filtroEscolhido} intensidade={edicao.cor.intensidade} />
           <PreviaEnquadrada
             player={player}
@@ -679,267 +937,130 @@ export default function PaginaProjeto() {
           </div>
         </section>
 
-        <div className="flex min-w-0 flex-col gap-6">
-          <section className="cartao p-6" aria-labelledby="titulo-formato">
-            <h2 id="titulo-formato" className="font-display text-lg font-bold">
-              Formato
-            </h2>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Proporção">
-              {(Object.keys(PROPORCOES) as Proporcao[]).map((valor) => {
-                const escolhido = edicao.proporcao === valor;
-                return (
-                  <button
-                    key={valor}
-                    type="button"
-                    role="radio"
-                    aria-checked={escolhido}
-                    onClick={() => editar({ proporcao: valor })}
-                    className={`flex flex-col items-center gap-1 rounded-2xl border px-3 py-3 transition ${
-                      escolhido ? "border-laranja bg-laranja/10" : "border-borda hover:border-suave"
-                    }`}
-                  >
-                    <span className="font-display font-bold">{valor}</span>
-                    <span className="text-xs text-suave">{PROPORCOES[valor].rotulo}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <label className="mt-5 flex items-center gap-4 text-sm">
-              <span className="shrink-0 text-suave">Zoom</span>
-              <input
-                type="range"
-                min={1}
-                max={ZOOM_MAXIMO}
-                step={0.05}
-                value={quadroSeguido ? quadroSeguido.zoom : edicao.enquadramento.zoom}
-                disabled={edicao.enquadramento.seguir_rosto}
-                onChange={(evento) => editar({ enquadramento: { ...edicao.enquadramento, zoom: Number(evento.target.value) } })}
-                className="w-full accent-[var(--hc-orange)]"
-              />
-              <span className="w-12 text-right tabular-nums">{edicao.enquadramento.zoom.toFixed(2)}x</span>
-            </label>
-            <label className="mt-4 flex items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                checked={edicao.enquadramento.seguir_rosto}
-                onChange={(evento) => {
-                  const ligado = evento.target.checked;
-                  editar({ enquadramento: { ...edicao.enquadramento, seguir_rosto: ligado } });
-                  if (ligado && trilhaRosto.length === 0) {
-                    chamarApi<Job>(`/midias/${midia.id}/rosto`, { metodo: "POST" }).catch((e) => {
-                      setErro(e instanceof ErroApi ? e.message : "Não foi possível acompanhar o rosto.");
-                    });
-                  }
-                }}
-                className="size-4 accent-[var(--hc-orange)]"
-              />
-              Seguir o rosto e aproximar nas ênfases
-            </label>
-            {edicao.enquadramento.seguir_rosto && trilhaRosto.length === 0 ? (
-              <p className="mt-2 text-sm text-suave">O acompanhamento do rosto ainda está sendo preparado.</p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => editar({ enquadramento: { x: 0.5, y: 0.5, zoom: 1, seguir_rosto: false } })}
-              className="mt-3 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto"
-            >
-              <RotateCcw className="size-4" aria-hidden /> Centralizar
+
+        {/* O painel da ferramenta escolhida: coluna no computador, gaveta que sobe no celular */}
+        <div
+          className={`${folhaAberta ? "fixed" : "hidden"} inset-x-0 bottom-[68px] z-30 max-h-[58dvh] overflow-y-auto rounded-t-3xl border-t border-borda bg-ink p-3 shadow-[0_-20px_60px_rgba(0,0,0,.5)] lg:static lg:z-auto lg:block lg:max-h-[calc(100dvh-330px)] lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none`}
+          aria-label={FERRAMENTAS.find((item) => item.id === ferramenta)?.rotulo}
+        >
+          <div className="mb-2 flex items-center justify-between lg:hidden">
+            <p className="font-display font-bold">{FERRAMENTAS.find((item) => item.id === ferramenta)?.rotulo}</p>
+            <button type="button" onClick={() => setFolhaAberta(false)} className="botao-contorno size-9 p-0" aria-label="Fechar">
+              <Check className="size-4" aria-hidden />
             </button>
-          </section>
-
-          <section className="cartao p-6" aria-labelledby="titulo-trecho">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="titulo-trecho" className="font-display text-lg font-bold">
-                Linha do tempo
-              </h2>
-              <p className="text-sm tabular-nums text-suave">
-                {partes.length} {partes.length === 1 ? "parte" : "partes"} · {formatarTempo(duracaoFinal)} no vídeo
-              </p>
-            </div>
-            <p className="mt-1 text-sm text-suave">Divida no ponto da prévia e arraste as partes para mudar a ordem. A mesma parte da gravação pode entrar mais de uma vez.</p>
-            <div className="mt-4">
-              <LinhaDoTempo
-                partes={partes}
-                duracoes={duracoes}
-                indiceAtual={indice}
-                posicaoFinal={posicaoFinal}
-                aoBuscar={buscarNaLinhaDoTempo}
-                aoReordenar={reordenar}
-              />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={dividir} className="botao-contorno px-4 py-2 text-sm">
-                <Scissors className="size-4" aria-hidden /> Dividir aqui
-              </button>
-              <button type="button" onClick={novaParte} className="botao-contorno px-4 py-2 text-sm">
-                <Plus className="size-4" aria-hidden /> Nova parte aqui
-              </button>
-              <button
-                type="button"
-                onClick={() => reordenar(indice, indice - 1)}
-                disabled={indice === 0}
-                className="botao-contorno px-3 py-2 text-sm disabled:opacity-40"
-                aria-label="Mover a parte para antes"
-              >
-                <ChevronLeft className="size-4" aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => reordenar(indice, indice + 1)}
-                disabled={indice >= partes.length - 1}
-                className="botao-contorno px-3 py-2 text-sm disabled:opacity-40"
-                aria-label="Mover a parte para depois"
-              >
-                <ChevronRight className="size-4" aria-hidden />
-              </button>
-              <button type="button" onClick={apagarParte} disabled={partes.length < 2} className="botao-contorno px-4 py-2 text-sm disabled:opacity-40">
-                <Trash2 className="size-4" aria-hidden /> Apagar parte
-              </button>
-            </div>
-            {avisoParte ? <p className="mt-2 text-sm text-amarelo">{avisoParte}</p> : null}
-
-            <h3 className="mt-6 text-sm font-semibold">
-              Parte {indice + 1} na gravação <span className="font-normal text-suave">· arraste as alças laranja ou marque pelo ponto da prévia</span>
-            </h3>
-            {forma ? (
-              <div className="mt-2">
-                <FormaDeOnda
-                  picos={forma.picos}
-                  duracao={midia.duracao}
-                  tempo={tempo}
-                  aoBuscar={buscar}
-                  cortes={cortesPorParte.flat()}
-                  faixa={[parteAtual.inicio, parteAtual.fim]}
-                  aoMudarFaixa={([inicio, fim]) => trocarParte({ ...parteAtual, inicio: Math.round(inicio * 100) / 100, fim: Math.round(fim * 100) / 100 })}
-                  outrasFaixas={partes.filter((_, i) => i !== indice).map((parte) => [parte.inicio, parte.fim] as [number, number])}
-                />
-              </div>
-            ) : null}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => marcar("inicio")} className="botao-contorno px-4 py-2 text-sm">
-                  Início aqui
-                </button>
-                <button type="button" onClick={() => marcar("fim")} className="botao-contorno px-4 py-2 text-sm">
-                  Fim aqui
-                </button>
-              </div>
-              <p className="tabular-nums text-suave">
-                {formatarTempo(parteAtual.inicio)} até {formatarTempo(parteAtual.fim)} · {formatarTempo(parteAtual.fim - parteAtual.inicio)}
-              </p>
-            </div>
-          </section>
-
-          <PainelAudio
-            ligada={edicao.audio.limpeza}
-            pronta={previaLimpa || estadoLimpeza?.status === "pronta"}
-            temAudio={Boolean(midia.audio)}
-            estado={estadoLimpeza}
-            aoMudar={mudarLimpeza}
-            aoTentarDeNovo={() => void pedirLimpeza()}
-          />
-
-          <PainelSilencios
-            opcao={opcaoCorte}
-            aoMudar={(opcao) => editar({ silencios: { intensidade: opcao === "desligado" ? null : opcao } })}
-            dados={
-              silencios && intensidade && silencios.intensidade === intensidade
-                ? { ...silencios, silencios: cortesPorParte.flat(), tempo_cortado: duracaoDasPartes(partes) - duracaoFinal, duracao_final: duracaoFinal }
-                : null
-            }
-            carregando={Boolean(intensidade) && silencios?.intensidade !== intensidade}
-            duracao={duracaoDasPartes(partes)}
-            pular
-            aoMudarPular={() => undefined}
-            semOpcaoPular
-          />
-
-          <PainelFala
-            palavras={palavrasFala}
-            legenda={edicao.legenda}
-            tempo={tempo}
-            midiaId={midia.id}
-            aoMudar={(legenda) => editar({ legenda })}
-            aoSaltar={irParaInstante}
-          />
-
-          <PainelLegenda
-            legenda={edicao.legenda}
-            temTranscricao={temTranscricao}
-            midiaId={midia.id}
-            aoMudar={(legenda) => editar({ legenda })}
-          />
-
-          <PainelTextos
-            textos={edicao.textos}
-            aoMudar={(textos) => editar({ textos })}
-            duracaoFinal={duracaoFinal}
-            posicaoFinal={posicaoFinal}
-          />
-
-          <PainelMusica musica={edicao.musica} musicas={musicas} aoMudar={(musica) => editar({ musica })} />
-
-          <PainelCor
-            cor={edicao.cor}
-            aoMudar={(cor) => editar({ cor })}
-            capa={midia.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
-          />
-
-          <PainelFundo fundo={edicao.fundo} aoMudar={(fundo) => editar({ fundo })} />
-
-          <PainelMarca marca={edicao.marca} temLogo={Boolean(identidade?.logo)} aoMudar={(marca) => editar({ marca })} />
-
-          <section className="cartao p-6" aria-labelledby="titulo-exportar">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 id="titulo-exportar" className="font-display text-lg font-bold">
-                  Exportar
-                </h2>
-                <p className="mt-1 text-sm text-suave">
-                  {PROPORCOES[edicao.proporcao].largura}×{PROPORCOES[edicao.proporcao].altura}. O vídeo sai com o áudio no volume das
-                  redes (-14 LUFS); a imagem é o quadro em que a prévia está ({formatarTempo(posicaoFinal)}).
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => exportar("video")} disabled={exportando} className="botao-cta">
-                  <Clapperboard className="size-4" aria-hidden /> {exportando ? "Enviando para a fila..." : "Exportar vídeo"}
-                </button>
-                <button type="button" onClick={() => exportar("video", "nvenc")} disabled={exportando} className="botao-contorno">
-                  <Clapperboard className="size-4" aria-hidden /> Exportar pela placa de vídeo
-                </button>
-                <button type="button" onClick={() => exportar("imagem")} disabled={exportando} className="botao-contorno">
-                  <ImageIcon className="size-4" aria-hidden /> Exportar imagem
-                </button>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-borda pt-4">
-              <a
-                href={`/api/projetos/${projeto.id}/pacote-edicao`}
-                download
-                aria-disabled={estadoSalvar !== "salvo"}
-                className={`botao-contorno px-4 py-2 text-sm ${estadoSalvar !== "salvo" ? "pointer-events-none opacity-50" : ""}`}
-              >
-                <FileArchive className="size-4" aria-hidden /> Baixar para DaVinci ou Premiere
-              </a>
-              <p className="min-w-0 flex-1 text-xs text-suave">
-                Um .zip com os cortes (XML) e a legenda (SRT), que apontam para a gravação original. Enquadramento, textos e
-                música ficam por conta do editor.
-              </p>
-            </div>
-            {projeto.publicacao ? (
-              <p className="mt-3 text-sm text-suave">
-                Legenda do post: {projeto.publicacao.legenda} {projeto.publicacao.hashtags.join(" ")}. Gerado por IA.
-              </p>
-            ) : null}
-            <button type="button" onClick={salvarComoModelo} className="mt-4 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto">
-              <BookmarkPlus className="size-4" aria-hidden /> Salvar o visual como modelo
-            </button>
-            {aviso ? <p className="mt-2 text-sm text-ciano">{aviso}</p> : null}
-            <div className="mt-5">
-              <ListaExportacoes projetoId={projeto.id} nova={ultimaExportacao} />
-            </div>
-          </section>
+          </div>
+          {painel(ferramenta)}
         </div>
+
+        {/* A barra de ferramentas: embaixo no celular, como no CapCut; vertical à direita no computador */}
+        <nav
+          className="fixed inset-x-0 bottom-0 z-40 flex gap-1 overflow-x-auto border-t border-borda bg-ink/95 px-2 py-2 backdrop-blur lg:static lg:flex-col lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0"
+          aria-label="Ferramentas"
+        >
+          {FERRAMENTAS.map(({ id: chave, rotulo, icone: Icone, soCelular }) => (
+            <button
+              key={chave}
+              type="button"
+              onClick={() => {
+                setFerramenta(chave);
+                setFolhaAberta(folhaAberta && ferramenta === chave ? false : true);
+              }}
+              aria-pressed={ferramenta === chave}
+              className={`flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] transition ${
+                ferramenta === chave ? "bg-surface-2 text-texto" : "text-suave hover:text-texto"
+              } ${soCelular ? "lg:hidden" : ""}`}
+            >
+              <Icone className="size-5" aria-hidden />
+              {rotulo}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* A linha do tempo larga, embaixo da prévia, como nos editores de vídeo */}
+      <div className="mt-4">
+      <section className="cartao p-6" aria-labelledby="titulo-trecho">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="titulo-trecho" className="font-display text-lg font-bold">
+            Linha do tempo
+          </h2>
+          <p className="text-sm tabular-nums text-suave">
+            {partes.length} {partes.length === 1 ? "parte" : "partes"} · {formatarTempo(duracaoFinal)} no vídeo
+          </p>
+        </div>
+        <p className="mt-1 text-sm text-suave">Divida no ponto da prévia e arraste as partes para mudar a ordem. A mesma parte da gravação pode entrar mais de uma vez.</p>
+        <div className="mt-4">
+          <LinhaDoTempo
+            partes={partes}
+            duracoes={duracoes}
+            indiceAtual={indice}
+            posicaoFinal={posicaoFinal}
+            aoBuscar={buscarNaLinhaDoTempo}
+            aoReordenar={reordenar}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={dividir} className="botao-contorno px-4 py-2 text-sm">
+            <Scissors className="size-4" aria-hidden /> Dividir aqui
+          </button>
+          <button type="button" onClick={novaParte} className="botao-contorno px-4 py-2 text-sm">
+            <Plus className="size-4" aria-hidden /> Nova parte aqui
+          </button>
+          <button
+            type="button"
+            onClick={() => reordenar(indice, indice - 1)}
+            disabled={indice === 0}
+            className="botao-contorno px-3 py-2 text-sm disabled:opacity-40"
+            aria-label="Mover a parte para antes"
+          >
+            <ChevronLeft className="size-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => reordenar(indice, indice + 1)}
+            disabled={indice >= partes.length - 1}
+            className="botao-contorno px-3 py-2 text-sm disabled:opacity-40"
+            aria-label="Mover a parte para depois"
+          >
+            <ChevronRight className="size-4" aria-hidden />
+          </button>
+          <button type="button" onClick={apagarParte} disabled={partes.length < 2} className="botao-contorno px-4 py-2 text-sm disabled:opacity-40">
+            <Trash2 className="size-4" aria-hidden /> Apagar parte
+          </button>
+        </div>
+        {avisoParte ? <p className="mt-2 text-sm text-amarelo">{avisoParte}</p> : null}
+
+        <h3 className="mt-6 text-sm font-semibold">
+          Parte {indice + 1} na gravação <span className="font-normal text-suave">· arraste as alças laranja ou marque pelo ponto da prévia</span>
+        </h3>
+        {forma ? (
+          <div className="mt-2">
+            <FormaDeOnda
+              picos={forma.picos}
+              duracao={midia.duracao}
+              tempo={tempo}
+              aoBuscar={buscar}
+              cortes={cortesPorParte.flat()}
+              faixa={[parteAtual.inicio, parteAtual.fim]}
+              aoMudarFaixa={([inicio, fim]) => trocarParte({ ...parteAtual, inicio: Math.round(inicio * 100) / 100, fim: Math.round(fim * 100) / 100 })}
+              outrasFaixas={partes.filter((_, i) => i !== indice).map((parte) => [parte.inicio, parte.fim] as [number, number])}
+            />
+          </div>
+        ) : null}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => marcar("inicio")} className="botao-contorno px-4 py-2 text-sm">
+              Início aqui
+            </button>
+            <button type="button" onClick={() => marcar("fim")} className="botao-contorno px-4 py-2 text-sm">
+              Fim aqui
+            </button>
+          </div>
+          <p className="tabular-nums text-suave">
+            {formatarTempo(parteAtual.inicio)} até {formatarTempo(parteAtual.fim)} · {formatarTempo(parteAtual.fim - parteAtual.inicio)}
+          </p>
+        </div>
+      </section>
       </div>
     </main>
   );

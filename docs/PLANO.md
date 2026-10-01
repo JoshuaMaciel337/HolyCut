@@ -625,6 +625,12 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 - [x] Marcar a pregação e exportar o vídeo 16:9 só da mensagem, sem louvor nem avisos (à mão na aba Gravação, ou automático pelos blocos do culto; a marcação da pessoa nunca é trocada pela IA). Testado pela API; a tela ainda não foi aberta no navegador
 - [x] Exportar para DaVinci e Premiere: XML com as partes, SRT e folga nas pontas (um .zip no editor: XML do Final Cut 7, que os dois importam, com um clipe por trecho que fica, apontando para a gravação original inteira, e a legenda em SRT no tempo do vídeo final; a gravação original baixa pela aba Gravação). Testado pela estrutura do XML; falta importar num DaVinci e num Premiere de verdade
 - [x] Escolher a capa do vídeo exportado e um QR code para baixar no celular (a capa sai do quadro em que o player do vídeo pronto está, sem renderizar de novo; o QR leva um link de 24 h que baixa só aquele vídeo, sem conta)
+- [ ] **Editor no estilo do CapCut e do Opus**, em etapas:
+  - [x] 1. Casca nova: no computador, a fala à esquerda, a prévia no centro, o painel da ferramenta e a barra de ícones à direita, e a linha do tempo larga embaixo; no celular, a prévia em cima, a linha do tempo e a barra fixa embaixo, com o painel subindo como gaveta. Os painéis são os mesmos de antes
+  - [ ] 2. Mexer direto na prévia: arrastar, aumentar e girar a legenda, os textos e o logo, e girar o vídeo (a posição vai para o render, medida contra a prévia)
+  - [ ] 3. Camadas: imagens, PNG, ícones e figurinhas por cima do vídeo, com entrada e saída na linha do tempo
+  - [ ] 4. Efeitos de vídeo (zoom, tremor, brilho, transições entre as partes) e efeitos sonoros com licença
+  - [ ] 5. Voltar para a IA depois de reeditar (refazer legenda, títulos e legenda do post a partir do corte novo) ou seguir para exportar
 - [ ] Abertura, encerramento e chamada no modelo, e a fonte própria da igreja
 - [ ] Tela dividida com o pregador e o telão
 
