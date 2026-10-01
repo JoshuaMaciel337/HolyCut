@@ -33,7 +33,7 @@ def png(largura=400, altura=200, cor=(255, 138, 0, 255)) -> bytes:
 def test_identidade_padrao_e_edicao(cliente):
     inicial = cliente.get("/api/identidade").json()
     assert inicial == {"nome_exibicao": "Igreja Identidade", "instagram": "", "cor_destaque": "#FF8A00",
-                       "logo": False, "atualizado_em": None}
+                       "logo": False, "estrategia": "", "atualizado_em": None}
 
     editada = cliente.patch("/api/identidade", json={
         "instagram": "https://instagram.com/Igreja.Viva", "cor_destaque": "#7b61ff", "nome_exibicao": "  IEV  "}).json()
