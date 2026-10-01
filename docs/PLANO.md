@@ -599,7 +599,7 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 
 - [x] **HolySermon:** o LLM sugere de 5 a 10 cortes por pregação, e cada um abre no editor com um clique. Cada sugestão traz título, motivo, nota e as partes (pode juntar trechos de lugares diferentes da pregação, na linha do tempo que já existe). Segue a estratégia da igreja, escrita uma vez em linguagem natural ("priorize o apelo e a oração"). Gemma 3 4B no Ollama. O título e a legenda do post precisam ser frases ditas; a hashtag só entra se a palavra aparece na fala
 - [ ] Separar o culto em blocos (louvor, avisos, oração, oferta e pregação), para cortar só a pregação: detecção de música e fala e o LLM para nomear os blocos
-- [ ] **HolyStudy:** resumo, temas, palavras-chave, personagens bíblicos e versículos citados de cada pregação, e um guia de estudo para células (perguntas, versículos-chave, aplicação e oração), com PDF
+- [ ] **HolyStudy:** resumo, temas, palavras-chave, personagens bíblicos e versículos citados de cada pregação, e um guia de estudo para células (perguntas, versículos-chave, aplicação e oração), com PDF. **Código pronto** (job `estudo_culto`, abas Visão geral e Estudo, página de impressão em PDF), testado com o modelo simulado; falta rodar com o Gemma no Nitro e conferir a qualidade em pregações reais
 - [ ] Busca no acervo por versículo, tema ou pergunta, com embeddings locais
 - [ ] Tradução da transcrição e das legendas para espanhol e inglês (só texto, sem dublagem)
 - [x] Títulos, legendas de post e hashtags gerados por rede. Saem no mesmo job do HolySermon e ficam no corte e no projeto, marcados como gerados por IA

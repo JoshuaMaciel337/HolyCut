@@ -9,7 +9,7 @@ import { useSessao } from "@/lib/sessao";
 export function Cabecalho() {
   const { sessao, sair } = useSessao();
   return (
-    <header className="border-b border-borda bg-surface/70 backdrop-blur">
+    <header className="border-b border-borda bg-surface/70 backdrop-blur print:hidden">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <Link href="/app" aria-label="Início">
           <Logo altura={30} prioridade />

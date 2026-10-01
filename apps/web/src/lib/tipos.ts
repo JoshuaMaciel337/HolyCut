@@ -145,6 +145,30 @@ export type Momentos = {
   cenas: number[];
 };
 
+/** Uma frase como o pregador disse, com o segundo da gravação em que aparece. */
+export type TrechoDito = {
+  texto: string;
+  inicio: number;
+  fim: number | null;
+};
+
+/** O HolyStudy: tudo conferido contra a fala; o que não foi dito fica de fora. */
+export type Estudo = {
+  status: string;
+  progresso: number;
+  mensagem: string;
+  erro: string | null;
+  gerado_por_ia: boolean;
+  resumo: TrechoDito[];
+  temas: string[];
+  personagens: string[];
+  versiculos_chave: { referencia: string; inicio: number; citacao: string; vezes: number }[];
+  perguntas: { pergunta: string; base: TrechoDito }[];
+  aplicacoes: TrechoDito[];
+  /** Convite fixo: a oração não é escrita pela IA. */
+  oracao: string;
+};
+
 export type FichaCulto = {
   /** AAAA-MM-DD */
   data: string;

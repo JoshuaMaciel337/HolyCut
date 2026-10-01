@@ -67,3 +67,14 @@ body {
     @apply text-xs font-medium uppercase tracking-[0.35em] text-suave;
   }
 }
+
+/* Impressão (guia de estudo): folha branca, sem o fundo escuro do site */
+@media print {
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  @page {
+    margin: 18mm 16mm;
+  }
+}

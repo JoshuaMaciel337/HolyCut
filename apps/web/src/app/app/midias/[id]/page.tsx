@@ -10,9 +10,10 @@ import { BarraProgresso } from "@/componentes/BarraProgresso";
 import { AbaGravacao } from "@/componentes/culto/AbaGravacao";
 import { AbaTranscricao } from "@/componentes/culto/AbaTranscricao";
 import { CapaDoCulto } from "@/componentes/culto/CapaDoCulto";
-import { EmBreveComIA } from "@/componentes/culto/EmBreveComIA";
+import { GuiaDeEstudo } from "@/componentes/culto/GuiaDeEstudo";
 import { FichaDoCulto } from "@/componentes/culto/FichaDoCulto";
 import { MomentosDoCulto } from "@/componentes/culto/MomentosDoCulto";
+import { ResumoDoCulto } from "@/componentes/culto/ResumoDoCulto";
 import { SugestoesDoCulto } from "@/componentes/culto/SugestoesDoCulto";
 import { VersiculosDoCulto } from "@/componentes/culto/VersiculosDoCulto";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
@@ -68,13 +69,7 @@ function ConteudoDaAba({ aba, midia, aoMudar }: { aba: AbaId; midia: Midia; aoMu
           <FichaDoCulto midia={midia} aoSalvar={aoMudar} />
           <CapaDoCulto midia={midia} aoMudar={aoMudar} />
           <MomentosDoCulto midiaId={midia.id} />
-          <EmBreveComIA
-            idSecao="resumo"
-            icone={BookOpen}
-            titulo="Resumo da pregação"
-            descricao="Quando a transcrição estiver pronta, a IA organiza o que foi pregado: um resumo fiel, os temas e os personagens bíblicos citados."
-            itens={["Resumo da mensagem, só com o que o pastor disse", "Temas e palavras-chave", "Personagens bíblicos citados"]}
-          />
+          <ResumoDoCulto midiaId={midia.id} />
         </div>
       );
     case "cortes":
@@ -83,13 +78,7 @@ function ConteudoDaAba({ aba, midia, aoMudar }: { aba: AbaId; midia: Midia; aoMu
       return <VersiculosDoCulto midiaId={midia.id} />;
     case "estudo":
       return (
-        <EmBreveComIA
-          idSecao="estudo"
-          icone={ScrollText}
-          titulo="Guia de estudo"
-          descricao="Da pregação sai um guia para células: perguntas, versículos-chave, aplicação e oração, com PDF para imprimir."
-          itens={["Perguntas para o grupo", "Versículos-chave da mensagem", "Aplicação e oração", "Download em PDF"]}
-        />
+        <GuiaDeEstudo midiaId={midia.id} />
       );
     case "transcricao":
       return <AbaTranscricao midiaId={midia.id} pronta={midia.status === "pronta"} temAudio={midia.audio != null} />;
