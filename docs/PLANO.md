@@ -598,7 +598,7 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 ### Fase 2 — IA de conteúdo (4 a 6 semanas)
 
 - [x] **HolySermon:** o LLM sugere de 5 a 10 cortes por pregação, e cada um abre no editor com um clique. Cada sugestão traz título, motivo, nota e as partes (pode juntar trechos de lugares diferentes da pregação, na linha do tempo que já existe). Segue a estratégia da igreja, escrita uma vez em linguagem natural ("priorize o apelo e a oração"). Gemma 3 4B no Ollama. O título e a legenda do post precisam ser frases ditas; a hashtag só entra se a palavra aparece na fala
-- [ ] Separar o culto em blocos (louvor, avisos, oração, oferta e pregação), para cortar só a pregação: detecção de música e fala e o LLM para nomear os blocos
+- [ ] Separar o culto em blocos (louvor, avisos, oração, oferta e pregação), para cortar só a pregação: detecção de música e fala e o LLM para nomear os blocos. **Código pronto** (job `blocos_culto`, faixa colorida na aba Gravação): as fronteiras saem do áudio e das palavras, o Gemma só escolhe o nome numa lista fechada e, sem ele, valem as palavras-chave. Com a pregação marcada, o HolySermon e o HolyStudy leem só a mensagem. Testado com um culto sintético; falta calibrar os limiares com cultos reais no Nitro
 - [ ] **HolyStudy:** resumo, temas, palavras-chave, personagens bíblicos e versículos citados de cada pregação, e um guia de estudo para células (perguntas, versículos-chave, aplicação e oração), com PDF. **Código pronto** (job `estudo_culto`, abas Visão geral e Estudo, página de impressão em PDF), testado com o modelo simulado; falta rodar com o Gemma no Nitro e conferir a qualidade em pregações reais
 - [ ] Busca no acervo por versículo, tema ou pergunta, com embeddings locais
 - [ ] Tradução da transcrição e das legendas para espanhol e inglês (só texto, sem dublagem)
@@ -622,7 +622,7 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 - [x] **Acervo da igreja** no estilo de streaming: ficha do culto, capas geradas, fileiras e a página do culto com abas (seção 8). Sem a IA, as abas de versículos, estudo e transcrição explicam o que chega com a transcrição
 - [ ] Importar pelo link do YouTube ou do Google Drive (só vídeos da própria igreja)
 - [ ] Monitorar o canal do YouTube pelo feed RSS público e começar sozinho quando a live do culto termina
-- [ ] Marcar a pregação e exportar o vídeo 16:9 só da mensagem, sem louvor nem avisos (automático quando a separação em blocos existir)
+- [x] Marcar a pregação e exportar o vídeo 16:9 só da mensagem, sem louvor nem avisos (à mão na aba Gravação, ou automático pelos blocos do culto; a marcação da pessoa nunca é trocada pela IA). Testado pela API; a tela ainda não foi aberta no navegador
 - [ ] Exportar para DaVinci e Premiere: XML com as partes, SRT e folga nas pontas
 - [ ] Escolher a capa do vídeo exportado e um QR code para baixar no celular
 - [ ] Abertura, encerramento e chamada no modelo, e a fonte própria da igreja

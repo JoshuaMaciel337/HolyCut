@@ -90,6 +90,8 @@ export type Midia = {
   arquivos: string[];
   /** A ficha do culto no acervo. O título é o próprio nome. */
   ficha: FichaCulto;
+  /** Onde a mensagem começa e termina. A marcação da pessoa nunca é trocada pela da IA. */
+  pregacao: Pregacao | null;
   /** Muda quando o pôster e o banner são redesenhados. */
   capa_versao: number | null;
   capa_personalizada: boolean;
@@ -98,6 +100,26 @@ export type Midia = {
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;
+};
+
+export type Pregacao = { inicio: number; fim: number; origem: "ia" | "pessoa" };
+
+export type TipoBloco = "louvor" | "oracao" | "avisos" | "oferta" | "ceia" | "pregacao" | "outro";
+
+/** Um bloco do culto. A frase é o começo do que foi dito nele. */
+export type Bloco = { inicio: number; fim: number; tipo: TipoBloco; frase: string };
+
+export type Blocos = {
+  status: "ausente" | "pendente" | "executando" | "pronta" | "erro";
+  progresso: number;
+  mensagem: string;
+  erro: string | null;
+  gerado_por_ia: boolean;
+  /** Falso quando os nomes vieram só das palavras-chave. */
+  nomes_pelo_modelo: boolean;
+  blocos: Bloco[];
+  /** A pregação que a análise encontrou. */
+  pregacao: { inicio: number; fim: number } | null;
 };
 
 export type Transcricao = {
@@ -389,7 +411,7 @@ export type Projeto = {
   id: string;
   midia_id: string;
   nome: string;
-  tipo: "reel" | "story";
+  tipo: "reel" | "story" | "mensagem";
   modelo_id: string | null;
   proporcao: Proporcao;
   partes: Parte[];

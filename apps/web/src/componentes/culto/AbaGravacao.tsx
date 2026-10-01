@@ -1,8 +1,10 @@
 "use client";
 
 import { ImagePlus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { BlocosDoCulto } from "@/componentes/culto/BlocosDoCulto";
+import { PainelPregacao } from "@/componentes/culto/PainelPregacao";
 import { FaixaDeMiniaturas } from "@/componentes/FaixaDeMiniaturas";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
@@ -10,6 +12,7 @@ import { ReelsDaMidia } from "@/componentes/ReelsDaMidia";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { formatarBytes, formatarData, formatarTempo } from "@/lib/formatar";
 import type { FormaDeOnda as DadosFormaDeOnda, Midia, Silencios } from "@/lib/tipos";
+import { useBlocos } from "@/lib/useBlocos";
 
 function Informacao({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -20,7 +23,7 @@ function Informacao({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-/** A gravação inteira: player, forma de onda, miniaturas, silêncios e detalhes técnicos. */
+/** A gravação inteira: player, forma de onda, miniaturas, blocos do culto, pregação, silêncios e detalhes técnicos. */
 export function AbaGravacao({ midia, aoMudar }: { midia: Midia; aoMudar: (midia: Midia) => void }) {
   const [forma, setForma] = useState<DadosFormaDeOnda | null>(null);
   const [tempo, setTempo] = useState(0);
@@ -29,10 +32,16 @@ export function AbaGravacao({ midia, aoMudar }: { midia: Midia; aoMudar: (midia:
   const [pularSilencios, setPularSilencios] = useState(true);
   const [erroSilencios, setErroSilencios] = useState("");
   const [avisoCapa, setAvisoCapa] = useState("");
+  const [rascunhoPregacao, setRascunhoPregacao] = useState<[number, number] | null>(null);
   const player = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   // Lidos a cada quadro da prévia, sem recriar o acompanhamento do player
   const cortesAtivos = useRef<[number, number][]>([]);
   const id = midia.id;
+  // Os blocos podem marcar a pregação: a gravação é recarregada quando o job termina
+  const recarregar = useCallback(() => {
+    chamarApi<Midia>(`/midias/${id}`).then(aoMudar).catch(() => undefined);
+  }, [id, aoMudar]);
+  const blocos = useBlocos(id, recarregar);
 
   const temForma = midia.arquivos.includes("forma_de_onda.json");
   useEffect(() => {
@@ -118,42 +127,74 @@ export function AbaGravacao({ midia, aoMudar }: { midia: Midia; aoMudar: (midia:
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <section className="cartao flex min-w-0 flex-col gap-4 p-4 sm:p-6" aria-label="Prévia">
-        {video ? (
-          <video
-            ref={player}
-            src={`${base}/proxy.mp4`}
-            poster={midia.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
-            controls
-            playsInline
-            preload="metadata"
-            className={`mx-auto w-full rounded-xl bg-black ${emPe ? "max-h-[70vh] w-auto" : ""}`}
-            style={{ aspectRatio: `${video.largura} / ${video.altura}` }}
+      <div className="flex min-w-0 flex-col gap-6">
+        <section className="cartao flex min-w-0 flex-col gap-4 p-4 sm:p-6" aria-label="Prévia">
+          {video ? (
+            <video
+              ref={player}
+              src={`${base}/proxy.mp4`}
+              poster={midia.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
+              controls
+              playsInline
+              preload="metadata"
+              className={`mx-auto w-full rounded-xl bg-black ${emPe ? "max-h-[70vh] w-auto" : ""}`}
+              style={{ aspectRatio: `${video.largura} / ${video.altura}` }}
+            />
+          ) : (
+            <audio ref={player} src={`${base}/proxy.m4a`} controls preload="metadata" className="w-full" />
+          )}
+          {forma && midia.duracao ? (
+            <div>
+              <FormaDeOnda
+                picos={forma.picos}
+                duracao={midia.duracao}
+                tempo={tempo}
+                aoBuscar={buscar}
+                cortes={cortes ?? []}
+                faixa={rascunhoPregacao ?? undefined}
+                aoMudarFaixa={rascunhoPregacao ? setRascunhoPregacao : undefined}
+              />
+              <p className="mt-2 text-right text-xs tabular-nums text-suave">
+                {formatarTempo(tempo)} / {formatarTempo(midia.duracao)}
+              </p>
+            </div>
+          ) : null}
+          {midia.miniaturas && midia.arquivos.includes("miniaturas.jpg") ? (
+            <FaixaDeMiniaturas midiaId={midia.id} miniaturas={midia.miniaturas} tempo={tempo} aoBuscar={buscar} />
+          ) : null}
+          {video ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={usarNaCapa} className="botao-contorno px-3 py-2 text-sm">
+                <ImagePlus className="size-4" aria-hidden /> Usar este quadro na capa
+              </button>
+              {avisoCapa ? <p className="text-sm text-suave">{avisoCapa}</p> : null}
+            </div>
+          ) : null}
+        </section>
+        {midia.duracao ? (
+          <BlocosDoCulto
+            dados={blocos.dados}
+            erro={blocos.erro}
+            andando={blocos.andando}
+            pedir={blocos.pedir}
+            duracao={midia.duracao}
+            tempo={tempo}
+            aoBuscar={buscar}
           />
-        ) : (
-          <audio ref={player} src={`${base}/proxy.m4a`} controls preload="metadata" className="w-full" />
-        )}
-        {forma && midia.duracao ? (
-          <div>
-            <FormaDeOnda picos={forma.picos} duracao={midia.duracao} tempo={tempo} aoBuscar={buscar} cortes={cortes ?? []} />
-            <p className="mt-2 text-right text-xs tabular-nums text-suave">
-              {formatarTempo(tempo)} / {formatarTempo(midia.duracao)}
-            </p>
-          </div>
         ) : null}
-        {midia.miniaturas && midia.arquivos.includes("miniaturas.jpg") ? (
-          <FaixaDeMiniaturas midiaId={midia.id} miniaturas={midia.miniaturas} tempo={tempo} aoBuscar={buscar} />
-        ) : null}
-        {video ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={usarNaCapa} className="botao-contorno px-3 py-2 text-sm">
-              <ImagePlus className="size-4" aria-hidden /> Usar este quadro na capa
-            </button>
-            {avisoCapa ? <p className="text-sm text-suave">{avisoCapa}</p> : null}
-          </div>
-        ) : null}
-      </section>
+      </div>
       <aside className="flex flex-col gap-6">
+        {midia.duracao ? (
+          <PainelPregacao
+            midia={midia}
+            tempo={tempo}
+            rascunho={rascunhoPregacao}
+            aoMudarRascunho={setRascunhoPregacao}
+            sugestao={blocos.dados?.status === "pronta" ? blocos.dados.pregacao : null}
+            aoBuscar={buscar}
+            aoMudar={aoMudar}
+          />
+        ) : null}
         {midia.arquivos.includes("forma_de_onda.json") && midia.duracao ? (
           <PainelSilencios
             opcao={opcaoCorte}

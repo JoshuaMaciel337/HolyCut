@@ -10,6 +10,8 @@ import { duracaoDasPartes } from "@/lib/partes";
 import { formatarTempo } from "@/lib/formatar";
 import type { Midia, Projeto } from "@/lib/tipos";
 
+const ROTULOS_PROJETO: Record<Projeto["tipo"], string> = { reel: "Reel", story: "Story", mensagem: "Mensagem" };
+
 /** Reels feitos a partir de uma gravação, e o botão para começar outro. */
 export function ReelsDaMidia({ midia, tempoAtual = 0 }: { midia: Midia; tempoAtual?: number }) {
   const router = useRouter();
@@ -55,7 +57,7 @@ export function ReelsDaMidia({ midia, tempoAtual = 0 }: { midia: Midia; tempoAtu
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{projeto.nome}</span>
                   <span className="text-xs text-suave">
-                    {projeto.tipo === "story" ? "Story" : "Reel"} · {projeto.proporcao} ·{" "}
+                    {ROTULOS_PROJETO[projeto.tipo]} · {projeto.proporcao} ·{" "}
                     {formatarTempo(duracaoDasPartes(projeto.partes))} escolhidos
                   </span>
                 </span>
