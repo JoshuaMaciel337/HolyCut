@@ -25,6 +25,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  RotateCw,
   Scissors,
   Trash2,
 } from "lucide-react";
@@ -163,6 +164,7 @@ export default function PaginaProjeto() {
             y: carregado.enquadramento.y,
             zoom: carregado.enquadramento.zoom,
             seguir_rosto: carregado.enquadramento.seguir_rosto ?? false,
+            rotacao: carregado.enquadramento.rotacao ?? 0,
           },
           marca: carregado.marca,
           fundo: carregado.fundo,
@@ -688,6 +690,36 @@ export default function PaginaProjeto() {
           />
           <span className="w-12 text-right tabular-nums">{edicao.enquadramento.zoom.toFixed(2)}x</span>
         </label>
+        <div className="mt-4 flex items-center gap-3 text-sm">
+          <span className="shrink-0 text-suave">Girar</span>
+          <button
+            type="button"
+            onClick={() => editar({ enquadramento: { ...edicao.enquadramento, rotacao: girar(edicao.enquadramento.rotacao, -90) } })}
+            className="botao-contorno size-9 shrink-0 p-0"
+            aria-label="Girar 90 graus para a esquerda"
+          >
+            <RotateCcw className="size-4" aria-hidden />
+          </button>
+          <input
+            type="range"
+            min={-180}
+            max={180}
+            step={1}
+            value={edicao.enquadramento.rotacao ?? 0}
+            onChange={(evento) => editar({ enquadramento: { ...edicao.enquadramento, rotacao: Number(evento.target.value) } })}
+            className="w-full accent-[var(--hc-orange)]"
+            aria-label="Giro do vídeo"
+          />
+          <button
+            type="button"
+            onClick={() => editar({ enquadramento: { ...edicao.enquadramento, rotacao: girar(edicao.enquadramento.rotacao, 90) } })}
+            className="botao-contorno size-9 shrink-0 p-0"
+            aria-label="Girar 90 graus para a direita"
+          >
+            <RotateCw className="size-4" aria-hidden />
+          </button>
+          <span className="w-12 text-right tabular-nums">{Math.round(edicao.enquadramento.rotacao ?? 0)}°</span>
+        </div>
         <label className="mt-4 flex items-center gap-3 text-sm">
           <input
             type="checkbox"
@@ -710,7 +742,7 @@ export default function PaginaProjeto() {
         ) : null}
         <button
           type="button"
-          onClick={() => editar({ enquadramento: { x: 0.5, y: 0.5, zoom: 1, seguir_rosto: false } })}
+          onClick={() => editar({ enquadramento: { x: 0.5, y: 0.5, zoom: 1, seguir_rosto: false, rotacao: 0 } })}
           className="mt-3 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto"
         >
           <RotateCcw className="size-4" aria-hidden /> Centralizar
@@ -921,6 +953,7 @@ export default function PaginaProjeto() {
             enquadramento={enquadramentoPrevia}
             aoMudar={(enquadramento) => editar({ enquadramento: { ...edicao.enquadramento, ...enquadramento } })}
             fundo={edicao.fundo}
+            rotacao={edicao.enquadramento.rotacao ?? 0}
             filtroCor={cssDoFiltro("cor-previa", filtroEscolhido, edicao.cor.intensidade)}
           >
             {identidade?.logo && edicao.marca.logo ? (
@@ -948,6 +981,12 @@ export default function PaginaProjeto() {
               instante={posicaoFinal}
               legenda={edicao.legenda}
               corDestaque={identidade?.cor_destaque ?? "#FF8A00"}
+              edicao={{
+                selecionada: selecionado === "legenda",
+                aoSelecionar: () => selecionar("legenda", "legenda"),
+                aoMudar: ({ x, y, fator }) =>
+                  editar({ legenda: { ...edicao.legenda, x, y, escala: Math.min(Math.max((edicao.legenda.escala ?? 1) * fator, 0.6), 2) } }),
+              }}
             />
           </PreviaEnquadrada>
           {musicaEscolhida ? (

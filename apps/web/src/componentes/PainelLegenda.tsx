@@ -80,7 +80,7 @@ export function PainelLegenda({
               type="button"
               role="radio"
               aria-checked={legenda.posicao === posicao.valor}
-              onClick={() => aoMudar({ ...legenda, posicao: posicao.valor })}
+              onClick={() => aoMudar({ ...legenda, posicao: posicao.valor, x: null, y: null })}
               className={`flex-1 rounded-full px-3 py-1 text-xs font-semibold ${
                 legenda.posicao === posicao.valor ? "bg-surface-2 text-texto" : "text-suave hover:text-texto"
               }`}

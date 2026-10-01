@@ -24,6 +24,8 @@ type Props = {
   fundo?: Fundo;
   /** Filtro de cor em CSS (url(#...) de um FiltroSvg), aplicado antes do desfoque, como no render. */
   filtroCor?: string;
+  /** Giro do vídeo em graus, no sentido do relógio. Gira o quadro já recortado, como o render. */
+  rotacao?: number;
 };
 
 function limitar(valor: number, [minimo, maximo]: [number, number]): number {
@@ -31,7 +33,7 @@ function limitar(valor: number, [minimo, maximo]: [number, number]): number {
 }
 
 /** Mostra só o que vai para o vídeo final. Arrastar a imagem muda o enquadramento. */
-export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children, fundo, filtroCor }: Props) {
+export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children, fundo, filtroCor, rotacao = 0 }: Props) {
   const recipiente = useRef<HTMLDivElement>(null);
   const inicio = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   const [disponivel, setDisponivel] = useState(0);
@@ -67,6 +69,7 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
         className="relative mx-auto touch-none overflow-hidden rounded-[1.75rem] bg-black shadow-[0_30px_80px_rgba(0,0,0,.5)] ring-4 ring-[#1c1f29] [container-type:size]"
         style={{ width: quadroLargura, height: quadroAltura }}
       >
+        <div className="absolute inset-0 overflow-hidden" style={rotacao ? { transform: `rotate(${rotacao}deg)` } : undefined}>
         <video
           ref={player}
           src={src}
@@ -85,6 +88,7 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
               undefined,
           }}
         />
+        </div>
         {fundo?.escurecer ? <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: fundo.escurecer }} /> : null}
         <div
           className="absolute inset-0 cursor-grab active:cursor-grabbing"

@@ -391,6 +391,11 @@ export type Legenda = {
   apagadas: string[];
   /** Vícios que a pessoa devolveu para o vídeo. */
   mantidas: string[];
+  /** Centro arrastado na prévia (0 a 1). Sem ele, vale a posição pronta. */
+  x?: number | null;
+  y?: number | null;
+  /** Tamanho da letra, de 0,6 a 2. */
+  escala?: number;
 };
 
 /** Palavra da transcrição, no tempo da gravação, para editar pelo texto. */
@@ -439,7 +444,7 @@ export type Projeto = {
   proporcao: Proporcao;
   partes: Parte[];
   silencios: { intensidade: Intensidade | null };
-  enquadramento: { x: number; y: number; zoom: number; seguir_rosto: boolean };
+  enquadramento: { x: number; y: number; zoom: number; seguir_rosto: boolean; rotacao?: number };
   audio: { normalizar: boolean; limpeza: boolean };
   marca: Marca;
   textos: TextoProjeto[];

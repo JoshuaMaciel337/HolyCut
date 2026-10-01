@@ -627,9 +627,9 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 - [x] Escolher a capa do vídeo exportado e um QR code para baixar no celular (a capa sai do quadro em que o player do vídeo pronto está, sem renderizar de novo; o QR leva um link de 24 h que baixa só aquele vídeo, sem conta)
 - [ ] **Editor no estilo do CapCut e do Opus**, em etapas:
   - [x] 1. Casca nova: no computador, a fala à esquerda, a prévia no centro, o painel da ferramenta e a barra de ícones à direita, e a linha do tempo larga embaixo; no celular, a prévia em cima, a linha do tempo e a barra fixa embaixo, com o painel subindo como gaveta. Os painéis são os mesmos de antes
-  - [ ] 2. Mexer direto na prévia: arrastar, aumentar e girar a legenda, os textos e o logo, e girar o vídeo (a posição vai para o render, medida contra a prévia)
+  - [x] 2. Mexer direto na prévia: arrastar, aumentar e girar a legenda, os textos e o logo, e girar o vídeo (a posição vai para o render, medida contra a prévia)
     - [x] Textos e logo: clicar seleciona, arrastar move, a alça laranja aumenta e a roxa gira. Medido: a faixa do texto no vídeo exportado cai a até 2 px da caixa da prévia
-    - [ ] A legenda automática e girar o próprio vídeo
+    - [x] A legenda automática (arrastar e aumentar; vai para o ASS com `n5\pos`) e girar o vídeo (botões de 90° e ajuste fino; o render gira o quadro já recortado, com cantos pretos). Comparado quadro a quadro com a prévia
   - [ ] 3. Camadas: imagens, PNG, ícones e figurinhas por cima do vídeo, com entrada e saída na linha do tempo
   - [ ] 4. Efeitos de vídeo (zoom, tremor, brilho, transições entre as partes) e efeitos sonoros com licença
   - [ ] 5. Voltar para a IA depois de reeditar (refazer legenda, títulos e legenda do post a partir do corte novo) ou seguir para exportar
