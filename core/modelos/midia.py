@@ -16,6 +16,9 @@ STATUS_ERRO = "erro"
 # Arquivos gerados pela ingestão. A API só serve nomes desta lista.
 ARQUIVO_PROXY_VIDEO = "proxy.mp4"
 ARQUIVO_PROXY_AUDIO = "proxy.m4a"
+# Áudio limpo da gravação inteira (48 kHz). Uso interno: a prévia ouve o proxy remuxado.
+ARQUIVO_AUDIO_LIMPO = "audio_limpo.wav"
+ARQUIVO_PROXY_LIMPO = "proxy_limpo.mp4"
 ARQUIVO_AUDIO_ANALISE = "audio.wav"
 ARQUIVO_FORMA_DE_ONDA = "forma_de_onda.json"
 ARQUIVO_MINIATURAS = "miniaturas.jpg"
@@ -24,7 +27,7 @@ ARQUIVO_CAPA = "capa.jpg"
 ARQUIVO_NIVEIS = "niveis.bin"
 NIVEIS_POR_SEGUNDO = 100
 # As capas do acervo (pôster e banner) são desenhadas depois, pelo job capas_culto
-ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_ONDA,
+ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_PROXY_LIMPO, ARQUIVO_FORMA_DE_ONDA,
                      ARQUIVO_MINIATURAS, ARQUIVO_CAPA, ARQUIVO_POSTER, ARQUIVO_BANNER}
 
 
