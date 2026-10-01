@@ -629,7 +629,7 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
   - [x] 1. Casca nova: no computador, a fala à esquerda, a prévia no centro, o painel da ferramenta e a barra de ícones à direita, e a linha do tempo larga embaixo; no celular, a prévia em cima, a linha do tempo e a barra fixa embaixo, com o painel subindo como gaveta. Os painéis são os mesmos de antes
   - [x] 2. Mexer direto na prévia: arrastar, aumentar e girar a legenda, os textos e o logo, e girar o vídeo (a posição vai para o render, medida contra a prévia)
     - [x] Textos e logo: clicar seleciona, arrastar move, a alça laranja aumenta e a roxa gira. Medido: a faixa do texto no vídeo exportado cai a até 2 px da caixa da prévia
-    - [x] A legenda automática (arrastar e aumentar; vai para o ASS com `n5\pos`) e girar o vídeo (botões de 90° e ajuste fino; o render gira o quadro já recortado, com cantos pretos). Comparado quadro a quadro com a prévia
+    - [x] A legenda automática (arrastar e aumentar; vai para o ASS com `\an5\pos`) e girar o vídeo (botões de 90° e ajuste fino; o render gira o quadro já recortado, com cantos pretos). Comparado quadro a quadro com a prévia
   - [ ] 3. Camadas: imagens, PNG, ícones e figurinhas por cima do vídeo, com entrada e saída na linha do tempo
   - [ ] 4. Efeitos de vídeo (zoom, tremor, brilho, transições entre as partes) e efeitos sonoros com licença
   - [ ] 5. Voltar para a IA depois de reeditar (refazer legenda, títulos e legenda do post a partir do corte novo) ou seguir para exportar
