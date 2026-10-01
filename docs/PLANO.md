@@ -624,7 +624,7 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 - [ ] Monitorar o canal do YouTube pelo feed RSS público e começar sozinho quando a live do culto termina. **Código pronto** (o laço do worker lê o feed de cada igreja a cada 10 min; na primeira volta só marca o que já tinha terminado; vídeo com menos de 20 min fica de fora). Testado com o feed simulado; falta conferir com o canal de verdade no Nitro
 - [x] Marcar a pregação e exportar o vídeo 16:9 só da mensagem, sem louvor nem avisos (à mão na aba Gravação, ou automático pelos blocos do culto; a marcação da pessoa nunca é trocada pela IA). Testado pela API; a tela ainda não foi aberta no navegador
 - [x] Exportar para DaVinci e Premiere: XML com as partes, SRT e folga nas pontas (um .zip no editor: XML do Final Cut 7, que os dois importam, com um clipe por trecho que fica, apontando para a gravação original inteira, e a legenda em SRT no tempo do vídeo final; a gravação original baixa pela aba Gravação). Testado pela estrutura do XML; falta importar num DaVinci e num Premiere de verdade
-- [ ] Escolher a capa do vídeo exportado e um QR code para baixar no celular
+- [x] Escolher a capa do vídeo exportado e um QR code para baixar no celular (a capa sai do quadro em que o player do vídeo pronto está, sem renderizar de novo; o QR leva um link de 24 h que baixa só aquele vídeo, sem conta)
 - [ ] Abertura, encerramento e chamada no modelo, e a fonte própria da igreja
 - [ ] Tela dividida com o pregador e o telão
 

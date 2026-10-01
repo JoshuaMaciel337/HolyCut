@@ -486,6 +486,8 @@ export type Exportacao = {
   criado_em: string;
   concluido_em: string | null;
   aprovacao: Aprovacao | null;
+  /** Muda quando a capa é trocada: vai na URL da capa para o navegador buscar a nova. */
+  capa_versao: number;
 };
 
 export type FormaDeOnda = {

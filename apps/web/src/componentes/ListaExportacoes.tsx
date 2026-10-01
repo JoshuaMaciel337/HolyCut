@@ -1,11 +1,12 @@
 "use client";
 
-import { CircleAlert, Download, Share2, Trash2 } from "lucide-react";
+import { CircleAlert, Download, ImagePlus, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AprovacaoDoVideo } from "@/componentes/AprovacaoDoVideo";
 import { BarraProgresso } from "@/componentes/BarraProgresso";
+import { QrDoCelular } from "@/componentes/QrDoCelular";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEventosJobs } from "@/lib/eventos";
 import { formatarBytes, formatarData, formatarTempo } from "@/lib/formatar";
@@ -49,6 +50,8 @@ export function ListaExportacoes({
   const [exportacoes, setExportacoes] = useState<Exportacao[] | null>(null);
   const [erro, setErro] = useState("");
   const [compartilhar] = useState(podeCompartilharArquivos);
+  const [avisoCapa, setAvisoCapa] = useState<Record<string, string>>({});
+  const players = useRef<Record<string, HTMLVideoElement | null>>({});
 
   const carregar = useCallback(() => {
     // De um projeto (no editor) ou de todos os projetos de um culto (na página do culto)
@@ -81,7 +84,15 @@ export function ListaExportacoes({
 
   useEventosJobs((job) => {
     const id = job.entrada?.exportacao_id;
-    if (job.tipo !== "renderizacao" || typeof id !== "string") return;
+    if (typeof id !== "string") return;
+    if (job.tipo === "capa_exportacao") {
+      if (job.status === "concluido") {
+        atualizar(id);
+        setAvisoCapa((avisos) => ({ ...avisos, [id]: "Capa trocada." }));
+      }
+      return;
+    }
+    if (job.tipo !== "renderizacao" && job.tipo !== "renderizacao_nvenc") return;
     setExportacoes(
       (lista) =>
         lista?.map((e) =>
@@ -100,6 +111,16 @@ export function ListaExportacoes({
       setExportacoes((lista) => lista?.filter((e) => e.id !== exportacao.id) ?? lista);
     } catch (e) {
       setErro(e instanceof ErroApi ? e.message : "Não foi possível excluir.");
+    }
+  }
+
+  async function usarQuadroNaCapa(exportacao: Exportacao) {
+    const instante = Math.round((players.current[exportacao.id]?.currentTime ?? 0) * 100) / 100;
+    try {
+      await chamarApi(`/exportacoes/${exportacao.id}/capa`, { metodo: "POST", corpo: { instante } });
+      setAvisoCapa((avisos) => ({ ...avisos, [exportacao.id]: `A capa vai ser o quadro de ${formatarTempo(instante)}. Leva alguns segundos.` }));
+    } catch (e) {
+      setAvisoCapa((avisos) => ({ ...avisos, [exportacao.id]: e instanceof ErroApi ? e.message : "Não foi possível trocar a capa." }));
     }
   }
 
@@ -144,8 +165,11 @@ export function ListaExportacoes({
                 />
               ) : exportacao.status === "pronta" ? (
                 <video
+                  ref={(elemento) => {
+                    players.current[exportacao.id] = elemento;
+                  }}
                   src={`${base}/video.mp4`}
-                  poster={exportacao.arquivos.includes("capa.jpg") ? `${base}/capa.jpg` : undefined}
+                  poster={exportacao.arquivos.includes("capa.jpg") ? `${base}/capa.jpg?v=${exportacao.capa_versao}` : undefined}
                   controls
                   playsInline
                   preload="none"
@@ -186,6 +210,20 @@ export function ListaExportacoes({
                       <Share2 className="size-4" aria-hidden /> Compartilhar
                     </button>
                   ) : null}
+                </div>
+              ) : null}
+              {exportacao.status === "pronta" && !imagem ? (
+                <div className="flex flex-col gap-2">
+                  <QrDoCelular exportacaoId={exportacao.id} />
+                  <button
+                    type="button"
+                    onClick={() => usarQuadroNaCapa(exportacao)}
+                    className="inline-flex items-center gap-1.5 self-start text-xs text-suave hover:text-texto"
+                    title="Pause o vídeo no quadro que você quer e clique"
+                  >
+                    <ImagePlus className="size-3.5" aria-hidden /> Usar o quadro do player como capa
+                  </button>
+                  {avisoCapa[exportacao.id] ? <p className="text-xs text-ciano">{avisoCapa[exportacao.id]}</p> : null}
                 </div>
               ) : null}
               {exportacao.status === "pronta" ? (
