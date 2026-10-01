@@ -12,6 +12,7 @@ STATUS_ENVIANDO = "enviando"        # upload em andamento
 STATUS_PROCESSANDO = "processando"  # ingestão na fila ou rodando
 STATUS_PRONTA = "pronta"
 STATUS_ERRO = "erro"
+PRIORIDADE_INGESTAO = 5   # a gravação nova passa na frente das análises
 
 # Arquivos gerados pela ingestão. A API só serve nomes desta lista.
 ARQUIVO_PROXY_VIDEO = "proxy.mp4"

@@ -22,6 +22,7 @@ from api.rotas import (
     eventos,
     exportacoes,
     identidade,
+    importacao,
     jobs,
     limpeza,
     midias,
@@ -124,6 +125,7 @@ app.include_router(auth.router)
 app.include_router(jobs.router)
 app.include_router(eventos.router)
 app.include_router(uploads.router)
+app.include_router(importacao.router)
 app.include_router(midias.router)
 app.include_router(limpeza.router)
 app.include_router(transcricoes.router)

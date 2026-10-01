@@ -24,6 +24,7 @@ from core.config import (
     HEARTBEAT_SEGUNDOS,
     INTERVALO_BUSCA_SEGUNDOS,
     INTERVALO_LIMPEZA_SEGUNDOS,
+    INTERVALO_MONITOR_SEGUNDOS,
     MODO_IA,
 )
 from core.modelos.job import STATUS_ERRO, ErroDefinitivo, tipos_por_recursos
@@ -38,6 +39,7 @@ from core.utils.fila import (
 )
 from core.utils.mongo import agora, conectar, criar_indices
 from worker.tarefas import REGISTRO
+from worker.tarefas.importacao import verificar_canais
 
 # -----------------------------------------------
 # CONFIGURAÇÕES
@@ -138,12 +140,18 @@ def processar_job(db, job: dict, worker_id: str) -> str:
 
 def executar_loop(db, tipos: list[str], worker_id: str, somente_disponiveis: bool = False):
     """Loop principal. Erros de um ciclo são registrados e o loop continua."""
-    ultima_limpeza = 0.0
+    ultima_limpeza = ultimo_monitor = 0.0
+    # O monitor do canal do YouTube roda nos workers que importam (os de CPU), não na fila:
+    # um job a cada 10 min por igreja esconderia o que importa na lista de atividades
+    monitorar = "importar_link" in tipos and not somente_disponiveis
     while not _parar.is_set():
         try:
             if time.monotonic() - ultima_limpeza >= INTERVALO_LIMPEZA_SEGUNDOS:
                 liberar_jobs_expirados(db)
                 ultima_limpeza = time.monotonic()
+            if monitorar and time.monotonic() - ultimo_monitor >= min(INTERVALO_MONITOR_SEGUNDOS, 60):
+                ultimo_monitor = time.monotonic()
+                verificar_canais(db)
 
             job = pegar_proximo_job(db, tipos, worker_id)
             if job is None:

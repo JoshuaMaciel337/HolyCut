@@ -67,6 +67,8 @@ MAX_TENTATIVAS_JOB = 3
 ESPERAS_RETRY_MINUTOS = [1, 5, 30]
 INTERVALO_BUSCA_SEGUNDOS = 2      # espera do worker quando a fila está vazia
 INTERVALO_LIMPEZA_SEGUNDOS = 60   # frequência da recuperação de jobs com posse vencida
+# Cada quanto o monitor lê o feed do canal do YouTube de cada igreja
+INTERVALO_MONITOR_SEGUNDOS = int(os.environ.get("INTERVALO_MONITOR_SEGUNDOS", "600"))
 
 # -----------------------------------------------
 # IA

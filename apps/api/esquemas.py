@@ -112,6 +112,32 @@ class PregacaoEntrada(BaseModel):
     fim: float = Field(gt=0)
 
 
+class ImportarEntrada(BaseModel):
+    url: str = Field(min_length=8, max_length=500, description="Link de um vídeo do YouTube ou de um arquivo do Drive")
+    confirmo_que_e_da_igreja: bool = Field(default=False, description="Exigido para o Drive, que não diz de quem é")
+
+
+class CanalYoutubeEntrada(BaseModel):
+    canal: str = Field(min_length=2, max_length=200, description="O @ do canal, o endereço dele ou o id UC...")
+    monitorar: bool = False
+
+
+class CanalYoutubeSaida(BaseModel):
+    configurado: bool
+    canal: str = ""
+    id: str | None = None
+    handle: str | None = None
+    monitorar: bool = False
+    ultima_verificacao: datetime | None = None
+    ultimo_erro: str | None = None
+
+
+class ImportacaoSaida(BaseModel):
+    origem: Literal["youtube", "drive"]
+    url: str
+    titulo: str = ""
+
+
 class MidiaSaida(BaseModel):
     id: str
     nome: str
@@ -126,6 +152,7 @@ class MidiaSaida(BaseModel):
     arquivos: list[str] = []
     ficha: FichaCultoSaida
     pregacao: PregacaoSaida | None = None
+    importacao: ImportacaoSaida | None = None
     capa_versao: int | None = None
     capa_personalizada: bool = False
     erro: str | None = None

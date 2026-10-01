@@ -4,3 +4,6 @@ pymongo==4.18.2
 requests==2.34.2
 schedule==1.2.2
 tzdata==2026.4
+# Importar do YouTube e do Drive. O YouTube muda com frequência: atualizar quando o download parar.
+# O extra pin-deno traz o Deno, que o yt-dlp precisa para o YouTube.
+yt-dlp[default,pin-deno]==2026.8.19

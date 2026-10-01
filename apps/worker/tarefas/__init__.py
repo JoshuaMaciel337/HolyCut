@@ -5,6 +5,7 @@ from worker.tarefas.blocos import executar_blocos
 from worker.tarefas.capas import executar_capas_culto
 from worker.tarefas.diagnostico_gpu import executar_diagnostico_gpu
 from worker.tarefas.estudo import executar_estudo
+from worker.tarefas.importacao import executar_importacao
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.limpeza_audio import executar_limpeza_audio
 from worker.tarefas.momentos import executar_momentos
@@ -40,4 +41,5 @@ REGISTRO = {
     "capas_culto": Tarefa(executar_capas_culto),
     "estudo_culto": Tarefa(executar_estudo),
     "blocos_culto": Tarefa(executar_blocos),
+    "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
 }

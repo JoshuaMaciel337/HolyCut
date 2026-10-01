@@ -26,6 +26,7 @@ from api.dependencias import obter_db, usuario_ou_chave_envio
 from core.config import ESPACO_MINIMO_LIVRE_BYTES, UPLOAD_MAX_BYTES
 from core.modelos.job import montar_job
 from core.modelos.midia import (
+    PRIORIDADE_INGESTAO,
     STATUS_ENVIANDO,
     STATUS_PROCESSANDO,
     chave_arquivo,
@@ -41,7 +42,6 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 TUS_VERSAO = "1.0.0"
 TIPO_CONTEUDO_PATCH = "application/offset+octet-stream"
 TAMANHO_ESCRITA = 1024 * 1024  # junta 1 MB antes de gravar no disco
-PRIORIDADE_INGESTAO = 5
 _travas: dict[str, asyncio.Lock] = {}
 
 
