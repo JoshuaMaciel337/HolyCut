@@ -12,6 +12,7 @@
 # Os cortes caem dentro do silêncio (há margem para a fala), então emendar
 # o áudio ali não faz estalo.
 # -----------------------------------------------
+import math
 import re
 import subprocess
 from functools import lru_cache
@@ -77,7 +78,7 @@ def expressao_selecao(trechos: list[tuple[float, float]]) -> str:
 
 
 def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor: dict | None = None,
-               comandos: str | None = None) -> str:
+               comandos: str | None = None, rotacao: float = 0.0) -> str:
     """
     Recorta, redimensiona, aplica o filtro de cor e o fundo (desfoque e escurecimento), antes das
     camadas de arte. É a mesma ordem da prévia: filtro de cor, blur e preto translúcido por cima.
@@ -87,6 +88,9 @@ def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor
     if comandos:
         caminho = comandos.replace("\\", "/").replace(":", r"\:")
         cadeia = f"sendcmd=filename={caminho}," + cadeia
+    if rotacao:
+        # Gira o quadro já recortado, em volta do centro, como a prévia: os cantos ficam pretos
+        cadeia += f",rotate={math.radians(float(rotacao)):.6f}:ow={largura}:oh={altura}:c=black"
     fundo, cor = fundo or {}, cor or {}
     desfoque, escurecer = float(fundo.get("desfoque") or 0), float(fundo.get("escurecer") or 0)
     filtro_cor = filtro_ffmpeg(cor.get("filtro") or "natural", float(cor.get("intensidade", 1.0)))
@@ -161,7 +165,7 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
                   camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None,
                   cor: dict | None = None, musica: dict | None = None, legenda: str | None = None,
                   audio_limpo: tuple[int, list[tuple[float, float]]] | None = None,
-                  comandos_rosto: str | None = None) -> str:
+                  comandos_rosto: str | None = None, rotacao: float = 0.0) -> str:
     """
     Grafo de filtros completo, com as saídas [v] e [a].
     partes: os trechos mantidos de cada parte do vídeo, na ordem final. A parte k é a entrada k do
@@ -204,7 +208,7 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
                 emenda += f"[p{indice}a]"
         grafo.append(f"{emenda}concat=n={len(partes)}:v=1:a={1 if tem_audio else 0}[pv]{'[pa]' if tem_audio else ''}")
         fonte_video, voz = "[pv]", "[pa]anull"
-    grafo.append(f"{fonte_video}{_enquadrar(recorte, largura, altura, fundo, cor, comandos_rosto)}"
+    grafo.append(f"{fonte_video}{_enquadrar(recorte, largura, altura, fundo, cor, comandos_rosto, rotacao)}"
                  f"{_sobrepor(camadas, duracao, primeira_entrada=len(partes))}")
     if not tem_audio and not musica:
         return _com_legenda(grafo, legenda)
@@ -231,10 +235,10 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
 
 
 def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_camadas: int = 0,
-                         fundo: dict | None = None, cor: dict | None = None) -> str:
+                         fundo: dict | None = None, cor: dict | None = None, rotacao: float = 0.0) -> str:
     """Um quadro só (exportação em imagem): enquadra, aplica cor e fundo e sobrepõe as camadas."""
     camadas = [(0.0, 0.0)] * quantidade_camadas
-    return f"[0:v]{_enquadrar(recorte, largura, altura, fundo, cor)}{_sobrepor(camadas, None)}"
+    return f"[0:v]{_enquadrar(recorte, largura, altura, fundo, cor, rotacao=rotacao)}{_sobrepor(camadas, None)}"
 
 
 def localizar_no_video(partes: list[list[tuple[float, float]]], posicao_final: float) -> tuple[int, float]:

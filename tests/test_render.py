@@ -205,3 +205,12 @@ def test_projeto_e_exportacao_guardam_a_configuracao():
     projeto["enquadramento"]["zoom"] = 2.0
     assert exportacao["configuracao"]["partes"][0]["fim"] == 2400.46
     assert exportacao["configuracao"]["enquadramento"]["zoom"] == 1.0
+
+
+def test_girar_o_video_entra_depois_do_recorte():
+    from core.utils.render import montar_filtro_imagem
+    recorte = {"largura": 608, "altura": 1080, "x": 656, "y": 0}
+    filtro = montar_filtro_imagem(recorte, 1080, 1920, rotacao=90)
+    assert "scale=1080:1920" in filtro and "rotate=1.570796:ow=1080:oh=1920:c=black" in filtro
+    assert filtro.index("crop=") < filtro.index("rotate=")
+    assert "rotate" not in montar_filtro_imagem(recorte, 1080, 1920)

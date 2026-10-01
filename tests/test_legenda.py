@@ -111,3 +111,16 @@ def test_filtro_queima_a_legenda_depois_do_video():
     assert "[vleg]subtitles=" in filtro
     sem = montar_filtro([[(0.0, 2.0)]], RECORTE, 1080, 1920, tem_audio=False)
     assert "subtitles=" not in sem
+
+
+def test_legenda_arrastada_vai_para_o_ponto_e_muda_de_tamanho():
+    from core.modelos.legenda import gerar_ass, legenda_do_projeto
+    blocos = [{"inicio": 0, "fim": 1, "palavras": [{"texto": "Deus", "destaque": True}, {"texto": "fiel"}]}]
+    linhas = gerar_ass(blocos, "destaque", "#FF8A00", 1080, 1920, "base", 0.3, 0.4, 1.5).splitlines()
+    dialogo = next(linha for linha in linhas if linha.startswith("Dialogue"))
+    assert "an5" in dialogo and "pos(324,768)" in dialogo
+    assert next(linha for linha in linhas if linha.startswith("Style")).split(",")[2] == "109"   # 1920 x 0,038 x 1,5
+    sem_arrasto = gerar_ass(blocos, "destaque", "#FF8A00", 1080, 1920)
+    assert "pos(" not in sem_arrasto
+    legenda = legenda_do_projeto({"legenda": {"x": 1.4, "y": "abc", "escala": 9}})
+    assert (legenda["x"], legenda["y"], legenda["escala"]) == (1.0, None, 2.0)

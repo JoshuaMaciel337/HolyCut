@@ -22,6 +22,20 @@ LEGENDA_PADRAO = {
 }
 
 
+def _fracao(valor) -> float | None:
+    try:
+        return min(max(float(valor), 0.0), 1.0) if valor is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _limitado(valor, minimo: float, maximo: float, padrao: float) -> float:
+    try:
+        return min(max(float(valor), minimo), maximo) if valor is not None else padrao
+    except (TypeError, ValueError):
+        return padrao
+
+
 def legenda_do_projeto(doc: dict) -> dict:
     """Estilo salvo no projeto, com as correções e os cortes da fala. Projeto antigo usa o padrão."""
     bruta = doc.get("legenda")
@@ -37,6 +51,10 @@ def legenda_do_projeto(doc: dict) -> dict:
         "preset": bruta.get("preset") if bruta.get("preset") in PRESETS else "destaque",
         "palavras_por_bloco": min(max(quantidade, 1), 8),
         "posicao": bruta.get("posicao") if bruta.get("posicao") in POSICOES else "base",
+        # Arrastada na prévia: o centro do bloco (0 a 1). Sem ela, vale a posição pronta.
+        "x": _fracao(bruta.get("x")),
+        "y": _fracao(bruta.get("y")),
+        "escala": _limitado(bruta.get("escala"), 0.6, 2.0, 1.0),
         "vicios": vicios if vicios in VICIOS else None,
         "edicoes": edicoes_validas(bruta.get("edicoes")),
         "apagadas": ids_validos(bruta.get("apagadas")),
@@ -191,7 +209,7 @@ def _eventos_do_bloco(bloco: dict, preset: str, cor_igreja: str, tamanho: int) -
 
 
 def gerar_ass(blocos: list[dict], preset: str, cor_destaque: str, largura: int, altura: int,
-              posicao: str = "base") -> str:
+              posicao: str = "base", x: float | None = None, y: float | None = None, escala: float = 1.0) -> str:
     """
     Arquivo ASS queimado no vídeo. Clean é o bloco inteiro em branco; Karaokê acende só a
     palavra do momento; Destaque pinta a mais longa na cor da igreja; Digno escreve essa
@@ -201,13 +219,19 @@ def gerar_ass(blocos: list[dict], preset: str, cor_destaque: str, largura: int, 
         return ""
     preset = preset if preset in PRESETS else "destaque"
     posicao = posicao if posicao in POSICOES else "base"
-    tamanho = max(int(round(altura * 0.038)), 28)
+    tamanho = max(int(round(altura * 0.038 * min(max(escala, 0.6), 2.0))), 28)
     contorno = max(int(round(altura * 0.003)), 2)
     margem = int(round(altura * 0.12)) if posicao == "base" else 0
     alinhamento = 2 if posicao == "base" else 5
     estilo = (f"Style: Legenda,Montserrat,{tamanho},&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,"
               f"-1,0,0,0,100,100,0,0,1,{contorno},0,{alinhamento},80,80,{margem},1")
     eventos = [evento for bloco in blocos for evento in _eventos_do_bloco(bloco, preset, cor_destaque, tamanho)]
+    if x is not None or y is not None:
+        # Arrastada na prévia: cada linha vai centrada no ponto escolhido (\an5\pos), como na prévia
+        centro_x = int(round((0.5 if x is None else x) * largura))
+        centro_y = int(round((0.5 if y is None else y) * altura))
+        ponto = "{\\an5\\pos(" + f"{centro_x},{centro_y}" + ")}"
+        eventos = [evento.replace(",,0,0,0,,", ",,0,0,0,," + ponto, 1) for evento in eventos]
     formato = ("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
                "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
                "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding")

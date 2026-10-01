@@ -354,6 +354,7 @@ class EnquadramentoEntrada(BaseModel):
     y: float = Field(ge=0, le=1)
     zoom: float = Field(ge=1, le=3)
     seguir_rosto: bool = False
+    rotacao: float = Field(default=0, ge=-180, le=180, description="Graus, no sentido do relógio")
 
 
 class AudioProjetoEntrada(BaseModel):
@@ -376,6 +377,9 @@ class LegendaEntrada(BaseModel):
     preset: Literal["clean", "karaoke", "destaque", "digno"] = "destaque"
     palavras_por_bloco: int = Field(default=3, ge=1, le=8)
     posicao: Literal["base", "centro"] = "base"
+    x: float | None = Field(default=None, ge=0, le=1, description="Centro arrastado na prévia")
+    y: float | None = Field(default=None, ge=0, le=1)
+    escala: float = Field(default=1.0, ge=0.6, le=2.0, description="Tamanho da letra")
     vicios: Literal["leve", "media", "forte"] | None = None
     edicoes: dict[str, str] = Field(default_factory=dict)
     apagadas: list[str] = Field(default_factory=list)

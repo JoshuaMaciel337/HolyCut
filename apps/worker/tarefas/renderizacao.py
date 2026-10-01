@@ -139,7 +139,8 @@ def preparar_legenda(db, organizacao_id, exportacao_id, midia: dict, config: dic
         return None
     organizacao = db.organizacoes.find_one({"_id": organizacao_id}, {"nome": 1, "identidade": 1}) or {}
     identidade = {**identidade_padrao(organizacao.get("nome", "")), **(organizacao.get("identidade") or {})}
-    texto = gerar_ass(blocos, legenda["preset"], identidade["cor_destaque"], largura, altura, legenda["posicao"])
+    texto = gerar_ass(blocos, legenda["preset"], identidade["cor_destaque"], largura, altura, legenda["posicao"],
+                      legenda["x"], legenda["y"], legenda["escala"])
     chave = chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_LEGENDA)
     storage.salvar_bytes(chave, texto.encode("utf-8"))
     logging.info(f"[{organizacao_id}] [exportacao {exportacao_id}] Legenda {legenda['preset']}: {len(blocos)} blocos.")
@@ -162,7 +163,8 @@ def exportar_imagem(db, exportacao: dict, config: dict, original, partes: list, 
         nome = f"camada_{indice}.png"
         storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, nome), para_png(imagem))
         entradas += ["-i", str(caminho(nome))]
-    filtro = montar_filtro_imagem(recorte, largura, altura, len(visiveis), config.get("fundo"), config.get("cor"))
+    filtro = montar_filtro_imagem(recorte, largura, altura, len(visiveis), config.get("fundo"), config.get("cor"),
+                                  float((config.get("enquadramento") or {}).get("rotacao") or 0))
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
 
     reportar(40, "Gerando a imagem")
@@ -309,7 +311,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
                            normalizar=(config.get("audio") or {}).get("normalizar", True),
                            camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas],
                            fundo=config.get("fundo"), cor=config.get("cor"), musica=musica, legenda=caminho_legenda,
-                           audio_limpo=audio_limpo, comandos_rosto=comandos_rosto)
+                           audio_limpo=audio_limpo, comandos_rosto=comandos_rosto,
+                           rotacao=float((config.get("enquadramento") or {}).get("rotacao") or 0))
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
     saida = caminho(ARQUIVO_VIDEO_EXPORTADO)
     # A gravação entra uma vez por parte, já a partir do início dela
