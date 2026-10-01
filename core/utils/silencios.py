@@ -12,8 +12,12 @@
 # -----------------------------------------------
 import numpy as np
 
+from core.modelos.fala import cortes_da_fala, fundir_cortes
+from core.modelos.legenda import legenda_do_projeto
 from core.modelos.midia import ARQUIVO_NIVEIS, NIVEIS_POR_SEGUNDO, chave_arquivo
+from core.modelos.projeto import partes_do_projeto
 from core.utils import storage
+from core.utils.render import planejar_trechos
 
 MARGEM_PADRAO = 0.12   # segundos preservados de cada lado da fala
 CORTE_MINIMO = 0.1     # silêncio que sobra menor que isso não vale o corte
@@ -76,3 +80,18 @@ def cortes_da_gravacao(midia: dict, intensidade: str | None) -> list[tuple[float
         return []
     niveis = np.fromfile(caminho, dtype=np.int8)
     return detectar_silencios(niveis, duracao=float(midia["duracao"]), **INTENSIDADES[intensidade])
+
+
+def cortes_do_projeto(midia: dict, config: dict, palavras: list[dict]) -> list[tuple[float, float]]:
+    """Tudo o que sai do vídeo: os silêncios na intensidade escolhida, os vícios e as palavras apagadas."""
+    cortes = cortes_da_gravacao(midia, (config.get("silencios") or {}).get("intensidade"))
+    return fundir_cortes([*cortes, *cortes_da_fala(palavras, legenda_do_projeto(config))])
+
+
+def partes_com_trechos(config: dict, cortes: list[tuple[float, float]]) -> list[tuple[dict, list[tuple[float, float]]]]:
+    """
+    Cada parte com os trechos que ficam, relativos ao início dela e alinhados aos quadros.
+    É a mesma conta para o render, a legenda e o XML do DaVinci e do Premiere. Parte vazia sai.
+    """
+    partes = [(parte, planejar_trechos(parte["inicio"], parte["fim"], cortes)) for parte in partes_do_projeto(config)]
+    return [(parte, trechos) for parte, trechos in partes if trechos]

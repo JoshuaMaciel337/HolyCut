@@ -18,7 +18,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from PIL import Image
 
-from core.modelos.fala import cortes_da_fala, fundir_cortes, palavras_visiveis
+from core.modelos.fala import palavras_visiveis
 from core.modelos.identidade import chave_logo, identidade_padrao
 from core.modelos.job import ErroDefinitivo
 from core.modelos.legenda import gerar_ass, legenda_do_projeto, montar_blocos, palavras_da_transcricao
@@ -34,7 +34,6 @@ from core.modelos.projeto import (
     STATUS_EXPORTACAO_PRONTA,
     calcular_recorte,
     chave_exportacao,
-    partes_do_projeto,
 )
 from core.modelos.rosto import comandos_de_recorte, instante_no_final
 from core.utils import storage
@@ -48,9 +47,8 @@ from core.utils.render import (
     montar_filtro,
     montar_filtro_imagem,
     opcao_filtro_em_arquivo,
-    planejar_trechos,
 )
-from core.utils.silencios import cortes_da_gravacao
+from core.utils.silencios import cortes_do_projeto, partes_com_trechos
 
 # -----------------------------------------------
 # CONFIGURAÇÕES
@@ -215,11 +213,9 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
 
     # 1. Trechos mantidos de cada parte (silêncio, vício ou palavra apagada saem do vídeo)
     reportar(2, "Calculando os cortes")
-    cortes = cortes_da_gravacao(midia, (config.get("silencios") or {}).get("intensidade"))
     transcricao = db.transcricoes.find_one({"midia_id": midia["_id"], "organizacao_id": organizacao_id})
-    cortes = fundir_cortes([*cortes, *cortes_da_fala(palavras_da_transcricao(transcricao), legenda_do_projeto(config))])
-    partes = [(parte, planejar_trechos(parte["inicio"], parte["fim"], cortes)) for parte in partes_do_projeto(config)]
-    partes = [(parte, trechos) for parte, trechos in partes if trechos]
+    cortes = cortes_do_projeto(midia, config, palavras_da_transcricao(transcricao))
+    partes = partes_com_trechos(config, cortes)
     if not partes:
         raise ErroDefinitivo("O vídeo ficou vazio depois dos cortes.")
     grupos = [trechos for _, trechos in partes]
