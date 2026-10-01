@@ -12,7 +12,8 @@
 # -----------------------------------------------
 import numpy as np
 
-from core.modelos.midia import NIVEIS_POR_SEGUNDO
+from core.modelos.midia import ARQUIVO_NIVEIS, NIVEIS_POR_SEGUNDO, chave_arquivo
+from core.utils import storage
 
 MARGEM_PADRAO = 0.12   # segundos preservados de cada lado da fala
 CORTE_MINIMO = 0.1     # silêncio que sobra menor que isso não vale o corte
@@ -62,3 +63,16 @@ def trechos_mantidos(duracao: float, cortes: list[tuple[float, float]]) -> list[
 
 def tempo_cortado(cortes: list[tuple[float, float]]) -> float:
     return round(sum(fim - inicio for inicio, fim in cortes), 2)
+
+
+def cortes_da_gravacao(midia: dict, intensidade: str | None) -> list[tuple[float, float]]:
+    """Os cortes que o render tira, lidos do niveis.bin da ingestão. Sem análise, não corta nada."""
+    if not intensidade or intensidade not in INTENSIDADES:
+        return []
+    if ARQUIVO_NIVEIS not in (midia.get("arquivos") or []):
+        return []
+    caminho = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_NIVEIS))
+    if not caminho.is_file():
+        return []
+    niveis = np.fromfile(caminho, dtype=np.int8)
+    return detectar_silencios(niveis, duracao=float(midia["duracao"]), **INTENSIDADES[intensidade])
