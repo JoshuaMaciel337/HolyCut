@@ -226,6 +226,9 @@ export function AbaGravacao({ midia, aoMudar }: { midia: Midia; aoMudar: (midia:
             <Informacao rotulo="Tamanho" valor={formatarBytes(midia.tamanho_total)} />
             <Informacao rotulo="Enviada em" valor={midia.enviado_em ? formatarData(midia.enviado_em) : "—"} />
             <Informacao rotulo="Arquivo" valor={midia.nome_original} />
+            {midia.importacao ? (
+              <Informacao rotulo="Importada do" valor={midia.importacao.origem === "youtube" ? "YouTube" : "Google Drive"} />
+            ) : null}
           </dl>
           {midia.status === "pronta" ? (
             <a href={`/api/midias/${id}/original`} download className="mt-4 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto">

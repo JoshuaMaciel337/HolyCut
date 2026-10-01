@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { CampoTexto } from "@/componentes/CampoTexto";
+import { CanalDoYoutube } from "@/componentes/CanalDoYoutube";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { formatarData } from "@/lib/formatar";
 import type { ChaveEnvio, ChaveEnvioCriada } from "@/lib/tipos";
@@ -68,10 +69,11 @@ export default function PaginaEnvioAutomatico() {
       <Link href="/app" className="inline-flex items-center gap-2 text-sm text-suave hover:text-texto">
         <ArrowLeft className="size-4" aria-hidden /> Início
       </Link>
-      <h1 className="mt-4 font-display text-3xl font-bold">Envio automático do OBS</h1>
+      <h1 className="mt-4 font-display text-3xl font-bold">Envio automático</h1>
       <p className="mt-1 max-w-2xl text-suave">
         Um programa pequeno no computador da mídia envia a gravação sozinho quando o OBS para de gravar. Quando o culto acaba, a
-        gravação já está chegando no HolyCut, sem ninguém abrir o site.
+        gravação já está chegando no HolyCut, sem ninguém abrir o site. Transmite no YouTube? O canal da igreja, mais abaixo, faz o
+        mesmo com cada live.
       </p>
       {erro ? (
         <p role="alert" className="mt-6 rounded-xl border border-vermelho/40 bg-vermelho/10 px-4 py-3 text-sm text-vermelho">
@@ -159,6 +161,8 @@ export default function PaginaEnvioAutomatico() {
           </ul>
         )}
       </section>
+
+      <CanalDoYoutube />
     </main>
   );
 }

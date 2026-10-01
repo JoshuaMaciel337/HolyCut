@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CartaoMidia } from "@/componentes/CartaoMidia";
 import { PainelSistema } from "@/componentes/PainelSistema";
+import { ImportarLink } from "@/componentes/ImportarLink";
 import { ZonaDeEnvio } from "@/componentes/ZonaDeEnvio";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEnvios } from "@/lib/envios";
@@ -58,7 +59,8 @@ export default function PaginaInicio() {
 
   useEventosJobs((job) => {
     const midiaId = job.entrada?.midia_id;
-    if (job.tipo !== "ingestao" || typeof midiaId !== "string") return;
+    // A importação pelo link aparece no cartão como o envio: primeiro o download, depois a ingestão
+    if ((job.tipo !== "ingestao" && job.tipo !== "importar_link") || typeof midiaId !== "string") return;
     setMidias(
       (lista) =>
         lista?.map((m) =>
@@ -67,7 +69,8 @@ export default function PaginaInicio() {
             : m,
         ) ?? lista,
     );
-    if (job.status === "concluido" || job.status === "erro") atualizarMidia(midiaId);
+    if (job.tipo === "importar_link" && job.status === "concluido") carregar();   // o monitor do canal também cria gravações
+    else if (job.status === "concluido" || job.status === "erro") atualizarMidia(midiaId);
   });
 
   async function excluir(midia: Midia) {
@@ -112,6 +115,8 @@ export default function PaginaInicio() {
               </Link>
             </p>
           </div>
+
+          <ImportarLink aoImportar={(midia) => setMidias((lista) => [midia, ...(lista ?? [])])} />
 
           {enviosSemMidia.length > 0 ? (
             <ul className="flex flex-col gap-2" aria-label="Envios começando">

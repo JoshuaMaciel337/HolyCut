@@ -92,6 +92,8 @@ export type Midia = {
   ficha: FichaCulto;
   /** Onde a mensagem começa e termina. A marcação da pessoa nunca é trocada pela da IA. */
   pregacao: Pregacao | null;
+  /** De onde a gravação veio, quando foi importada pelo link. */
+  importacao: { origem: "youtube" | "drive"; url: string; titulo: string } | null;
   /** Muda quando o pôster e o banner são redesenhados. */
   capa_versao: number | null;
   capa_personalizada: boolean;
@@ -100,6 +102,17 @@ export type Midia = {
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;
+};
+
+/** O canal da igreja no YouTube e o monitor que importa cada live que termina. */
+export type CanalYoutube = {
+  configurado: boolean;
+  canal: string;
+  id: string | null;
+  handle: string | null;
+  monitorar: boolean;
+  ultima_verificacao: string | null;
+  ultimo_erro: string | null;
 };
 
 export type Pregacao = { inicio: number; fim: number; origem: "ia" | "pessoa" };
