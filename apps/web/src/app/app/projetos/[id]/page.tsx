@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleAlert,
   Clapperboard,
+  FileArchive,
   ImageIcon,
   LoaderCircle,
   Pause,
@@ -910,6 +911,20 @@ export default function PaginaProjeto() {
                   <ImageIcon className="size-4" aria-hidden /> Exportar imagem
                 </button>
               </div>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-borda pt-4">
+              <a
+                href={`/api/projetos/${projeto.id}/pacote-edicao`}
+                download
+                aria-disabled={estadoSalvar !== "salvo"}
+                className={`botao-contorno px-4 py-2 text-sm ${estadoSalvar !== "salvo" ? "pointer-events-none opacity-50" : ""}`}
+              >
+                <FileArchive className="size-4" aria-hidden /> Baixar para DaVinci ou Premiere
+              </a>
+              <p className="min-w-0 flex-1 text-xs text-suave">
+                Um .zip com os cortes (XML) e a legenda (SRT), que apontam para a gravação original. Enquadramento, textos e
+                música ficam por conta do editor.
+              </p>
             </div>
             {projeto.publicacao ? (
               <p className="mt-3 text-sm text-suave">

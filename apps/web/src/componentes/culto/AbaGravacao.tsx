@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus } from "lucide-react";
+import { Download, ImagePlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BlocosDoCulto } from "@/componentes/culto/BlocosDoCulto";
@@ -227,6 +227,11 @@ export function AbaGravacao({ midia, aoMudar }: { midia: Midia; aoMudar: (midia:
             <Informacao rotulo="Enviada em" valor={midia.enviado_em ? formatarData(midia.enviado_em) : "—"} />
             <Informacao rotulo="Arquivo" valor={midia.nome_original} />
           </dl>
+          {midia.status === "pronta" ? (
+            <a href={`/api/midias/${id}/original`} download className="mt-4 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto">
+              <Download className="size-4" aria-hidden /> Baixar a gravação original
+            </a>
+          ) : null}
         </section>
       </aside>
     </div>
