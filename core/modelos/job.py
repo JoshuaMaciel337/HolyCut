@@ -32,6 +32,7 @@ TAREFAS = {
     "preparar_musica": RECURSO_CPU,
     "capas_culto": RECURSO_CPU,
     "importar_link": RECURSO_CPU,
+    "capa_exportacao": RECURSO_CPU,
 }
 
 

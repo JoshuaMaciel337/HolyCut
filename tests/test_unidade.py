@@ -52,6 +52,7 @@ def test_espera_retry_cresce_e_para_no_maximo():
 def test_tipos_por_recursos():
     assert tipos_por_recursos(["cpu"]) == [
         "teste", "enquadramento_rosto", "ingestao", "renderizacao", "preparar_musica", "capas_culto", "importar_link",
+        "capa_exportacao",
     ]
     assert tipos_por_recursos(["gpu"]) == [
         "diagnostico_gpu", "transcricao", "limpeza_audio", "sugestao_cortes", "estudo_culto", "blocos_culto",
@@ -60,7 +61,7 @@ def test_tipos_por_recursos():
     assert set(tipos_por_recursos(["cpu", "gpu"])) == {
         "teste", "diagnostico_gpu", "transcricao", "limpeza_audio", "sugestao_cortes", "estudo_culto", "blocos_culto",
         "momentos", "renderizacao_nvenc", "enquadramento_rosto", "ingestao", "renderizacao", "preparar_musica",
-        "capas_culto", "importar_link",
+        "capas_culto", "importar_link", "capa_exportacao",
     }
 
 

@@ -2,6 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from worker.tarefas.blocos import executar_blocos
+from worker.tarefas.capa_exportacao import executar_capa_exportacao
 from worker.tarefas.capas import executar_capas_culto
 from worker.tarefas.diagnostico_gpu import executar_diagnostico_gpu
 from worker.tarefas.estudo import executar_estudo
@@ -42,4 +43,5 @@ REGISTRO = {
     "estudo_culto": Tarefa(executar_estudo),
     "blocos_culto": Tarefa(executar_blocos),
     "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
+    "capa_exportacao": Tarefa(executar_capa_exportacao),
 }

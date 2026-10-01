@@ -550,6 +550,16 @@ class ExportacaoSaida(BaseModel):
     criado_em: datetime
     concluido_em: datetime | None = None
     aprovacao: AprovacaoSaida | None = None
+    capa_versao: int = Field(default=0, description="Muda quando a capa é trocada, para o navegador buscar a nova")
+
+
+class CapaExportacaoEntrada(BaseModel):
+    instante: float = Field(ge=0, description="Segundo do vídeo exportado de onde sai a capa")
+
+
+class LinkCelularSaida(BaseModel):
+    caminho: str = Field(description="Junte ao endereço do site: é o que vai no QR code")
+    expira_em: datetime
 
 
 def projeto_para_saida(doc: dict) -> ProjetoSaida:

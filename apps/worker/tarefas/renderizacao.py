@@ -193,6 +193,11 @@ def exportar_imagem(db, exportacao: dict, config: dict, original, partes: list, 
 # -----------------------------------------------
 # FUNÇÃO PRINCIPAL
 # -----------------------------------------------
+def extrair_capa(video, destino, instante: float):
+    """Um quadro do vídeo final, em JPG de 540 px de largura. Serve à exportação e à troca de capa."""
+    executar_ffmpeg(["-ss", f"{instante:.2f}", "-i", str(video), "-frames:v", "1",
+                     "-vf", f"scale={LARGURA_CAPA}:-2", "-q:v", "3", "-update", "1", str(destino)])
+
 def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     exportacao_id = ObjectId(job["entrada"]["exportacao_id"])
     exportacao = db.exportacoes.find_one({"_id": exportacao_id})
@@ -332,9 +337,7 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
 
     # 3. Capa
     reportar(95, "Gerando a capa")
-    executar_ffmpeg(["-ss", f"{min(1.0, duracao / 2):.2f}", "-i", str(saida), "-frames:v", "1",
-                     "-vf", f"scale={LARGURA_CAPA}:-2", "-q:v", "3", "-update", "1",
-                     str(caminho(ARQUIVO_CAPA_EXPORTADA))])
+    extrair_capa(saida, caminho(ARQUIVO_CAPA_EXPORTADA), min(1.0, duracao / 2))
     temporarios = [ARQUIVO_FILTRO, *(f"camada_{indice}.png" for indice in range(len(camadas)))]
     if caminho_legenda:
         temporarios.append(ARQUIVO_LEGENDA)

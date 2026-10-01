@@ -18,6 +18,7 @@ from api.rotas import (
     analise,
     aprovar,
     auth,
+    celular,
     chaves_envio,
     eventos,
     exportacoes,
@@ -134,6 +135,7 @@ app.include_router(analise.router)
 app.include_router(pregacao.router)
 app.include_router(projetos.router)
 app.include_router(exportacoes.router)
+app.include_router(celular.router)
 app.include_router(identidade.router)
 app.include_router(modelos.router)
 app.include_router(musicas.router)

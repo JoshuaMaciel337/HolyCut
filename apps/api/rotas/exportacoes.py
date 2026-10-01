@@ -14,13 +14,16 @@ from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     AprovacaoCriadaSaida,
     AprovacaoCriarEntrada,
+    CapaExportacaoEntrada,
     ExportacaoSaida,
+    LinkCelularSaida,
     aprovacao_para_saida,
     exportacao_para_saida,
 )
 from core.modelos.aprovacao import montar_aprovacao
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
-from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE
+from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
+from core.modelos.link_celular import montar_link_celular
 from core.modelos.projeto import (
     ARQUIVO_CAPA_EXPORTADA,
     ARQUIVOS_EXPORTACAO,
@@ -148,3 +151,31 @@ async def cancelar_aprovacao(exportacao_id: str, usuario=Depends(usuario_atual),
 async def excluir_exportacao(exportacao_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     exportacao = await buscar_exportacao(db, exportacao_id, usuario)
     await apagar_exportacoes(db, {"_id": exportacao["_id"]})
+
+
+async def buscar_video_pronto(db, exportacao_id: str, usuario: dict) -> dict:
+    exportacao = await buscar_exportacao(db, exportacao_id, usuario)
+    if exportacao["status"] != STATUS_EXPORTACAO_PRONTA or exportacao.get("formato", "video") != "video":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Isso só vale para um vídeo já exportado.")
+    return exportacao
+
+
+@router.post("/{exportacao_id}/capa", response_model=ExportacaoSaida)
+async def trocar_capa(exportacao_id: str, dados: CapaExportacaoEntrada,
+                      usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """A capa sai do quadro escolhido no vídeo pronto, sem renderizar de novo."""
+    exportacao = await buscar_video_pronto(db, exportacao_id, usuario)
+    job = montar_job("capa_exportacao", exportacao["organizacao_id"],
+                     {"exportacao_id": str(exportacao["_id"]), "instante": round(dados.instante, 2)},
+                     prioridade=4, criado_por=usuario["_id"])
+    await db.jobs.insert_one(job)
+    return exportacao_para_saida(exportacao)
+
+
+@router.post("/{exportacao_id}/link-celular", response_model=LinkCelularSaida)
+async def criar_link_celular(exportacao_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Um link de 24 h para o QR code. O celular baixa o vídeo sem entrar na conta."""
+    exportacao = await buscar_video_pronto(db, exportacao_id, usuario)
+    token, link = montar_link_celular()
+    await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"link_celular": link}})
+    return LinkCelularSaida(caminho=f"/api/baixar/{token}", expira_em=link["expira_em"])
