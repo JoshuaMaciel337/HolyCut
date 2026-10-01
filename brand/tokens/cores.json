@@ -1,9 +1,9 @@
 {
   "cores": {
-    "ink": "#0B0B0F",
-    "surface": "#131317",
-    "surface_2": "#1A1A1F",
-    "border": "#2A2A32",
+    "ink": "#070709",
+    "surface": "#0F0F13",
+    "surface_2": "#17171C",
+    "border": "#25252D",
     "white": "#FFFFFF",
     "text": "#F5F5F7",
     "muted": "#9C9EA8",
@@ -43,6 +43,35 @@
       "#A855F7",
       "#FF8A00"
     ]
+  },
+  "tema_claro": {
+    "cores": {
+      "ink": "#F8F6F2",
+      "surface": "#FFFFFF",
+      "surface_2": "#F1EEE8",
+      "border": "#E3DFD7",
+      "text": "#17171B",
+      "muted": "#5C5C66",
+      "yellow": "#A16207",
+      "orange": "#C2570C",
+      "coral": "#C2410C",
+      "red": "#DC2626",
+      "violet": "#9333EA",
+      "magenta": "#C026D3",
+      "cyan": "#0E7490"
+    },
+    "gradientes": {
+      "marca": [
+        "#FF8A00",
+        "#E2500C"
+      ],
+      "brand": [
+        "#FF8A00",
+        "#E2500C",
+        "#C026D3",
+        "#9333EA"
+      ]
+    }
   },
   "tipografia": {
     "display": {

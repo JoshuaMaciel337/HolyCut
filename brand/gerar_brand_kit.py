@@ -56,10 +56,10 @@ SLOGAN = ["TRANSFORME MOMENTOS", "EM HISTÓRIAS."]
 # e o roxo #A855F7 dos elementos de IA. O cinza do texto secundário é um pouco mais
 # claro que o #888B93 do kit, para passar com folga no contraste (7:1 no fundo).
 CORES = {
-    "ink": "#0B0B0F",
-    "surface": "#131317",
-    "surface_2": "#1A1A1F",
-    "border": "#2A2A32",
+    "ink": "#070709",
+    "surface": "#0F0F13",
+    "surface_2": "#17171C",
+    "border": "#25252D",
     "white": "#FFFFFF",
     "text": "#F5F5F7",
     "muted": "#9C9EA8",
@@ -70,6 +70,28 @@ CORES = {
     "violet": "#A855F7",
     "magenta": "#F05BFF",
     "cyan": "#43D9FF",
+}
+# Tema claro: off-white entre o branco e o bege do FeedChurch, como o fundo do Cut.Pro.
+# Só muda o que precisa: os acentos escurecem para o texto colorido passar no contraste
+# (4,5:1 no fundo), e o degradê da marca troca o amarelo, que some no claro.
+CORES_CLARO = {
+    "ink": "#F8F6F2",
+    "surface": "#FFFFFF",
+    "surface_2": "#F1EEE8",
+    "border": "#E3DFD7",
+    "text": "#17171B",
+    "muted": "#5C5C66",
+    "yellow": "#A16207",
+    "orange": "#C2570C",
+    "coral": "#C2410C",
+    "red": "#DC2626",
+    "violet": "#9333EA",
+    "magenta": "#C026D3",
+    "cyan": "#0E7490",
+}
+GRADIENTES_CLARO = {
+    "marca": ["#FF8A00", "#E2500C"],
+    "brand": ["#FF8A00", "#E2500C", "#C026D3", "#9333EA"],
 }
 # A dobra do símbolo fica com o vermelho do kit v1: o logo não muda com a paleta da interface
 COR_DOBRA = "#FF5A36"
@@ -430,11 +452,17 @@ def gerar_tokens():
     linhas.append("")
     linhas += [f"  --hc-shadow-{nome}: {valor};" for nome, valor in sombras.items()]
     linhas.append("}")
+    linhas += ["", "/* Tema claro: o site põe data-tema=\"claro\" no <html> */", ':root[data-tema="claro"] {']
+    linhas += [f"  --hc-{nome.replace('_', '-')}: {valor};" for nome, valor in CORES_CLARO.items()]
+    linhas += [f"  --hc-gradient-{nome}: {css_gradiente(cores)};" for nome, cores in GRADIENTES_CLARO.items()]
+    linhas.append("  --hc-shadow-soft: 0 10px 30px rgba(23,23,27,.08);")
+    linhas.append("}")
     salvar(PASTA_TOKENS / "design-tokens.css", "\n".join(linhas) + "\n")
 
     salvar(PASTA_TOKENS / "cores.json", json.dumps({
         "cores": CORES,
         "gradientes": GRADIENTES,
+        "tema_claro": {"cores": CORES_CLARO, "gradientes": GRADIENTES_CLARO},
         "tipografia": {
             "display": {"familia": "Montserrat", "pesos": [600, 700]},
             "body": {"familia": "Inter", "pesos": [400, 500, 600, 700]},

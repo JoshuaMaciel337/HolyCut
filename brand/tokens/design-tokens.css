@@ -1,9 +1,9 @@
 /* HolyCut Design Tokens — gerado por brand/gerar_brand_kit.py, não editar à mão */
 :root {
-  --hc-ink: #0B0B0F;
-  --hc-surface: #131317;
-  --hc-surface-2: #1A1A1F;
-  --hc-border: #2A2A32;
+  --hc-ink: #070709;
+  --hc-surface: #0F0F13;
+  --hc-surface-2: #17171C;
+  --hc-border: #25252D;
   --hc-white: #FFFFFF;
   --hc-text: #F5F5F7;
   --hc-muted: #9C9EA8;
@@ -34,4 +34,24 @@
   --hc-shadow-soft: 0 10px 30px rgba(0,0,0,.28);
   --hc-shadow-glow-violet: 0 0 28px rgba(168,85,247,.35);
   --hc-shadow-glow-orange: 0 0 28px rgba(255,138,0,.30);
+}
+
+/* Tema claro: o site põe data-tema="claro" no <html> */
+:root[data-tema="claro"] {
+  --hc-ink: #F8F6F2;
+  --hc-surface: #FFFFFF;
+  --hc-surface-2: #F1EEE8;
+  --hc-border: #E3DFD7;
+  --hc-text: #17171B;
+  --hc-muted: #5C5C66;
+  --hc-yellow: #A16207;
+  --hc-orange: #C2570C;
+  --hc-coral: #C2410C;
+  --hc-red: #DC2626;
+  --hc-violet: #9333EA;
+  --hc-magenta: #C026D3;
+  --hc-cyan: #0E7490;
+  --hc-gradient-marca: linear-gradient(135deg, #FF8A00 0%, #E2500C 100%);
+  --hc-gradient-brand: linear-gradient(135deg, #FF8A00 0%, #E2500C 33%, #C026D3 67%, #9333EA 100%);
+  --hc-shadow-soft: 0 10px 30px rgba(23,23,27,.08);
 }
