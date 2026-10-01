@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from worker.tarefas.capas import executar_capas_culto
 from worker.tarefas.diagnostico_gpu import executar_diagnostico_gpu
+from worker.tarefas.estudo import executar_estudo
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.limpeza_audio import executar_limpeza_audio
 from worker.tarefas.momentos import executar_momentos
@@ -36,4 +37,5 @@ REGISTRO = {
     "renderizacao": Tarefa(executar_renderizacao, ao_falhar=marcar_exportacao_com_erro),
     "preparar_musica": Tarefa(executar_preparar_musica, ao_falhar=marcar_musica_com_erro),
     "capas_culto": Tarefa(executar_capas_culto),
+    "estudo_culto": Tarefa(executar_estudo),
 }

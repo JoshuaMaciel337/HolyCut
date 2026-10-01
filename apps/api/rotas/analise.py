@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import JobSaida, MomentosSaida, RostoSaida, job_para_saida
+from api.esquemas import EstudoSaida, JobSaida, MomentosSaida, RostoSaida, job_para_saida
 from api.rotas.midias import buscar_midia
 from core.config import MODO_IA
 from core.modelos.job import STATUS_ERRO, STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
@@ -86,3 +86,28 @@ async def pedir_momentos(midia_id: str, db=Depends(obter_db), usuario: dict = De
         raise HTTPException(status.HTTP_409_CONFLICT, "Os momentos com IA estão desligados neste servidor.")
     midia = await buscar_midia(db, midia_id, usuario)
     return await _enfileirar(db, midia, "momentos")
+
+
+@router.get("/{midia_id}/estudo", response_model=EstudoSaida)
+async def obter_estudo(midia_id: str, db=Depends(obter_db), usuario: dict = Depends(usuario_atual)):
+    """O HolyStudy da pregação: resumo em frases ditas, temas, versículos e o guia para células."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    documento = await db.estudos.find_one({"midia_id": midia["_id"], "organizacao_id": midia["organizacao_id"]})
+    job = await _ultimo_job(db, midia, "estudo_culto")
+    andamento = _andamento(EstudoSaida, documento, job, "O estudo desta pregação ainda não foi feito.")
+    if andamento is not None:
+        return andamento
+    return EstudoSaida.model_validate({**documento, "status": "pronta", "progresso": 100,
+                                       "mensagem": "Estudo pronto"})
+
+
+@router.post("/{midia_id}/estudo", response_model=JobSaida)
+async def pedir_estudo(midia_id: str, db=Depends(obter_db), usuario: dict = Depends(usuario_atual)):
+    if MODO_IA != "real":
+        raise HTTPException(status.HTTP_409_CONFLICT, "O estudo com IA está desligado neste servidor.")
+    midia = await buscar_midia(db, midia_id, usuario)
+    transcricao = await db.transcricoes.find_one({"midia_id": midia["_id"], "organizacao_id": midia["organizacao_id"]},
+                                                 {"_id": 1})
+    if transcricao is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "O estudo sai da transcrição. Transcreva a gravação primeiro.")
+    return await _enfileirar(db, midia, "estudo_culto")

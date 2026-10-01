@@ -25,7 +25,7 @@ from core.modelos.transcricao import (
 )
 from core.modelos.versiculo import detectar_versiculos
 from core.utils import storage
-from core.utils.fila import enfileirar_momentos, enfileirar_rosto, enfileirar_sugestao
+from core.utils.fila import enfileirar_estudo, enfileirar_momentos, enfileirar_rosto, enfileirar_sugestao
 from core.utils.mongo import agora
 
 
@@ -169,6 +169,7 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
                  f"{len(documento['versiculos'])} versículos.")
     if palavras and MODO_IA == "real":
         enfileirar_sugestao(db, organizacao_id, str(midia_id))
+        enfileirar_estudo(db, organizacao_id, str(midia_id))
         enfileirar_momentos(db, organizacao_id, str(midia_id))
         if midia.get("video"):
             enfileirar_rosto(db, organizacao_id, str(midia_id))

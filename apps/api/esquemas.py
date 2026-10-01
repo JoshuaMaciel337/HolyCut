@@ -654,6 +654,40 @@ class MomentosSaida(BaseModel):
     cenas: list[float] = []
 
 
+class TrechoDitoSaida(BaseModel):
+    """Uma frase como o pregador disse, com o momento da gravação."""
+    texto: str
+    inicio: float
+    fim: float | None = None
+
+
+class PerguntaEstudoSaida(BaseModel):
+    pergunta: str
+    base: TrechoDitoSaida
+
+
+class VersiculoChaveSaida(BaseModel):
+    referencia: str
+    inicio: float
+    citacao: str = ""
+    vezes: int = 1
+
+
+class EstudoSaida(BaseModel):
+    status: str
+    progresso: int = 0
+    mensagem: str = ""
+    erro: str | None = None
+    gerado_por_ia: bool = False
+    resumo: list[TrechoDitoSaida] = []
+    temas: list[str] = []
+    personagens: list[str] = []
+    versiculos_chave: list[VersiculoChaveSaida] = []
+    perguntas: list[PerguntaEstudoSaida] = []
+    aplicacoes: list[TrechoDitoSaida] = []
+    oracao: str = ""
+
+
 def job_para_saida(doc: dict) -> JobSaida:
     return JobSaida.model_validate({**doc, "id": str(doc["_id"])})
 

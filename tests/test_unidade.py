@@ -54,10 +54,11 @@ def test_tipos_por_recursos():
         "teste", "enquadramento_rosto", "ingestao", "renderizacao", "preparar_musica", "capas_culto",
     ]
     assert tipos_por_recursos(["gpu"]) == [
-        "diagnostico_gpu", "transcricao", "limpeza_audio", "sugestao_cortes", "momentos", "renderizacao_nvenc",
+        "diagnostico_gpu", "transcricao", "limpeza_audio", "sugestao_cortes", "estudo_culto", "momentos",
+        "renderizacao_nvenc",
     ]
     assert set(tipos_por_recursos(["cpu", "gpu"])) == {
-        "teste", "diagnostico_gpu", "transcricao", "limpeza_audio", "sugestao_cortes", "momentos",
+        "teste", "diagnostico_gpu", "transcricao", "limpeza_audio", "sugestao_cortes", "estudo_culto", "momentos",
         "renderizacao_nvenc", "enquadramento_rosto", "ingestao", "renderizacao", "preparar_musica", "capas_culto",
     }
 

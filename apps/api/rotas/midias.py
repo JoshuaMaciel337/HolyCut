@@ -43,6 +43,7 @@ TIPOS_ARQUIVO = {
 }
 # Os arquivos de uma mídia não mudam depois de gerados
 CACHE_ARQUIVOS = "private, max-age=86400"
+COLECOES_DA_ANALISE = ("transcricoes", "sugestoes", "rostos", "momentos", "estudos")
 PRIORIDADE_CAPAS = 7   # rápido, e a pessoa está vendo a capa mudar
 
 
@@ -196,6 +197,9 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     )
     await apagar_exportacoes(db, {"midia_id": midia["_id"]})
     await db.projetos.delete_many({"midia_id": midia["_id"]})
+    # O que a IA tirou da gravação (a transcrição é o texto da pregação) vai junto
+    for colecao in COLECOES_DA_ANALISE:
+        await db[colecao].delete_many({"midia_id": midia["_id"], "organizacao_id": midia["organizacao_id"]})
     await db.midias.delete_one({"_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
