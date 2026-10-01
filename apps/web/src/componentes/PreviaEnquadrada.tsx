@@ -86,7 +86,6 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
           }}
         />
         {fundo?.escurecer ? <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: fundo.escurecer }} /> : null}
-        {children}
         <div
           className="absolute inset-0 cursor-grab active:cursor-grabbing"
           role="application"
@@ -102,6 +101,8 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
             inicio.current = null;
           }}
         />
+        {/* Por cima da área de enquadrar: o texto e o logo se arrastam sozinhos; o resto do quadro enquadra o vídeo */}
+        {children}
         <span className="pointer-events-none absolute left-1/2 top-3 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-xs text-white/90">
           <Move className="size-3.5" aria-hidden /> Arraste para enquadrar
         </span>

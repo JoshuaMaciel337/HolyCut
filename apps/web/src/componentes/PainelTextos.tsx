@@ -133,7 +133,7 @@ export function PainelTextos({ textos, aoMudar, duracaoFinal, posicaoFinal }: Pr
                 ) : null}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Opcoes rotulo="Estilo" opcoes={ESTILOS} valor={texto.estilo} aoMudar={(estilo) => atualizar(texto.id, { estilo })} />
-                  <Opcoes rotulo="Posição" opcoes={POSICOES} valor={texto.posicao} aoMudar={(posicao) => atualizar(texto.id, { posicao })} />
+                  <Opcoes rotulo="Posição" opcoes={POSICOES} valor={texto.posicao} aoMudar={(posicao) => atualizar(texto.id, { posicao, x: null, y: null, rotacao: 0 })} />
                 </div>
                 <label className="flex items-center gap-3 text-sm">
                   <span className="w-16 shrink-0 text-suave">Tamanho</span>

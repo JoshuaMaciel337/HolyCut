@@ -20,8 +20,17 @@ const ESPERA_MS = 250;
  * Enquanto a próxima versão não chega, continua mostrando a anterior (sem piscar).
  */
 export function useCamada(pedido: PedidoCamada | null): string | null {
+  return useCamadaComCaixa(pedido).url;
+}
+
+/** [x0, y0, x1, y1] do elemento, em pixels da camada. */
+export type Caixa = [number, number, number, number];
+
+/** A camada e a caixa do elemento dentro dela, para a prévia desenhar a seleção com as alças. */
+export function useCamadaComCaixa(pedido: PedidoCamada | null): { url: string | null; caixa: Caixa | null } {
   const chave = pedido ? JSON.stringify(pedido) : null;
   const [url, setUrl] = useState<string | null>(null);
+  const [caixa, setCaixa] = useState<Caixa | null>(null);
   const ultima = useRef<string | null>(null);
 
   useEffect(() => {
@@ -37,10 +46,12 @@ export function useCamada(pedido: PedidoCamada | null): string | null {
           signal: controlador.signal,
         });
         if (!resposta.ok) return;
+        const valores = (resposta.headers.get("X-Caixa") ?? "").split(",").map(Number);
         const nova = URL.createObjectURL(await resposta.blob());
         if (ultima.current) URL.revokeObjectURL(ultima.current);
         ultima.current = nova;
         setUrl(nova);
+        setCaixa(valores.length === 4 && valores.every(Number.isFinite) && valores[2] > valores[0] ? (valores as Caixa) : null);
       } catch {
         // cancelada por uma edição mais nova, ou sem conexão: fica a versão anterior
       }
@@ -58,5 +69,5 @@ export function useCamada(pedido: PedidoCamada | null): string | null {
     [],
   );
 
-  return chave ? url : null;
+  return chave ? { url, caixa } : { url: null, caixa: null };
 }

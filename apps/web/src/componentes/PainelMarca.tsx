@@ -47,7 +47,7 @@ export function PainelMarca({ marca, temLogo, aoMudar }: { marca: Marca; temLogo
                   aria-checked={marca.posicao === canto.valor}
                   aria-label={canto.rotulo}
                   title={canto.rotulo}
-                  onClick={() => aoMudar({ ...marca, posicao: canto.valor })}
+                  onClick={() => aoMudar({ ...marca, posicao: canto.valor, x: null, y: null, rotacao: 0 })}
                   className={`flex rounded-lg p-1 ${canto.classe} ${marca.posicao === canto.valor ? "bg-laranja/20" : "hover:bg-surface-2"}`}
                 >
                   <span className={`size-3 rounded-sm ${marca.posicao === canto.valor ? "bg-laranja" : "bg-borda"}`} />

@@ -628,9 +628,12 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 - [ ] **Editor no estilo do CapCut e do Opus**, em etapas:
   - [x] 1. Casca nova: no computador, a fala à esquerda, a prévia no centro, o painel da ferramenta e a barra de ícones à direita, e a linha do tempo larga embaixo; no celular, a prévia em cima, a linha do tempo e a barra fixa embaixo, com o painel subindo como gaveta. Os painéis são os mesmos de antes
   - [ ] 2. Mexer direto na prévia: arrastar, aumentar e girar a legenda, os textos e o logo, e girar o vídeo (a posição vai para o render, medida contra a prévia)
+    - [x] Textos e logo: clicar seleciona, arrastar move, a alça laranja aumenta e a roxa gira. Medido: a faixa do texto no vídeo exportado cai a até 2 px da caixa da prévia
+    - [ ] A legenda automática e girar o próprio vídeo
   - [ ] 3. Camadas: imagens, PNG, ícones e figurinhas por cima do vídeo, com entrada e saída na linha do tempo
   - [ ] 4. Efeitos de vídeo (zoom, tremor, brilho, transições entre as partes) e efeitos sonoros com licença
   - [ ] 5. Voltar para a IA depois de reeditar (refazer legenda, títulos e legenda do post a partir do corte novo) ou seguir para exportar
+- [ ] **Edição automática com estilos:** a IA edita sozinha seguindo um estilo da biblioteca (por exemplo, "Reel dinâmico" ou "Devocional calmo": ritmo dos cortes, zoom, legenda, filtro, música e posição do logo), e o resultado é um projeto comum, que a pessoa reabre e muda. A liberdade é só na edição, nunca no conteúdo: nada de fala ou título que o pastor não disse. Aprender o estilo a partir de um vídeo de exemplo fica para depois
 - [ ] Abertura, encerramento e chamada no modelo, e a fonte própria da igreja
 - [ ] Tela dividida com o pregador e o telão
 

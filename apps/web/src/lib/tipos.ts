@@ -262,6 +262,11 @@ export type Marca = {
   posicao: PosicaoLogo;
   tamanho: number;
   opacidade: number;
+  /** Centro arrastado na prévia (0 a 1 da moldura). Sem ele, vale a posição pronta. */
+  x?: number | null;
+  y?: number | null;
+  /** Graus, no sentido do relógio. */
+  rotacao?: number;
 };
 
 export type EstiloTexto = "destaque" | "limpo" | "manuscrito";
@@ -280,6 +285,11 @@ export type TextoProjeto = {
   fim: number | null;
   /** Escala da fonte, de 0,5 a 2. */
   tamanho: number;
+  /** Centro arrastado na prévia (0 a 1 da moldura). Sem ele, vale a posição pronta. */
+  x?: number | null;
+  y?: number | null;
+  /** Graus, no sentido do relógio. */
+  rotacao?: number;
 };
 
 export type Fundo = {

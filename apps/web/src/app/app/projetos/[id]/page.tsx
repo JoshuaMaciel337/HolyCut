@@ -32,7 +32,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { CamadaSobreposta } from "@/componentes/CamadaSobreposta";
+import { CamadaSobreposta, type MudancaCamada } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { LegendaNaPrevia } from "@/componentes/LegendaNaPrevia";
 import { LinhaDoTempo } from "@/componentes/LinhaDoTempo";
@@ -118,6 +118,8 @@ export default function PaginaProjeto() {
   const [ferramenta, setFerramenta] = useState<Ferramenta>("legenda");
   // No celular o painel é uma gaveta que abre ao tocar na ferramenta; no computador ele fica sempre à vista
   const [folhaAberta, setFolhaAberta] = useState(false);
+  // O elemento selecionado na prévia: "logo" ou o id de um texto
+  const [selecionado, setSelecionado] = useState<string | null>(null);
   const [tempo, setTempo] = useState(0);
   const [tocando, setTocando] = useState(false);
   const [exportando, setExportando] = useState(false);
@@ -622,6 +624,28 @@ export default function PaginaProjeto() {
   const indicePico = forma ? Math.floor(tempo * forma.picos_por_segundo) : -1;
   const falando = forma ? Math.max(...forma.picos.slice(Math.max(indicePico - 1, 0), indicePico + 2), 0) >= PICO_DE_FALA : false;
 
+  // O gesto na prévia vira posição, escala e giro do elemento, dentro dos limites que o render aceita
+  const girar = (atual: number | undefined, giro: number) => {
+    const total = (((atual ?? 0) + giro + 180) % 360 + 360) % 360 - 180;
+    return Math.round(total * 10) / 10;
+  };
+  const moverTexto = (id: string, { x, y, fator, giro }: MudancaCamada) =>
+    editar({
+      textos: edicao.textos.map((texto) =>
+        texto.id === id
+          ? { ...texto, x, y, tamanho: Math.min(Math.max(texto.tamanho * fator, 0.5), 2), rotacao: girar(texto.rotacao, giro) }
+          : texto,
+      ),
+    });
+  const moverLogo = ({ x, y, fator, giro }: MudancaCamada) =>
+    editar({
+      marca: { ...edicao.marca, x, y, tamanho: Math.min(Math.max(edicao.marca.tamanho * fator, 0.06), 0.4), rotacao: girar(edicao.marca.rotacao, giro) },
+    });
+  const selecionar = (qual: string, ferramentaDele: Ferramenta) => {
+    setSelecionado(qual);
+    setFerramenta(ferramentaDele);
+  };
+
   const painel = (qual: Ferramenta) => {
     switch (qual) {
     case "formato":
@@ -884,6 +908,7 @@ export default function PaginaProjeto() {
           className="mx-auto flex w-full max-w-[var(--largura-previa)] flex-col items-center gap-3 lg:sticky lg:top-4 lg:max-w-none lg:gap-4"
           style={{ "--largura-previa": `calc(46dvh * ${alvo.largura / alvo.altura})` } as React.CSSProperties}
           aria-label="Prévia"
+          onPointerDown={() => setSelecionado(null)}
         >
           <FiltroSvg id="cor-previa" filtro={filtroEscolhido} intensidade={edicao.cor.intensidade} />
           <PreviaEnquadrada
@@ -899,7 +924,10 @@ export default function PaginaProjeto() {
             filtroCor={cssDoFiltro("cor-previa", filtroEscolhido, edicao.cor.intensidade)}
           >
             {identidade?.logo && edicao.marca.logo ? (
-              <CamadaSobreposta pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "logo", marca: edicao.marca }} />
+              <CamadaSobreposta
+                pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "logo", marca: edicao.marca }}
+                edicao={{ selecionada: selecionado === "logo", aoSelecionar: () => selecionar("logo", "marca"), aoMudar: moverLogo }}
+              />
             ) : null}
             {edicao.textos
               .filter((texto) => texto.texto.trim())
@@ -908,6 +936,11 @@ export default function PaginaProjeto() {
                   key={texto.id}
                   pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "texto", texto }}
                   visivel={posicaoFinal >= texto.inicio && (texto.fim === null || posicaoFinal < texto.fim)}
+                  edicao={{
+                    selecionada: selecionado === texto.id,
+                    aoSelecionar: () => selecionar(texto.id, "textos"),
+                    aoMudar: (mudanca) => moverTexto(texto.id, mudanca),
+                  }}
                 />
               ))}
             <LegendaNaPrevia
