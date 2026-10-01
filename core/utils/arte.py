@@ -179,7 +179,7 @@ def para_png(imagem: Image.Image) -> bytes:
 # -----------------------------------------------
 # CAPAS DO ACERVO
 # -----------------------------------------------
-FUNDO_ESCURO = (8, 9, 15)       # --hc-ink
+FUNDO_ESCURO = (11, 11, 15)     # --hc-ink
 MAX_LINHAS_TITULO_POSTER = 4
 MAX_LINHAS_TITULO_BANNER = 3
 

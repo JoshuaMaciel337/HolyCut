@@ -1,26 +1,26 @@
 /* HolyCut Design Tokens — gerado por brand/gerar_brand_kit.py, não editar à mão */
 :root {
-  --hc-ink: #08090F;
-  --hc-surface: #11131A;
-  --hc-surface-2: #1A1D26;
-  --hc-border: #2A2E3A;
+  --hc-ink: #0B0B0F;
+  --hc-surface: #131317;
+  --hc-surface-2: #1A1A1F;
+  --hc-border: #2A2A32;
   --hc-white: #FFFFFF;
-  --hc-text: #F5F7FA;
-  --hc-muted: #A8AFBD;
+  --hc-text: #F5F5F7;
+  --hc-muted: #9C9EA8;
   --hc-yellow: #FFD24D;
   --hc-orange: #FF8A00;
   --hc-coral: #FF6A3D;
-  --hc-red: #FF5A36;
-  --hc-violet: #7B61FF;
+  --hc-red: #FF6B6B;
+  --hc-violet: #A855F7;
   --hc-magenta: #F05BFF;
   --hc-cyan: #43D9FF;
 
   --hc-gradient-marca: linear-gradient(135deg, #FFD24D 0%, #FF8A00 100%);
   --hc-gradient-marca-claro: linear-gradient(135deg, #FF9A1F 0%, #FF5A36 100%);
   --hc-gradient-perna: linear-gradient(135deg, #FF6A3D 0%, #FF8A00 50%, #FFC43D 100%);
-  --hc-gradient-brand: linear-gradient(135deg, #FFD24D 0%, #FF8A00 33%, #F05BFF 67%, #7B61FF 100%);
-  --hc-gradient-ia: linear-gradient(135deg, #7B61FF 0%, #F05BFF 100%);
-  --hc-gradient-cta: linear-gradient(135deg, #7B61FF 0%, #FF8A00 100%);
+  --hc-gradient-brand: linear-gradient(135deg, #FFD24D 0%, #FF8A00 33%, #F05BFF 67%, #A855F7 100%);
+  --hc-gradient-ia: linear-gradient(135deg, #A855F7 0%, #F05BFF 100%);
+  --hc-gradient-cta: linear-gradient(135deg, #A855F7 0%, #FF8A00 100%);
 
   --hc-font-display: 'Montserrat', system-ui, sans-serif;
   --hc-font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -32,6 +32,6 @@
   --hc-radius-pill: 999px;
 
   --hc-shadow-soft: 0 10px 30px rgba(0,0,0,.28);
-  --hc-shadow-glow-violet: 0 0 28px rgba(123,97,255,.35);
+  --hc-shadow-glow-violet: 0 0 28px rgba(168,85,247,.35);
   --hc-shadow-glow-orange: 0 0 28px rgba(255,138,0,.30);
 }

@@ -232,7 +232,7 @@ export default function PaginaIdentidade() {
             <p className="mt-1 text-sm text-suave">Salve para ver a cor nova aqui.</p>
             <div
               className="relative mx-auto mt-4 aspect-[9/16] w-48 overflow-hidden rounded-2xl"
-              style={{ background: "linear-gradient(180deg, #1b2240, #3a2a6b 60%, #08090F)" }}
+              style={{ background: "linear-gradient(180deg, #1d1530, #3b2463 60%, var(--hc-ink))" }}
             >
               {exemplo ? (
                 <Image src={exemplo} alt="Exemplo de texto com a cor da igreja" fill unoptimized sizes="192px" />

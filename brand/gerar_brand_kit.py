@@ -5,6 +5,7 @@
 # das definições deste arquivo. Rodar de novo sempre que mudar cor ou forma.
 #
 #   python brand/gerar_brand_kit.py
+#   python brand/gerar_brand_kit.py --so-tokens   (só as cores, sem logos nem navegador)
 #
 # Dependências: fonttools, Pillow (brand/requirements.txt)
 # PNGs são renderizados pelo Edge ou Chrome em modo headless.
@@ -13,6 +14,7 @@
 # -----------------------------------------------
 # IMPORTS — stdlib primeiro, depois terceiros
 # -----------------------------------------------
+import argparse
 import json
 import logging
 import os
@@ -50,23 +52,27 @@ TIMEOUT_RENDER_SEGUNDOS = 60
 
 SLOGAN = ["TRANSFORME MOMENTOS", "EM HISTÓRIAS."]
 
-# Paleta oficial — mesmos valores do kit v1, com o coral do símbolo
+# Paleta oficial — kit v2 (outubro de 2026): pretos neutros, sem o azulado do v1,
+# e o roxo #A855F7 dos elementos de IA. O cinza do texto secundário é um pouco mais
+# claro que o #888B93 do kit, para passar com folga no contraste (7:1 no fundo).
 CORES = {
-    "ink": "#08090F",
-    "surface": "#11131A",
-    "surface_2": "#1A1D26",
-    "border": "#2A2E3A",
+    "ink": "#0B0B0F",
+    "surface": "#131317",
+    "surface_2": "#1A1A1F",
+    "border": "#2A2A32",
     "white": "#FFFFFF",
-    "text": "#F5F7FA",
-    "muted": "#A8AFBD",
+    "text": "#F5F5F7",
+    "muted": "#9C9EA8",
     "yellow": "#FFD24D",
     "orange": "#FF8A00",
     "coral": "#FF6A3D",
-    "red": "#FF5A36",
-    "violet": "#7B61FF",
+    "red": "#FF6B6B",
+    "violet": "#A855F7",
     "magenta": "#F05BFF",
     "cyan": "#43D9FF",
 }
+# A dobra do símbolo fica com o vermelho do kit v1: o logo não muda com a paleta da interface
+COR_DOBRA = "#FF5A36"
 
 GRADIENTES = {
     # Símbolo e "Cut" do logo: quente, como no styleboard
@@ -75,11 +81,11 @@ GRADIENTES = {
     "marca-claro": ["#FF9A1F", "#FF5A36"],
     "perna": ["#FF6A3D", "#FF8A00", "#FFC43D"],
     # Destaques gerais e ilustrações
-    "brand": ["#FFD24D", "#FF8A00", "#F05BFF", "#7B61FF"],
+    "brand": ["#FFD24D", "#FF8A00", "#F05BFF", "#A855F7"],
     # Elementos de IA
-    "ia": ["#7B61FF", "#F05BFF"],
+    "ia": ["#A855F7", "#F05BFF"],
     # Botões principais, como o "Comece agora" do mockup
-    "cta": ["#7B61FF", "#FF8A00"],
+    "cta": ["#A855F7", "#FF8A00"],
 }
 
 # -----------------------------------------------
@@ -191,7 +197,7 @@ def desenhar_simbolo(modo: str, prefixo: str = "hc") -> tuple[str, str]:
         defs = ""
     else:
         base = CORES["white"] if modo == "escuro" else CORES["ink"]
-        perna, dobra = f"url(#{prefixo}-perna)", CORES["red"]
+        perna, dobra = f"url(#{prefixo}-perna)", COR_DOBRA
         defs = gradiente_linear(f"{prefixo}-perna", GRADIENTES["perna"], 332, 208, 238, 452)
 
     def forma(pontos: str, cor: str, raio: int = RAIO_CANTO) -> str:
@@ -408,7 +414,7 @@ def gerar_tokens():
     raios = {"sm": 8, "md": 14, "lg": 22, "pill": 999}
     sombras = {
         "soft": "0 10px 30px rgba(0,0,0,.28)",
-        "glow-violet": "0 0 28px rgba(123,97,255,.35)",
+        "glow-violet": "0 0 28px rgba(168,85,247,.35)",
         "glow-orange": "0 0 28px rgba(255,138,0,.30)",
     }
 
@@ -481,6 +487,14 @@ def gerar_pngs(simbolos: list[Path], horizontais: list[Path], icones: dict[str, 
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Gera o brand kit do HolyCut")
+    parser.add_argument("--so-tokens", action="store_true",
+                        help="Gera só os tokens de cor, sem redesenhar os logos e sem abrir o navegador")
+    args = parser.parse_args()
+    if args.so_tokens:
+        gerar_tokens()
+        logging.info("Tokens gerados.")
+        return
     if not FONTE_MONTSERRAT.exists():
         logging.error(f"Fonte não encontrada: {FONTE_MONTSERRAT}")
         return

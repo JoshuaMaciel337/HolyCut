@@ -67,7 +67,7 @@ export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cort
 
     const estilos = getComputedStyle(document.documentElement);
     const gradiente = contexto.createLinearGradient(0, 0, largura, 0);
-    gradiente.addColorStop(0, estilos.getPropertyValue("--hc-violet").trim() || "#7B61FF");
+    gradiente.addColorStop(0, estilos.getPropertyValue("--hc-violet").trim() || "#A855F7");
     gradiente.addColorStop(1, estilos.getPropertyValue("--hc-orange").trim() || "#FF8A00");
     const tocado = duracao > 0 ? (tempo / duracao) * largura : 0;
     const paraX = (segundos: number) => (duracao > 0 ? (segundos / duracao) * largura : 0);
@@ -87,10 +87,10 @@ export function FormaDeOnda({ picos, duracao, tempo, aoBuscar, altura = 72, cort
     });
     if (faixa) {
       const [inicio, fim] = faixa.map(paraX);
-      contexto.fillStyle = "rgba(8, 9, 15, 0.72)";
+      contexto.fillStyle = "rgba(11, 11, 15, 0.72)";
       contexto.fillRect(0, 0, inicio, altura);
       contexto.fillRect(fim, 0, largura - fim, altura);
-      contexto.fillStyle = "rgba(123, 97, 255, 0.22)";
+      contexto.fillStyle = "rgba(168, 85, 247, 0.22)";
       for (const [a, b] of outrasFaixas) contexto.fillRect(paraX(a), 0, Math.max(paraX(b) - paraX(a), 1), altura);
       contexto.fillStyle = estilos.getPropertyValue("--hc-orange").trim() || "#FF8A00";
       for (const x of [inicio, fim]) {

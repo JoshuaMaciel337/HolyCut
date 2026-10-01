@@ -1,17 +1,17 @@
 {
   "cores": {
-    "ink": "#08090F",
-    "surface": "#11131A",
-    "surface_2": "#1A1D26",
-    "border": "#2A2E3A",
+    "ink": "#0B0B0F",
+    "surface": "#131317",
+    "surface_2": "#1A1A1F",
+    "border": "#2A2A32",
     "white": "#FFFFFF",
-    "text": "#F5F7FA",
-    "muted": "#A8AFBD",
+    "text": "#F5F5F7",
+    "muted": "#9C9EA8",
     "yellow": "#FFD24D",
     "orange": "#FF8A00",
     "coral": "#FF6A3D",
-    "red": "#FF5A36",
-    "violet": "#7B61FF",
+    "red": "#FF6B6B",
+    "violet": "#A855F7",
     "magenta": "#F05BFF",
     "cyan": "#43D9FF"
   },
@@ -33,14 +33,14 @@
       "#FFD24D",
       "#FF8A00",
       "#F05BFF",
-      "#7B61FF"
+      "#A855F7"
     ],
     "ia": [
-      "#7B61FF",
+      "#A855F7",
       "#F05BFF"
     ],
     "cta": [
-      "#7B61FF",
+      "#A855F7",
       "#FF8A00"
     ]
   },
@@ -77,7 +77,7 @@
   },
   "sombras": {
     "soft": "0 10px 30px rgba(0,0,0,.28)",
-    "glow-violet": "0 0 28px rgba(123,97,255,.35)",
+    "glow-violet": "0 0 28px rgba(168,85,247,.35)",
     "glow-orange": "0 0 28px rgba(255,138,0,.30)"
   }
 }

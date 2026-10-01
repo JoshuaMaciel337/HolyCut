@@ -48,16 +48,17 @@ Os valores oficiais estão em [tokens/design-tokens.css](tokens/design-tokens.cs
 
 | Token | Cor | Uso |
 |---|---|---|
-| `ink` | `#08090F` | Fundo principal |
-| `surface` | `#11131A` | Cards |
-| `surface-2` | `#1A1D26` | Elementos dentro de cards |
-| `border` | `#2A2E3A` | Bordas e divisores |
-| `text` | `#F5F7FA` | Texto principal |
-| `muted` | `#A8AFBD` | Texto secundário |
+| `ink` | `#0B0B0F` | Fundo principal |
+| `surface` | `#131317` | Cards |
+| `surface-2` | `#1A1A1F` | Elementos dentro de cards |
+| `border` | `#2A2A32` | Bordas e divisores |
+| `text` | `#F5F5F7` | Texto principal |
+| `muted` | `#9C9EA8` | Texto secundário |
 | `yellow` | `#FFD24D` | Destaques |
 | `orange` | `#FF8A00` | Acento principal e hover |
-| `coral` / `red` | `#FF6A3D` / `#FF5A36` | Detalhes do símbolo |
-| `violet` | `#7B61FF` | Elementos de IA |
+| `coral` | `#FF6A3D` | Detalhes do símbolo |
+| `red` | `#FF6B6B` | Alertas e erros (a dobra do símbolo continua `#FF5A36`) |
+| `violet` | `#A855F7` | Elementos de IA |
 | `magenta` | `#F05BFF` | Acento secundário de IA |
 | `cyan` | `#43D9FF` | Dados e ícones |
 
