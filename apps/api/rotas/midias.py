@@ -218,6 +218,19 @@ async def baixar_arquivo(midia_id: str, nome: str, usuario=Depends(usuario_atual
                         headers={"Cache-Control": CACHE_ARQUIVOS})
 
 
+@router.get("/{midia_id}/original")
+async def baixar_original(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """A gravação como foi enviada, com o nome de origem: é o arquivo que o XML do DaVinci e do Premiere procura."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA or not midia.get("original"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
+    caminho = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], midia["original"]))
+    if not caminho.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
+    return FileResponse(caminho, media_type="application/octet-stream", filename=midia["nome_original"],
+                        content_disposition_type="attachment")
+
+
 @router.get("/{midia_id}/silencios", response_model=SilenciosSaida)
 async def silencios_da_midia(
     midia_id: str,

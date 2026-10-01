@@ -1,11 +1,13 @@
 # -----------------------------------------------
 # HolyCut API — projetos (Reels montados a partir de uma gravação)
 # -----------------------------------------------
+import io
 import logging
+import zipfile
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pymongo import ReturnDocument
 from starlette.concurrency import run_in_threadpool
 
@@ -20,7 +22,7 @@ from api.esquemas import (
     exportacao_para_saida,
     projeto_para_saida,
 )
-from api.rotas.exportacoes import apagar_exportacoes
+from api.rotas.exportacoes import apagar_exportacoes, nome_de_arquivo
 from api.rotas.identidade import carregar_identidade
 from api.rotas.modelos import buscar_modelo
 from api.rotas.musicas import buscar_musica
@@ -28,9 +30,17 @@ from core.modelos.fala import cortes_da_fala, fundir_cortes, palavras_para_edica
 from core.modelos.job import montar_job
 from core.modelos.legenda import COR_DOURADA, legenda_do_projeto, montar_blocos, palavras_da_transcricao
 from core.modelos.midia import ARQUIVO_AUDIO_LIMPO, STATUS_PRONTA
+from core.modelos.pacote_edicao import (
+    PALAVRAS_POR_LEGENDA_SRT,
+    clipes_da_linha_do_tempo,
+    gerar_srt,
+    gerar_xml,
+    leia_me,
+    taxa_de_quadros,
+)
 from core.modelos.projeto import DURACAO_MINIMA_TRECHO, montar_exportacao, montar_projeto, partes_do_projeto
 from core.utils.mongo import agora
-from core.utils.silencios import cortes_da_gravacao
+from core.utils.silencios import cortes_da_gravacao, cortes_do_projeto, partes_com_trechos
 
 router = APIRouter(prefix="/api/projetos", tags=["projetos"])
 PRIORIDADE_RENDER = 3
@@ -189,3 +199,40 @@ async def exportar_projeto(projeto_id: str, dados: ExportarEntrada | None = None
     await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"job_id": job["_id"]}})
     logging.info(f"[{usuario['organizacao_id']}] Exportação na fila: {projeto['nome']}")
     return exportacao_para_saida({**exportacao, "job_id": job["_id"]}, job)
+
+
+def montar_pacote(projeto: dict, midia: dict, palavras: list[dict]) -> tuple[str, bytes]:
+    """O .zip com o XML dos cortes, o SRT da legenda e o passo a passo. Devolve o nome do arquivo e os bytes."""
+    cortes = cortes_do_projeto(midia, projeto, palavras)
+    partes = partes_com_trechos(projeto, cortes)
+    _, _, quadros = taxa_de_quadros(midia["video"].get("fps"))
+    base = nome_de_arquivo(projeto["nome"], "")
+    xml = gerar_xml(projeto["nome"], midia["nome_original"], float(midia["duracao"]), midia["video"],
+                    midia.get("audio"), clipes_da_linha_do_tempo(partes, quadros))
+    legenda = legenda_do_projeto(projeto)
+    blocos = montar_blocos(palavras_visiveis(palavras, legenda), [parte for parte, _ in partes], cortes,
+                           PALAVRAS_POR_LEGENDA_SRT)
+    srt = gerar_srt(blocos)
+    memoria = io.BytesIO()
+    with zipfile.ZipFile(memoria, "w", zipfile.ZIP_DEFLATED) as pacote:
+        pacote.writestr(f"{base}.xml", xml)
+        if srt:
+            pacote.writestr(f"{base}.srt", srt)
+        pacote.writestr("LEIA-ME.txt", leia_me(projeto["nome"], midia["nome_original"], base, bool(srt),
+                                               projeto["proporcao"]))
+    return f"{base}.zip", memoria.getvalue()
+
+
+@router.get("/{projeto_id}/pacote-edicao")
+async def baixar_pacote_edicao(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Os cortes do projeto para o DaVinci Resolve e o Premiere Pro: XML, SRT e o passo a passo, num .zip."""
+    projeto = await buscar_projeto(db, projeto_id, usuario)
+    midia = await buscar_midia_do_projeto(db, projeto["midia_id"], usuario)
+    if not midia.get("video") or not midia.get("duracao"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "O pacote de edição precisa de uma gravação com vídeo.")
+    transcricao = await db.transcricoes.find_one({"midia_id": midia["_id"],
+                                                  "organizacao_id": usuario["organizacao_id"]})
+    nome, conteudo = await run_in_threadpool(montar_pacote, projeto, midia, palavras_da_transcricao(transcricao))
+    return Response(conteudo, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}"', "Cache-Control": "no-store"})
