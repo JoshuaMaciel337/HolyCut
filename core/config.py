@@ -73,3 +73,4 @@ INTERVALO_LIMPEZA_SEGUNDOS = 60   # frequência da recuperação de jobs com pos
 # -----------------------------------------------
 MODO_IA = os.environ.get("MODO_IA", "simulado")  # "simulado" ou "real"
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODELO = os.environ.get("OLLAMA_MODELO", "gemma3:4b")
