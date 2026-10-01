@@ -61,6 +61,8 @@ def test_ingestao_de_video_horizontal(db_limpo):
     resultado, midia, job = processar(db_limpo, midia_id)
     assert resultado == "concluido", job.get("erro")
     assert midia["status"] == "pronta"
+    # Sem MODO_IA=real a ingestão não põe a transcrição na fila
+    assert db_limpo.jobs.find_one({"tipo": "transcricao"}) is None
     assert 11.5 < midia["duracao"] < 12.5
     assert midia["video"]["largura"] == 1920 and midia["video"]["fps"] == 60
     assert set(midia["arquivos"]) == {"proxy.mp4", "audio.wav", "forma_de_onda.json", "niveis.bin",

@@ -32,6 +32,22 @@ INDICES = {
     "midias": [
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
     ],
+    "transcricoes": [
+        ([("midia_id", 1)], {"unique": True}),
+        ([("organizacao_id", 1), ("midia_id", 1)], {}),
+    ],
+    "sugestoes": [
+        ([("midia_id", 1)], {"unique": True}),
+        ([("organizacao_id", 1), ("midia_id", 1)], {}),
+    ],
+    "rostos": [
+        ([("midia_id", 1)], {"unique": True}),
+        ([("organizacao_id", 1), ("midia_id", 1)], {}),
+    ],
+    "momentos": [
+        ([("midia_id", 1)], {"unique": True}),
+        ([("organizacao_id", 1), ("midia_id", 1)], {}),
+    ],
     "projetos": [
         ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
         ([("midia_id", 1)], {}),

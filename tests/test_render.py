@@ -158,6 +158,30 @@ def test_filtro_com_musica_sem_abaixar_e_sem_audio_na_gravacao():
     assert so_musica[1].startswith("[1:a]aresample=48000") and so_musica[1].endswith("[a]")
 
 
+def test_filtro_com_rosto_poe_o_sendcmd_antes_do_crop():
+    recorte = calcular_recorte(1920, 1080, "9:16")
+    grafo = montar_filtro([[(0.0, 2.0)]], recorte, 1080, 1920, tem_audio=False, comandos_rosto="C:/dados/rosto.txt")
+    assert "sendcmd=filename=C\\:/dados/rosto.txt,crop=" in grafo
+
+
+def test_filtro_com_audio_limpo_nao_desloca_as_camadas():
+    recorte = calcular_recorte(1920, 1080, "9:16")
+    uma = montar_filtro([[(0.0, 2.0)]], recorte, 1080, 1920, tem_audio=True, audio_limpo=(2, [(5.0, 9.0)]))
+    assert "[2:a]atrim=start=5.000:end=9.000" in uma
+    assert "[0:a]" not in uma
+
+    partes = [[(0.0, 2.0)], [(0.0, 1.0)]]
+    grafo = montar_filtro(partes, recorte, 1080, 1920, tem_audio=True, camadas=[(0, 3)],
+                          audio_limpo=(4, [(12.0, 20.0), (30.0, 40.0)])).split(";\n")
+    assert grafo[0].startswith("[4:a]asplit=2")
+    assert "atrim=start=12.000:end=20.000" in grafo[2]
+    assert "atrim=start=30.000:end=40.000" in grafo[4]
+    assert all("[0:a]" not in linha and "[1:a]" not in linha for linha in grafo)
+    assert any(linha.startswith("[base0][2:v]overlay") for linha in grafo)
+    with pytest.raises(ValueError):
+        montar_filtro(partes, recorte, 1080, 1920, tem_audio=True, audio_limpo=(1, [(0.0, 1.0)]))
+
+
 # -----------------------------------------------
 # PROJETO E EXPORTAÇÃO
 # -----------------------------------------------
@@ -167,6 +191,7 @@ def test_projeto_e_exportacao_guardam_a_configuracao():
     assert projeto["nome"] == "Reel · Culto de domingo"
     assert projeto["partes"] == [{"id": "p1", "inicio": 0.0, "fim": 2400.46}]
     assert projeto["silencios"] == {"intensidade": "media"}
+    assert projeto["audio"] == {"normalizar": True, "limpeza": False}
     assert projeto["musica"] == {"id": None, "volume": 0.25, "abaixar_na_fala": True, "inicio": 0.0}
     with pytest.raises(ValueError):
         montar_projeto("org1", midia, "u1", proporcao="3:2")

@@ -17,6 +17,7 @@ from core.modelos.job import (
     STATUS_EXECUTANDO,
     STATUS_PENDENTE,
     calcular_espera_retry,
+    montar_job,
 )
 from core.utils.mongo import agora
 
@@ -45,6 +46,49 @@ def enfileirar_job(db, job: dict):
     except Exception as e:
         logging.error(f"Erro ao enfileirar job {job.get('tipo')}: {e}")
         return None
+
+
+def enfileirar_transcricao(db, organizacao_id, midia_id: str):
+    """Coloca a transcrição na fila. Se já houver uma andando para essa mídia, devolve a que existe."""
+    ativo = db[COLECAO_JOBS].find_one({
+        "tipo": "transcricao",
+        "entrada.midia_id": str(midia_id),
+        "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]},
+    })
+    if ativo:
+        return ativo["_id"]
+    return enfileirar_job(db, montar_job("transcricao", organizacao_id, {"midia_id": str(midia_id)}))
+
+
+def enfileirar_sugestao(db, organizacao_id, midia_id: str):
+    """Cortes sugeridos. Se já houver um job andando para essa gravação, devolve o que existe."""
+    ativo = db[COLECAO_JOBS].find_one({
+        "tipo": "sugestao_cortes",
+        "entrada.midia_id": str(midia_id),
+        "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]},
+    })
+    if ativo:
+        return ativo["_id"]
+    return enfileirar_job(db, montar_job("sugestao_cortes", organizacao_id, {"midia_id": str(midia_id)}))
+
+
+def _enfileirar_unico(db, tipo: str, organizacao_id, midia_id: str):
+    ativo = db[COLECAO_JOBS].find_one({
+        "tipo": tipo,
+        "entrada.midia_id": str(midia_id),
+        "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]},
+    })
+    if ativo:
+        return ativo["_id"]
+    return enfileirar_job(db, montar_job(tipo, organizacao_id, {"midia_id": str(midia_id)}))
+
+
+def enfileirar_momentos(db, organizacao_id, midia_id: str):
+    return _enfileirar_unico(db, "momentos", organizacao_id, midia_id)
+
+
+def enfileirar_rosto(db, organizacao_id, midia_id: str):
+    return _enfileirar_unico(db, "enquadramento_rosto", organizacao_id, midia_id)
 
 
 def pegar_proximo_job(db, tipos: list[str], worker_id: str) -> dict | None:

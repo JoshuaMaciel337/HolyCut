@@ -19,6 +19,12 @@ RECURSO_GPU = "gpu"
 TAREFAS = {
     "teste": RECURSO_CPU,
     "diagnostico_gpu": RECURSO_GPU,
+    "transcricao": RECURSO_GPU,
+    "limpeza_audio": RECURSO_GPU,
+    "sugestao_cortes": RECURSO_GPU,
+    "momentos": RECURSO_GPU,
+    "renderizacao_nvenc": RECURSO_GPU,
+    "enquadramento_rosto": RECURSO_CPU,
     "ingestao": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "preparar_musica": RECURSO_CPU,

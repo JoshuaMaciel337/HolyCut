@@ -98,15 +98,21 @@ services:
   # ---------- Só no Nitro 5 ----------
   worker-gpu:
     profiles: [gpu]
-    build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
-    image: holycut/worker:local
+    build: {context: ., dockerfile: infra/docker/worker-gpu.Dockerfile}
+    image: holycut/worker-gpu:local
     command: ["python", "-m", "worker.worker_principal", "--automatico", "--recursos", "gpu"]
     environment:
       <<: *ambiente-python
       MODO_IA: real
       OLLAMA_URL: http://ollama:11434
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
-    volumes: ["${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"]
+      HF_HOME: /cache/huggingface
+      HUGGINGFACE_HUB_CACHE: /cache/huggingface
+      XDG_CACHE_HOME: /cache/huggingface
+    volumes:
+      - ${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento
+      - huggingface_cache:/cache/huggingface
+    shm_size: "2gb"
     deploy: *gpu
     depends_on:
       mongo: {condition: service_healthy}
@@ -145,3 +151,4 @@ services:
 volumes:
   mongo_dados:
   ollama_modelos:
+  huggingface_cache:

@@ -8,6 +8,7 @@ from datetime import datetime
 
 from core.config import TZ
 from core.modelos.identidade import marca_padrao
+from core.modelos.legenda import legenda_do_projeto
 from core.modelos.modelos_story import DURACAO_PADRAO_STORY, aplicar_modelo
 from core.modelos.musica import MUSICA_DO_PROJETO_PADRAO
 
@@ -38,7 +39,7 @@ DESFOQUE_MAXIMO = 30
 # Campos do projeto que definem o vídeo. A exportação guarda uma cópia deles,
 # então editar o projeto depois não muda um vídeo já exportado.
 CAMPOS_DO_VIDEO = ("proporcao", "partes", "silencios", "enquadramento", "audio", "marca", "textos", "fundo", "cor",
-                   "musica")
+                   "musica", "legenda")
 
 
 def partes_do_projeto(projeto_ou_config: dict) -> list[dict]:
@@ -90,13 +91,14 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         "proporcao": proporcao,
         "partes": [{"id": "p1", **trecho}],
         "silencios": silencios,
-        "enquadramento": {"x": 0.5, "y": 0.5, "zoom": 1.0},
-        "audio": {"normalizar": True},
+        "enquadramento": {"x": 0.5, "y": 0.5, "zoom": 1.0, "seguir_rosto": False},
+        "audio": {"normalizar": True, "limpeza": False},
         "marca": visual.get("marca") or marca_padrao(identidade),
         "textos": visual.get("textos", []),
         "fundo": {**FUNDO_PADRAO, **visual.get("fundo", {})},
         "cor": {**COR_PADRAO, **visual.get("cor", {})},
         "musica": dict(MUSICA_DO_PROJETO_PADRAO),
+        "legenda": legenda_do_projeto({}),
         "versao": 1,
         "criado_em": momento,
         "atualizado_em": momento,
@@ -104,7 +106,7 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
 
 
 def montar_exportacao(projeto: dict, criado_por, momento: datetime | None = None,
-                      formato: str = "video", instante: float = 0.0) -> dict:
+                      formato: str = "video", instante: float = 0.0, encoder: str = "cpu") -> dict:
     """formato "imagem": um quadro só, no instante dado (segundos do vídeo final), em JPG."""
     if formato not in FORMATOS_EXPORTACAO:
         raise ValueError(f"Formato desconhecido: {formato}")
@@ -112,6 +114,7 @@ def montar_exportacao(projeto: dict, criado_por, momento: datetime | None = None
     return {
         "formato": formato,
         "instante": max(float(instante), 0.0),
+        "encoder": "nvenc" if formato == "video" and encoder == "nvenc" else "cpu",
         "organizacao_id": projeto["organizacao_id"],
         "projeto_id": projeto["_id"],
         "midia_id": projeto["midia_id"],

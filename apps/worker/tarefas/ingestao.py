@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 from bson import ObjectId
 
+from core.config import MODO_IA
 from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import (
     ARQUIVO_AUDIO_ANALISE,
@@ -32,8 +33,10 @@ from core.modelos.midia import (
     STATUS_PRONTA,
     chave_arquivo,
 )
+from core.modelos.transcricao import deve_transcrever
 from core.utils import storage
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
+from core.utils.fila import enfileirar_transcricao
 from core.utils.mongo import agora
 from worker.tarefas.capas import gerar_capas
 
@@ -216,5 +219,8 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
         gerar_capas(db, db.midias.find_one({"_id": midia_id}))
     except Exception as e:
         logging.warning(f"[{organizacao_id}] Não foi possível desenhar as capas de {midia_id}: {e}")
+    if deve_transcrever(MODO_IA, tem_audio):
+        enfileirar_transcricao(db, organizacao_id, midia_id)
+        logging.info(f"{rotulo} Transcrição enfileirada.")
     reportar(100, "Pronta para editar")
     return {"midia_id": str(midia_id), "duracao": duracao, "arquivos": arquivos}

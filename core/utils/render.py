@@ -76,13 +76,17 @@ def expressao_selecao(trechos: list[tuple[float, float]]) -> str:
     return "+".join(f"gte(t,{a - meio:.4f})*lt(t,{b - meio:.4f})" for a, b in trechos)
 
 
-def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor: dict | None = None) -> str:
+def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor: dict | None = None,
+               comandos: str | None = None) -> str:
     """
     Recorta, redimensiona, aplica o filtro de cor e o fundo (desfoque e escurecimento), antes das
     camadas de arte. É a mesma ordem da prévia: filtro de cor, blur e preto translúcido por cima.
     """
     cadeia = (f"crop={recorte['largura']}:{recorte['altura']}:{recorte['x']}:{recorte['y']},"
               f"scale={largura}:{altura}:flags=lanczos,setsar=1")
+    if comandos:
+        caminho = comandos.replace("\\", "/").replace(":", r"\:")
+        cadeia = f"sendcmd=filename={caminho}," + cadeia
     fundo, cor = fundo or {}, cor or {}
     desfoque, escurecer = float(fundo.get("desfoque") or 0), float(fundo.get("escurecer") or 0)
     filtro_cor = filtro_ffmpeg(cor.get("filtro") or "natural", float(cor.get("intensidade", 1.0)))
@@ -122,15 +126,42 @@ def _selecionar_video(entrada: int, trechos: list[tuple[float, float]]) -> str:
     return f"[{entrada}:v]setpts=PTS-STARTPTS,fps={FPS},select='{expressao_selecao(trechos)}',setpts=N/{FPS}/TB"
 
 
-def _selecionar_audio(entrada: int, trechos: list[tuple[float, float]]) -> str:
-    return (f"[{entrada}:a]asetpts=PTS-STARTPTS,aresample={TAXA_AUDIO},asetnsamples=n={AMOSTRAS_POR_QUADRO}:p=0,"
+def _cadeia_audio(trechos: list[tuple[float, float]]) -> str:
+    return (f"asetpts=PTS-STARTPTS,aresample={TAXA_AUDIO},asetnsamples=n={AMOSTRAS_POR_QUADRO}:p=0,"
             f"aselect='{expressao_selecao(trechos)}',asetpts=N/SR/TB")
+
+
+def _selecionar_audio(entrada: int, trechos: list[tuple[float, float]]) -> str:
+    return f"[{entrada}:a]{_cadeia_audio(trechos)}"
+
+
+def _audio_limpo(rotulo: str, trechos: list[tuple[float, float]], inicio: float, fim: float) -> str:
+    """Corta a faixa limpa no intervalo absoluto da parte e aplica os mesmos cortes relativos."""
+    return f"{rotulo}atrim=start={inicio:.3f}:end={fim:.3f},{_cadeia_audio(trechos)}"
+
+
+# A imagem do worker copia brand/fontes para esta pasta. O ASS pede Montserrat e Caveat pelo nome.
+PASTA_FONTES_LEGENDA = "/app/brand/fontes"
+
+
+def _com_legenda(grafo: list[str], legenda: str | None) -> str:
+    """Queima o ASS depois das camadas. Sem arquivo, o grafo sai como estava."""
+    if legenda:
+        for indice, linha in enumerate(grafo):
+            if linha.endswith("[v]"):
+                caminho = legenda.replace("\\", "/").replace(":", r"\:")
+                grafo[indice] = f"{linha[:-3]}[vleg]"
+                grafo.append(f"[vleg]subtitles={caminho}:fontsdir={PASTA_FONTES_LEGENDA}[v]")
+                break
+    return ";\n".join(grafo)
 
 
 def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largura: int, altura: int,
                   tem_audio: bool, normalizar: bool = True,
                   camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None,
-                  cor: dict | None = None, musica: dict | None = None) -> str:
+                  cor: dict | None = None, musica: dict | None = None, legenda: str | None = None,
+                  audio_limpo: tuple[int, list[tuple[float, float]]] | None = None,
+                  comandos_rosto: str | None = None) -> str:
     """
     Grafo de filtros completo, com as saídas [v] e [a].
     partes: os trechos mantidos de cada parte do vídeo, na ordem final. A parte k é a entrada k do
@@ -140,37 +171,54 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
     camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. As camadas vêm
     logo depois das partes nas entradas do FFmpeg.
     musica: {"entrada": índice da faixa no FFmpeg, "volume": 0 a 1, "abaixar_na_fala": bool}.
+    legenda: caminho do arquivo ASS, queimado por cima de tudo. A prévia usa os mesmos blocos.
+    audio_limpo: (índice da faixa no FFmpeg, intervalo absoluto de cada parte na gravação).
+    A faixa entra depois da música, para não deslocar as camadas. A voz sai dela, não do vídeo.
     """
+    if audio_limpo is not None and len(audio_limpo[1]) != len(partes):
+        raise ValueError("A faixa limpa precisa de um intervalo para cada parte.")
+    if audio_limpo is not None:
+        tem_audio = True
     duracao = round(sum(duracao_dos_trechos(trechos) for trechos in partes), 3)
     grafo = []
     if len(partes) == 1:
         fonte_video = f"{_selecionar_video(0, partes[0])},"
-        voz = _selecionar_audio(0, partes[0])
+        if audio_limpo is None:
+            voz = _selecionar_audio(0, partes[0])
+        else:
+            inicio, fim = audio_limpo[1][0]
+            voz = _audio_limpo(f"[{audio_limpo[0]}:a]", partes[0], inicio, fim)
     else:
         emenda = ""
+        if audio_limpo is not None:
+            grafo.append(f"[{audio_limpo[0]}:a]asplit={len(partes)}" + "".join(f"[c{i}]" for i in range(len(partes))))
         for indice, trechos in enumerate(partes):
             grafo.append(f"{_selecionar_video(indice, trechos)}[p{indice}v]")
             emenda += f"[p{indice}v]"
             if tem_audio:
-                grafo.append(f"{_selecionar_audio(indice, trechos)}[p{indice}a]")
+                if audio_limpo is None:
+                    grafo.append(f"{_selecionar_audio(indice, trechos)}[p{indice}a]")
+                else:
+                    inicio, fim = audio_limpo[1][indice]
+                    grafo.append(f"{_audio_limpo(f'[c{indice}]', trechos, inicio, fim)}[p{indice}a]")
                 emenda += f"[p{indice}a]"
         grafo.append(f"{emenda}concat=n={len(partes)}:v=1:a={1 if tem_audio else 0}[pv]{'[pa]' if tem_audio else ''}")
         fonte_video, voz = "[pv]", "[pa]anull"
-    grafo.append(f"{fonte_video}{_enquadrar(recorte, largura, altura, fundo, cor)}"
+    grafo.append(f"{fonte_video}{_enquadrar(recorte, largura, altura, fundo, cor, comandos_rosto)}"
                  f"{_sobrepor(camadas, duracao, primeira_entrada=len(partes))}")
     if not tem_audio and not musica:
-        return ";\n".join(grafo)
+        return _com_legenda(grafo, legenda)
 
     acabamento = f"loudnorm=I={LUFS_ALVO}:TP={PICO_MAXIMO_DB}:LRA=11,aresample={TAXA_AUDIO}," if normalizar else ""
     acabamento += (f"afade=t=in:d={FADE_ENTRADA},"
                    f"afade=t=out:st={max(duracao - FADE_SAIDA, 0):.3f}:d={FADE_SAIDA}[a]")
     if not musica:
-        return ";\n".join([*grafo, f"{voz},{acabamento}"])
+        return _com_legenda([*grafo, f"{voz},{acabamento}"], legenda)
 
     faixa = (f"[{musica['entrada']}:a]aresample={TAXA_AUDIO},aformat=channel_layouts=stereo,"
              f"atrim=0:{duracao:.3f},asetpts=PTS-STARTPTS,volume={float(musica['volume']):.3f}")
     if not tem_audio:
-        return ";\n".join([*grafo, f"{faixa},{acabamento}"])
+        return _com_legenda([*grafo, f"{faixa},{acabamento}"], legenda)
     if musica.get("abaixar_na_fala", True):
         # A voz vira a "chave" do compressor: quando alguém fala, a música abaixa sozinha
         grafo += [f"{voz},aformat=channel_layouts=stereo,asplit=2[voz][chave]", f"{faixa}[musica0]",
@@ -179,7 +227,7 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
     else:
         grafo += [f"{voz},aformat=channel_layouts=stereo[voz]", f"{faixa}[musica]"]
     grafo.append(f"[voz][musica]amix=inputs=2:duration=first:normalize=0,{acabamento}")
-    return ";\n".join(grafo)
+    return _com_legenda(grafo, legenda)
 
 
 def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_camadas: int = 0,
