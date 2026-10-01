@@ -23,6 +23,7 @@ TAREFAS = {
     "limpeza_audio": RECURSO_GPU,
     "sugestao_cortes": RECURSO_GPU,
     "estudo_culto": RECURSO_GPU,
+    "blocos_culto": RECURSO_GPU,
     "momentos": RECURSO_GPU,
     "renderizacao_nvenc": RECURSO_GPU,
     "enquadramento_rosto": RECURSO_CPU,

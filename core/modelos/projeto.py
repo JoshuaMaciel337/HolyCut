@@ -19,6 +19,7 @@ PROPORCOES = {
     "16:9": (1920, 1080),   # YouTube
 }
 INTENSIDADES_CORTE = ("leve", "media", "forte")
+TIPOS_PROJETO = ("reel", "story", "mensagem")
 DURACAO_MINIMA_TRECHO = 1.0
 MAXIMO_PARTES = 30
 ZOOM_MAXIMO = 3.0
@@ -63,14 +64,17 @@ def _id_do_modelo(modelo: dict | None) -> str | None:
 
 def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = None,
                    proporcao: str = "9:16", momento: datetime | None = None, identidade: dict | None = None,
-                   tipo: str = "reel", modelo: dict | None = None, inicio: float = 0.0) -> dict:
+                   tipo: str = "reel", modelo: dict | None = None, inicio: float = 0.0,
+                   fim: float | None = None) -> dict:
     """
     Reel: a gravação inteira, com corte de silêncios médio.
     Story: 15 s a partir de inicio, sem corte de silêncios, com o visual do modelo escolhido.
+    Mensagem: a pregação de inicio a fim, em 16:9 para o YouTube, sem corte de silêncios
+    e sem legenda gravada no vídeo (o ritmo do pregador fica como foi).
     """
     if proporcao not in PROPORCOES:
         raise ValueError(f"Proporção desconhecida: {proporcao}")
-    if tipo not in ("reel", "story"):
+    if tipo not in TIPOS_PROJETO:
         raise ValueError(f"Tipo de projeto desconhecido: {tipo}")
     momento = momento or datetime.now(TZ)
     duracao = round(float(midia["duracao"]), 2)
@@ -78,6 +82,10 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         inicio = min(max(round(inicio, 2), 0.0), max(duracao - DURACAO_MINIMA_TRECHO, 0.0))
         trecho = {"inicio": inicio, "fim": round(min(inicio + DURACAO_PADRAO_STORY, duracao), 2)}
         rotulo, proporcao, silencios = "Story", "9:16", {"intensidade": None}
+    elif tipo == "mensagem":
+        inicio = min(max(round(inicio, 2), 0.0), max(duracao - DURACAO_MINIMA_TRECHO, 0.0))
+        trecho = {"inicio": inicio, "fim": round(min(fim if fim is not None else duracao, duracao), 2)}
+        rotulo, proporcao, silencios = "Mensagem", "16:9", {"intensidade": None}
     else:
         trecho, rotulo, silencios = {"inicio": 0.0, "fim": duracao}, "Reel", {"intensidade": "media"}
     visual = aplicar_modelo(modelo, identidade or {}) if modelo else {}
@@ -98,7 +106,7 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         "fundo": {**FUNDO_PADRAO, **visual.get("fundo", {})},
         "cor": {**COR_PADRAO, **visual.get("cor", {})},
         "musica": dict(MUSICA_DO_PROJETO_PADRAO),
-        "legenda": legenda_do_projeto({}),
+        "legenda": legenda_do_projeto({"legenda": {"ativa": tipo != "mensagem"}}),
         "versao": 1,
         "criado_em": momento,
         "atualizado_em": momento,

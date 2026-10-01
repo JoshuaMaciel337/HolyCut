@@ -1,10 +1,10 @@
 # -----------------------------------------------
-# HolyCut API — rosto e momentos da gravação
+# HolyCut API — o que a análise tira da gravação: rosto, momentos, estudo e blocos
 # -----------------------------------------------
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import EstudoSaida, JobSaida, MomentosSaida, RostoSaida, job_para_saida
+from api.esquemas import BlocosSaida, EstudoSaida, JobSaida, MomentosSaida, RostoSaida, job_para_saida
 from api.rotas.midias import buscar_midia
 from core.config import MODO_IA
 from core.modelos.job import STATUS_ERRO, STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
@@ -111,3 +111,31 @@ async def pedir_estudo(midia_id: str, db=Depends(obter_db), usuario: dict = Depe
     if transcricao is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "O estudo sai da transcrição. Transcreva a gravação primeiro.")
     return await _enfileirar(db, midia, "estudo_culto")
+
+
+@router.get("/{midia_id}/blocos", response_model=BlocosSaida)
+async def obter_blocos(midia_id: str, db=Depends(obter_db), usuario: dict = Depends(usuario_atual)):
+    """Louvor, oração, avisos, oferta, ceia e pregação, do começo ao fim do culto."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    documento = await db.blocos.find_one({"midia_id": midia["_id"], "organizacao_id": midia["organizacao_id"]})
+    job = await _ultimo_job(db, midia, "blocos_culto")
+    andamento = _andamento(BlocosSaida, documento, job, "Os blocos deste culto ainda não foram separados.")
+    if andamento is not None:
+        return andamento
+    return BlocosSaida(status="pronta", progresso=100, mensagem="Blocos prontos",
+                       gerado_por_ia=bool(documento.get("gerado_por_ia")),
+                       nomes_pelo_modelo=bool(documento.get("modelo")),
+                       blocos=documento.get("blocos") or [], pregacao=documento.get("pregacao"))
+
+
+@router.post("/{midia_id}/blocos", response_model=JobSaida)
+async def pedir_blocos(midia_id: str, db=Depends(obter_db), usuario: dict = Depends(usuario_atual)):
+    if MODO_IA != "real":
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "A separação em blocos está desligada neste servidor. Marque a pregação à mão.")
+    midia = await buscar_midia(db, midia_id, usuario)
+    transcricao = await db.transcricoes.find_one({"midia_id": midia["_id"], "organizacao_id": midia["organizacao_id"]},
+                                                 {"_id": 1})
+    if transcricao is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Os blocos saem da transcrição. Transcreva a gravação primeiro.")
+    return await _enfileirar(db, midia, "blocos_culto")

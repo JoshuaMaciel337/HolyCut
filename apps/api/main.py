@@ -27,6 +27,7 @@ from api.rotas import (
     midias,
     modelos,
     musicas,
+    pregacao,
     projetos,
     sistema,
     sugestoes,
@@ -128,6 +129,7 @@ app.include_router(limpeza.router)
 app.include_router(transcricoes.router)
 app.include_router(sugestoes.router)
 app.include_router(analise.router)
+app.include_router(pregacao.router)
 app.include_router(projetos.router)
 app.include_router(exportacoes.router)
 app.include_router(identidade.router)

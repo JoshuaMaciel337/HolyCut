@@ -96,8 +96,8 @@ def test_excluir_o_culto_apaga_o_que_a_ia_tirou_dele(cliente, db_limpo, monkeypa
     organizacao_id = ObjectId(cliente.get("/api/auth/eu").json()["organizacao"]["id"])
     midia_id = culto_transcrito(db_limpo, organizacao_id)
     rodar_estudo(db_limpo, organizacao_id, midia_id, monkeypatch)
-    for colecao in ("sugestoes", "rostos", "momentos"):
+    for colecao in ("sugestoes", "rostos", "momentos", "blocos"):
         db_limpo[colecao].insert_one({"organizacao_id": organizacao_id, "midia_id": midia_id})
     assert cliente.delete(f"/api/midias/{midia_id}").status_code == 204
-    for colecao in ("transcricoes", "sugestoes", "rostos", "momentos", "estudos"):
+    for colecao in ("transcricoes", "sugestoes", "rostos", "momentos", "estudos", "blocos"):
         assert db_limpo[colecao].count_documents({"midia_id": midia_id}) == 0, colecao

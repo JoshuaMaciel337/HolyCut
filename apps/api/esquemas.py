@@ -100,6 +100,18 @@ class FichaCultoSaida(BaseModel):
     descricao: str = ""
 
 
+class PregacaoSaida(BaseModel):
+    """Onde a mensagem começa e termina. A marcação da pessoa nunca é trocada pela da IA."""
+    inicio: float
+    fim: float
+    origem: Literal["ia", "pessoa"]
+
+
+class PregacaoEntrada(BaseModel):
+    inicio: float = Field(ge=0)
+    fim: float = Field(gt=0)
+
+
 class MidiaSaida(BaseModel):
     id: str
     nome: str
@@ -113,6 +125,7 @@ class MidiaSaida(BaseModel):
     miniaturas: dict | None = None
     arquivos: list[str] = []
     ficha: FichaCultoSaida
+    pregacao: PregacaoSaida | None = None
     capa_versao: int | None = None
     capa_personalizada: bool = False
     erro: str | None = None
@@ -686,6 +699,30 @@ class EstudoSaida(BaseModel):
     perguntas: list[PerguntaEstudoSaida] = []
     aplicacoes: list[TrechoDitoSaida] = []
     oracao: str = ""
+
+
+class BlocoSaida(BaseModel):
+    """Um bloco do culto. A frase é o começo do que foi dito nele, para reconhecer o trecho."""
+    inicio: float
+    fim: float
+    tipo: Literal["louvor", "oracao", "avisos", "oferta", "ceia", "pregacao", "outro"]
+    frase: str = ""
+
+
+class TrechoSaida(BaseModel):
+    inicio: float
+    fim: float
+
+
+class BlocosSaida(BaseModel):
+    status: str
+    progresso: int = 0
+    mensagem: str = ""
+    erro: str | None = None
+    gerado_por_ia: bool = False
+    nomes_pelo_modelo: bool = Field(default=False, description="Falso quando os nomes vieram só das palavras-chave")
+    blocos: list[BlocoSaida] = []
+    pregacao: TrechoSaida | None = Field(default=None, description="A pregação que a análise encontrou")
 
 
 def job_para_saida(doc: dict) -> JobSaida:

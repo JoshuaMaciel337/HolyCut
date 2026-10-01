@@ -25,7 +25,13 @@ from core.modelos.transcricao import (
 )
 from core.modelos.versiculo import detectar_versiculos
 from core.utils import storage
-from core.utils.fila import enfileirar_estudo, enfileirar_momentos, enfileirar_rosto, enfileirar_sugestao
+from core.utils.fila import (
+    enfileirar_blocos,
+    enfileirar_estudo,
+    enfileirar_momentos,
+    enfileirar_rosto,
+    enfileirar_sugestao,
+)
 from core.utils.mongo import agora
 
 
@@ -168,6 +174,8 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
     logging.info(f"{rotulo} Transcrição pronta: {len(segmentos)} trechos, {palavras} palavras, "
                  f"{len(documento['versiculos'])} versículos.")
     if palavras and MODO_IA == "real":
+        # Os blocos vêm primeiro: com a pregação marcada, os cortes e o estudo leem só a mensagem
+        enfileirar_blocos(db, organizacao_id, str(midia_id))
         enfileirar_sugestao(db, organizacao_id, str(midia_id))
         enfileirar_estudo(db, organizacao_id, str(midia_id))
         enfileirar_momentos(db, organizacao_id, str(midia_id))

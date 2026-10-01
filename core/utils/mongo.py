@@ -48,6 +48,10 @@ INDICES = {
         ([("midia_id", 1)], {"unique": True}),
         ([("organizacao_id", 1), ("midia_id", 1)], {}),
     ],
+    "blocos": [
+        ([("midia_id", 1)], {"unique": True}),
+        ([("organizacao_id", 1), ("midia_id", 1)], {}),
+    ],
     "estudos": [
         ([("midia_id", 1)], {"unique": True}),
         ([("organizacao_id", 1), ("midia_id", 1)], {}),

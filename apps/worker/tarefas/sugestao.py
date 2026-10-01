@@ -3,6 +3,7 @@
 #
 # O Gemma, no Ollama, lê a transcrição em pedaços e devolve cortes.
 # Só fica o corte cujo título é uma frase que o pregador disse.
+# Com a pregação marcada, louvor e avisos ficam de fora.
 # No fim o modelo sai da memória, para o Whisper caber na placa.
 # -----------------------------------------------
 import logging
@@ -10,6 +11,7 @@ from collections.abc import Callable
 
 from bson import ObjectId
 
+from core.modelos.blocos import palavras_da_pregacao
 from core.modelos.job import ErroDefinitivo
 from core.modelos.sermon import (
     ESQUEMA_CORTES,
@@ -31,7 +33,7 @@ def executar_sugestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     if midia is None:
         raise ErroDefinitivo("A gravação foi excluída antes da sugestão.")
     transcricao = db.transcricoes.find_one({"midia_id": midia_id, "organizacao_id": organizacao_id})
-    palavras = palavras_do_documento(transcricao)
+    palavras = palavras_da_pregacao(palavras_do_documento(transcricao), midia.get("pregacao"))
     if not palavras:
         raise ErroDefinitivo("A transcrição ainda não está pronta para sugerir cortes.")
 

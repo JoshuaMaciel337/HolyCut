@@ -43,7 +43,7 @@ TIPOS_ARQUIVO = {
 }
 # Os arquivos de uma mídia não mudam depois de gerados
 CACHE_ARQUIVOS = "private, max-age=86400"
-COLECOES_DA_ANALISE = ("transcricoes", "sugestoes", "rostos", "momentos", "estudos")
+COLECOES_DA_ANALISE = ("transcricoes", "sugestoes", "rostos", "momentos", "estudos", "blocos")
 PRIORIDADE_CAPAS = 7   # rápido, e a pessoa está vendo a capa mudar
 
 

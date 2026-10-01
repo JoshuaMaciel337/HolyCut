@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from worker.tarefas.blocos import executar_blocos
 from worker.tarefas.capas import executar_capas_culto
 from worker.tarefas.diagnostico_gpu import executar_diagnostico_gpu
 from worker.tarefas.estudo import executar_estudo
@@ -38,4 +39,5 @@ REGISTRO = {
     "preparar_musica": Tarefa(executar_preparar_musica, ao_falhar=marcar_musica_com_erro),
     "capas_culto": Tarefa(executar_capas_culto),
     "estudo_culto": Tarefa(executar_estudo),
+    "blocos_culto": Tarefa(executar_blocos),
 }

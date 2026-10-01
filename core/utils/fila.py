@@ -91,6 +91,10 @@ def enfileirar_estudo(db, organizacao_id, midia_id: str):
     return _enfileirar_unico(db, "estudo_culto", organizacao_id, midia_id)
 
 
+def enfileirar_blocos(db, organizacao_id, midia_id: str):
+    return _enfileirar_unico(db, "blocos_culto", organizacao_id, midia_id)
+
+
 def enfileirar_rosto(db, organizacao_id, midia_id: str):
     return _enfileirar_unico(db, "enquadramento_rosto", organizacao_id, midia_id)
 
