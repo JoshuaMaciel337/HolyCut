@@ -37,7 +37,7 @@ from core.modelos.projeto import (
 )
 from core.modelos.rosto import comandos_de_recorte, instante_no_final
 from core.utils import storage
-from core.utils.arte import camada_logo, camada_texto, para_png
+from core.utils.arte import camada_logo, camada_texto, para_png, posicionar
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg
 from core.utils.mongo import agora
 from core.utils.render import (
@@ -83,8 +83,10 @@ def desenhar_camadas(db, organizacao_id, config: dict, largura: int, altura: int
     if marca.get("logo"):
         logo = storage.caminho_local(chave_logo(organizacao_id))
         if logo.is_file():
-            camadas.append((camada_logo(largura, altura, logo.read_bytes(), marca.get("posicao", "topo_direita"),
-                                        marca.get("tamanho", 0.16), marca.get("opacidade", 0.9)), 0.0, duracao))
+            imagem = camada_logo(largura, altura, logo.read_bytes(), marca.get("posicao", "topo_direita"),
+                                 marca.get("tamanho", 0.16), marca.get("opacidade", 0.9))
+            imagem = posicionar(imagem, marca.get("x"), marca.get("y"), marca.get("rotacao") or 0)
+            camadas.append((imagem, 0.0, duracao))
         else:
             logging.warning(f"[{organizacao_id}] O projeto pede o logo, mas a igreja não tem logo enviado.")
     for texto in config.get("textos") or []:
@@ -95,6 +97,7 @@ def desenhar_camadas(db, organizacao_id, config: dict, largura: int, altura: int
         imagem = camada_texto(largura, altura, texto["texto"], texto.get("estilo", "destaque"),
                               texto.get("posicao", "base"), identidade["cor_destaque"], texto.get("referencia", ""),
                               float(texto.get("tamanho") or 1.0))
+        imagem = posicionar(imagem, texto.get("x"), texto.get("y"), texto.get("rotacao") or 0)
         camadas.append((imagem, inicio_texto, fim_texto))
     return camadas
 

@@ -12,7 +12,7 @@ from api.esquemas import CamadaEntrada, IdentidadeAtualizarEntrada, IdentidadeSa
 from core.config import LOGO_MAX_BYTES
 from core.modelos.identidade import chave_logo, identidade_padrao, normalizar_instagram
 from core.utils import storage
-from core.utils.arte import ErroImagem, camada_logo, camada_texto, para_png, preparar_logo
+from core.utils.arte import ErroImagem, camada_logo, camada_texto, para_png, posicionar, preparar_logo
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api", tags=["identidade"])
@@ -109,11 +109,17 @@ async def desenhar_camada(dados: CamadaEntrada, usuario=Depends(usuario_atual), 
             raise HTTPException(status.HTTP_404_NOT_FOUND, "A igreja ainda não enviou o logo.")
         imagem = await run_in_threadpool(camada_logo, dados.largura, dados.altura, logo, marca.posicao,
                                          marca.tamanho, marca.opacidade)
+        imagem = await run_in_threadpool(posicionar, imagem, marca.x, marca.y, marca.rotacao)
     else:
         texto = dados.texto
         if texto is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Informe o texto.")
         imagem = await run_in_threadpool(camada_texto, dados.largura, dados.altura, texto.texto, texto.estilo,
                                          texto.posicao, identidade["cor_destaque"], texto.referencia, texto.tamanho)
+        imagem = await run_in_threadpool(posicionar, imagem, texto.x, texto.y, texto.rotacao)
     png = await run_in_threadpool(para_png, imagem)
-    return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
+    # A caixa do elemento vai junto, para a prévia desenhar a seleção com as alças em cima dele
+    caixa = imagem.getbbox() or (0, 0, 0, 0)
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "no-store", "X-Caixa": ",".join(str(valor) for valor in caixa),
+                             "Access-Control-Expose-Headers": "X-Caixa"})

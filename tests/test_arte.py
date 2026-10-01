@@ -143,3 +143,19 @@ def test_filtro_com_camadas():
     assert linhas[0].endswith("setsar=1[base0]")
     assert linhas[1] == "[base0][1:v]overlay=0:0:enable='between(t,0.000,10.000)'[base1]"
     assert linhas[2] == "[base1][2:v]overlay=0:0:enable='between(t,2.000,10.000)',format=yuv420p[v]"
+
+
+def test_posicionar_leva_o_elemento_para_o_ponto_e_gira():
+    from PIL import Image
+
+    from core.utils.arte import posicionar
+    camada = Image.new("RGBA", (200, 400), (0, 0, 0, 0))
+    camada.paste((255, 255, 255, 255), (80, 40, 120, 60))   # um bloco de 40x20 no alto, centro em (100, 50)
+    assert posicionar(camada) is camada   # sem posição nem rotação, nada muda
+    movida = posicionar(camada, 0.25, 0.75)
+    assert movida.getbbox() == (30, 290, 70, 310)   # centro em (50, 300)
+    girada = posicionar(camada, None, None, 90)
+    x0, y0, x1, y1 = girada.getbbox()
+    assert (x1 - x0, y1 - y0) == (20, 40) and ((x0 + x1) / 2, (y0 + y1) / 2) == (100, 50)
+    # Na borda, o que passa da moldura só fica de fora (não quebra)
+    assert posicionar(camada, 1.0, 0.0).getbbox() == (180, 0, 200, 10)

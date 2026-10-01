@@ -235,6 +235,9 @@ class MarcaEntrada(BaseModel):
     posicao: PosicaoLogo = "topo_direita"
     tamanho: float = Field(default=0.16, ge=0.06, le=0.4)
     opacidade: float = Field(default=0.9, ge=0.2, le=1)
+    x: float | None = Field(default=None, ge=0, le=1, description="Centro arrastado na prévia; None usa a posição")
+    y: float | None = Field(default=None, ge=0, le=1)
+    rotacao: float = Field(default=0, ge=-180, le=180, description="Graus, no sentido do relógio")
 
 
 class TextoEntrada(BaseModel):
@@ -247,6 +250,9 @@ class TextoEntrada(BaseModel):
     inicio: float = Field(default=0, ge=0, description="Segundos no vídeo final")
     fim: float | None = Field(default=None, gt=0, description="None: até o fim do vídeo")
     tamanho: float = Field(default=1.0, ge=0.5, le=2.0, description="Escala da fonte")
+    x: float | None = Field(default=None, ge=0, le=1, description="Centro arrastado na prévia; None usa a posição")
+    y: float | None = Field(default=None, ge=0, le=1)
+    rotacao: float = Field(default=0, ge=-180, le=180, description="Graus, no sentido do relógio")
 
 
 class FundoEntrada(BaseModel):

@@ -88,7 +88,8 @@ def test_projeto_nasce_com_o_logo_e_aceita_textos(cliente, db_limpo):
     midia_id = str(db_limpo.midias.insert_one(midia).inserted_id)
 
     projeto = cliente.post("/api/projetos", json={"midia_id": midia_id}).json()
-    assert projeto["marca"] == {"logo": True, "posicao": "topo_direita", "tamanho": 0.16, "opacidade": 0.9}
+    assert projeto["marca"] == {"logo": True, "posicao": "topo_direita", "tamanho": 0.16, "opacidade": 0.9,
+                               "x": None, "y": None, "rotacao": 0.0}
     assert projeto["textos"] == []
 
     textos = [{"id": "a", "tipo": "titulo", "texto": "Culto de hoje", "estilo": "manuscrito", "posicao": "topo"},

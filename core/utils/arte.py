@@ -58,6 +58,29 @@ def preparar_logo(conteudo: bytes) -> bytes:
     return saida.getvalue()
 
 
+def posicionar(camada: Image.Image, x: float | None = None, y: float | None = None,
+               rotacao: float = 0.0) -> Image.Image:
+    """
+    Leva o elemento desenhado na camada para o centro (x, y), em fração da moldura, e gira em graus
+    (positivo no sentido do relógio, como no CSS). Sem x, y e rotação, a camada volta como estava.
+    """
+    if x is None and y is None and not rotacao:
+        return camada
+    caixa = camada.getbbox()
+    if caixa is None:
+        return camada
+    elemento = camada.crop(caixa)
+    if rotacao:
+        elemento = elemento.rotate(-float(rotacao), resample=Image.Resampling.BICUBIC, expand=True)
+    centro_x = (caixa[0] + caixa[2]) / 2 if x is None else min(max(float(x), 0.0), 1.0) * camada.width
+    centro_y = (caixa[1] + caixa[3]) / 2 if y is None else min(max(float(y), 0.0), 1.0) * camada.height
+    resultado = Image.new("RGBA", camada.size, (0, 0, 0, 0))
+    # paste aceita posição fora da moldura (o elemento pode sair pela borda); alpha_composite não
+    canto = (int(round(centro_x - elemento.width / 2)), int(round(centro_y - elemento.height / 2)))
+    resultado.paste(elemento, canto, elemento)
+    return resultado
+
+
 def camada_logo(largura: int, altura: int, logo_png: bytes, posicao: str = "topo_direita",
                 tamanho: float = 0.16, opacidade: float = 0.9) -> Image.Image:
     camada = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
