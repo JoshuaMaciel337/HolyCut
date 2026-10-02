@@ -24,6 +24,12 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
  && pip install --no-cache-dir --force-reinstall --no-deps --index-url https://download.pytorch.org/whl/cu124 "torchaudio==2.6.0" \
  && python -c "import torch, torchaudio; assert torch.version.cuda, 'O PyTorch ficou sem CUDA'; import df.enhance"
 
+# O ctranslate2 procura o cuDNN 8 (libcudnn_ops_infer.so.8). O torch traz o 9.
+# Sem o 8, a transcrição morre ao começar a ouvir e a barra fica em 5%.
+RUN pip install --no-cache-dir --target /opt/cudnn8 "nvidia-cudnn-cu12==8.9.7.29" \
+ && test -f /opt/cudnn8/nvidia/cudnn/lib/libcudnn_ops_infer.so.8
+ENV LD_LIBRARY_PATH=/opt/cudnn8/nvidia/cudnn/lib
+
 COPY core /app/core
 COPY apps/worker /app/worker
 COPY infra/backup /app/backup
@@ -33,7 +39,8 @@ RUN useradd --create-home --uid 1000 holycut \
  && mkdir -p /dados/armazenamento /dados/backups /cache/huggingface \
  && chown -R holycut /dados /cache
 COPY infra/docker/entrar-como-holycut.sh /usr/local/bin/entrar-como-holycut
-RUN chmod +x /usr/local/bin/entrar-como-holycut
+# O checkout no Windows pode gravar CRLF. Com \r no shebang o Linux não acha o /bin/sh.
+RUN sed -i 's/\r$//' /usr/local/bin/entrar-como-holycut && chmod +x /usr/local/bin/entrar-como-holycut
 
 # Sobe como root só para entregar o cache do modelo ao usuário holycut. O worker em si não fica como root.
 ENTRYPOINT ["entrar-como-holycut"]

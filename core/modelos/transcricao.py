@@ -9,6 +9,9 @@ from core.config import TZ
 
 MODELO = "large-v3-turbo"
 IDIOMA = "pt"
+# Uma gravação longa ouvida de uma vez derruba o worker (as 2 h somem da memória).
+# Dez minutos cabem, e a barra anda a cada trecho.
+TAMANHO_FATIA = 600
 
 # Nomes como são ditos no púlpito. Ajudam o Whisper a não trocar "João" por uma palavra parecida.
 LIVROS = (
@@ -20,6 +23,43 @@ LIVROS = (
     "Coríntios", "Gálatas", "Efésios", "Filipenses", "Colossenses", "Tessalonicenses",
     "Timóteo", "Tito", "Filemom", "Hebreus", "Tiago", "Pedro", "Judas", "Apocalipse",
 )
+
+
+def fatias_de(duracao: float, tamanho: float = TAMANHO_FATIA) -> list[tuple[float, float]]:
+    """Intervalos [início, fim] que cobrem a gravação, sem sobrepor e sem passar do fim."""
+    duracao = float(duracao or 0)
+    if duracao <= 0:
+        return [(0.0, 0.0)]
+    if duracao <= tamanho:
+        return [(0.0, round(duracao, 3))]
+    fatias, inicio = [], 0.0
+    while round(duracao - inicio, 3) > 0.05:
+        fim = min(inicio + tamanho, duracao)
+        fatias.append((round(inicio, 3), round(fim, 3)))
+        inicio = fim
+    return fatias
+
+
+def com_deslocamento(brutos: list[dict], segundos: float) -> list[dict]:
+    """Soma o início da fatia aos tempos. A fatia em si começa no zero."""
+    if not segundos:
+        return brutos
+    saida = []
+    for segmento in brutos:
+        palavras = []
+        for palavra in segmento.get("palavras") or []:
+            palavras.append({
+                **palavra,
+                "inicio": None if palavra.get("inicio") is None else palavra["inicio"] + segundos,
+                "fim": None if palavra.get("fim") is None else palavra["fim"] + segundos,
+            })
+        saida.append({
+            **segmento,
+            "inicio": (segmento.get("inicio") or 0) + segundos,
+            "fim": (segmento.get("fim") or 0) + segundos,
+            "palavras": palavras,
+        })
+    return saida
 
 
 def deve_transcrever(modo_ia: str, tem_audio: bool) -> bool:

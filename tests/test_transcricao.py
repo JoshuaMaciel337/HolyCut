@@ -76,3 +76,20 @@ def test_documento_marca_que_foi_gerado_por_ia():
 def test_transcricao_e_job_de_gpu():
     assert "transcricao" in tipos_por_recursos(["gpu"])
     assert "transcricao" not in tipos_por_recursos(["cpu"])
+
+
+def test_gravacao_longa_e_ouvida_em_fatias_de_dez_minutos():
+    from core.modelos.transcricao import TAMANHO_FATIA, com_deslocamento, fatias_de
+
+    assert fatias_de(90) == [(0.0, 90.0)]
+    fatias = fatias_de(9537.381)
+    assert fatias[0] == (0.0, TAMANHO_FATIA)
+    assert fatias[-1][1] == 9537.381
+    assert len(fatias) == 16
+    assert all(fim - inicio <= TAMANHO_FATIA + 0.001 for inicio, fim in fatias)
+    deslocado = com_deslocamento(
+        [{"texto": "paz", "inicio": 1.0, "fim": 2.0, "palavras": [{"texto": "paz", "inicio": 1.0, "fim": 2.0}]}],
+        600,
+    )
+    assert deslocado[0]["inicio"] == 601.0
+    assert deslocado[0]["palavras"][0]["fim"] == 602.0
