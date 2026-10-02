@@ -18,8 +18,10 @@ from api.rotas import (
     analise,
     aprovar,
     auth,
+    banco,
     celular,
     chaves_envio,
+    efeitos,
     eventos,
     exportacoes,
     identidade,
@@ -123,8 +125,10 @@ async def tratar_erro_validacao(_request: Request, exc: RequestValidationError):
 # -----------------------------------------------
 app.include_router(sistema.router)
 app.include_router(auth.router)
+app.include_router(banco.router)
 app.include_router(jobs.router)
 app.include_router(eventos.router)
+app.include_router(efeitos.router)
 app.include_router(uploads.router)
 app.include_router(importacao.router)
 app.include_router(midias.router)

@@ -4,6 +4,11 @@
 # -----------------------------------------------
 
 ZOOM_ENFASE = 1.25
+# O contorno não mede o corpo: a trilha só guarda o centro do rosto.
+# A caixa é esta fração da gravação, a mesma na prévia e no drawbox.
+FRACAO_LARGURA_CONTORNO = 0.22
+FRACAO_ALTURA_CONTORNO = 0.32
+ESPESSURA_CONTORNO = 6
 
 
 def suavizar(amostras: list[tuple[float, float, float]], alfa: float = 0.35,
@@ -57,6 +62,28 @@ def instante_no_final(partes: list[tuple[float, float]], grupos: list[list[tuple
             cursor += fim - começo
         saida += cursor
     return None
+
+
+def caixa_contorno(x: float, y: float, recorte: dict, largura_saida: int, altura_saida: int,
+                   largura_origem: int, altura_origem: int) -> tuple[int, int, int, int]:
+    """Retângulo no vídeo final: o centro é o rosto e o tamanho é a fração da gravação."""
+    centro_x = (x * largura_origem - recorte["x"]) / recorte["largura"] * largura_saida
+    centro_y = (y * altura_origem - recorte["y"]) / recorte["altura"] * altura_saida
+    largura = FRACAO_LARGURA_CONTORNO * largura_origem / recorte["largura"] * largura_saida
+    altura = FRACAO_ALTURA_CONTORNO * altura_origem / recorte["altura"] * altura_saida
+    largura = max(int(round(largura)), 2)
+    altura = max(int(round(altura)), 2)
+    largura -= largura % 2
+    altura -= altura % 2
+    return int(round(centro_x - largura / 2)), int(round(centro_y - altura / 2)), largura, altura
+
+
+def comandos_de_contorno(caixas: list[tuple[float, int, int, int, int]]) -> str:
+    """Arquivo do sendcmd. caixas são (tempo do vídeo final, x, y, largura, altura)."""
+    linhas = []
+    for tempo, x, y, largura, altura in caixas:
+        linhas.append(f"{tempo:.3f} drawbox x {x}, drawbox y {y}, drawbox w {largura}, drawbox h {altura};")
+    return "\n".join(linhas) + ("\n" if linhas else "")
 
 
 def comandos_de_recorte(recortes: list[tuple[float, dict]]) -> str:

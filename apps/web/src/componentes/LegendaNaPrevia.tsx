@@ -49,6 +49,20 @@ export function LegendaNaPrevia({
   if (!legenda.ativa) return null;
   const bloco = blocoNoInstante(blocos, instante);
   if (!bloco) return null;
+  const flutuante = legenda.preset === "flutuante";
+  const palavraFlutuante = flutuante
+    ? bloco.palavras.find((item) => instante >= item.inicio && instante < item.fim) ?? null
+    : null;
+  if (flutuante && !palavraFlutuante) return null;
+  const duracaoPalavra = palavraFlutuante ? Math.max(palavraFlutuante.fim - palavraFlutuante.inicio, 0.08) : 1;
+  const progresso = palavraFlutuante
+    ? Math.min(Math.max((instante - palavraFlutuante.inicio) / duracaoPalavra, 0), 1)
+    : 0;
+  let opacidadePalavra = 1;
+  if (progresso < 0.15) opacidadePalavra = progresso / 0.15;
+  else if (progresso > 0.8) opacidadePalavra = (1 - progresso) / 0.2;
+  // O centro guardado é o meio do movimento. A palavra sobe 4% da moldura, como o \move do ASS.
+  const desvio = flutuante ? 0.04 - progresso * 0.08 : 0;
   const aceso = indiceAceso(bloco, instante, legenda.preset);
   const cor = legenda.preset === "digno" ? DOURADO : corDestaque;
   const escala = legenda.escala ?? 1;
@@ -92,13 +106,15 @@ export function LegendaNaPrevia({
     }
     edicao.aoMudar({
       x: Math.min(Math.max((inicio.cx + gesto.dx) / inicio.largura, 0), 1),
-      y: Math.min(Math.max((inicio.cy + gesto.dy) / inicio.altura, 0), 1),
+      y: Math.min(Math.max((inicio.cy + gesto.dy) / inicio.altura - desvio, 0), 1),
       fator: gesto.fator,
     });
     setGesto({ ...gesto, soltoEm: chave });
   }
 
   const deslocamento = aplicado ? ` translate(${aplicado.dx}px, ${aplicado.dy}px) scale(${aplicado.fator})` : "";
+  const centroY = legenda.y ?? (legenda.posicao === "centro" ? 0.5 : 0.78);
+  const palavrasVisiveis = palavraFlutuante ? [palavraFlutuante] : bloco.palavras;
   return (
     <p
       ref={elemento}
@@ -107,21 +123,29 @@ export function LegendaNaPrevia({
       onPointerDown={edicao ? (evento) => comecar(evento, "mover") : undefined}
       onPointerMove={edicao ? mover : undefined}
       onPointerUp={edicao ? soltar : undefined}
-      className={`absolute z-10 w-[84%] text-center font-display font-bold leading-tight text-white ${
+      className={`absolute z-10 text-center font-display font-bold leading-tight text-white ${
+        flutuante ? "whitespace-nowrap" : "w-[84%]"
+      } ${
         edicao ? "pointer-events-auto cursor-move touch-none" : "pointer-events-none"
       } ${edicao?.selecionada ? "rounded-md outline-2 outline-dashed outline-white/90" : ""} ${
-        livre ? "" : legenda.posicao === "centro" ? "left-[8%] top-1/2" : "bottom-[12%] left-[8%]"
+        flutuante || livre ? "" : legenda.posicao === "centro" ? "left-[8%] top-1/2" : "bottom-[12%] left-[8%]"
       }`}
       style={{
-        fontSize: `${3.8 * escala}cqh`,
+        fontSize: `${3.8 * (flutuante ? 1.8 : 1) * escala}cqh`,
         WebkitTextStroke: `${0.12 * escala}cqh #000`,
         paintOrder: "stroke fill",
-        ...(livre ? { left: `${(legenda.x ?? 0.5) * 100}%`, top: `${(legenda.y ?? 0.5) * 100}%` } : {}),
-        transform: `${livre ? "translate(-50%, -50%)" : legenda.posicao === "centro" ? "translateY(-50%)" : ""}${deslocamento}` || undefined,
+        opacity: flutuante ? opacidadePalavra : undefined,
+        textShadow: flutuante ? `0 0 0.4em ${corDestaque}` : undefined,
+        ...(flutuante
+          ? { left: `${(legenda.x ?? 0.5) * 100}%`, top: `${(centroY + desvio) * 100}%` }
+          : livre
+            ? { left: `${(legenda.x ?? 0.5) * 100}%`, top: `${(legenda.y ?? 0.5) * 100}%` }
+            : {}),
+        transform: `${flutuante || livre ? "translate(-50%, -50%)" : legenda.posicao === "centro" ? "translateY(-50%)" : ""}${deslocamento}` || undefined,
       }}
     >
-      {bloco.palavras.map((palavra, indice) => {
-        const acesa = legenda.preset !== "clean" && indice === aceso;
+      {palavrasVisiveis.map((palavra, indice) => {
+        const acesa = !flutuante && legenda.preset !== "clean" && indice === aceso;
         return (
           <span
             key={`${palavra.id}-${indice}`}

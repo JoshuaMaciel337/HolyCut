@@ -103,6 +103,20 @@ def test_ass_digno_karaoke_e_clean():
     assert gerar_ass([], "clean", "#FF8A00", 1080, 1920) == ""
 
 
+def test_legenda_flutuante_sobe_uma_palavra_por_vez():
+    palavras = _palavras(("A", 0.0, 0.3), ("paz", 0.3, 0.8))
+    blocos = montar_blocos(palavras, [{"inicio": 0.0, "fim": 2.0}], [], 3)
+    texto = gerar_ass(blocos, "flutuante", "#FF8A00", 1080, 1920)
+    linhas = [linha for linha in texto.splitlines() if linha.startswith("Dialogue")]
+    assert len(linhas) == 2
+    assert all(r"\move(540,1575,540,1421)" in linha for linha in linhas)
+    assert r"\fad(45,60)" in linhas[0]
+    assert "A" in linhas[0] and "paz" not in linhas[0]
+    assert "paz" in linhas[1]
+    assert "pos(" not in texto
+    assert r"\fs131" in linhas[0]
+
+
 def test_filtro_queima_a_legenda_depois_do_video():
     filtro = montar_filtro([[(0.0, 2.0)]], RECORTE, 1080, 1920, tem_audio=True,
                            legenda="/dados/org/exportacoes/e1/legenda.ass")

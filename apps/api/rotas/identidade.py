@@ -3,6 +3,8 @@
 # -----------------------------------------------
 import logging
 
+from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
@@ -10,9 +12,19 @@ from starlette.concurrency import run_in_threadpool
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import CamadaEntrada, IdentidadeAtualizarEntrada, IdentidadeSaida
 from core.config import LOGO_MAX_BYTES
+from core.modelos.figura import chave_figura
 from core.modelos.identidade import chave_logo, identidade_padrao, normalizar_instagram
 from core.utils import storage
-from core.utils.arte import ErroImagem, camada_logo, camada_texto, para_png, posicionar, preparar_logo
+from core.utils.arte import (
+    ErroImagem,
+    camada_figura,
+    camada_logo,
+    camada_texto,
+    desenhar_icone,
+    para_png,
+    posicionar,
+    preparar_logo,
+)
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api", tags=["identidade"])
@@ -110,6 +122,27 @@ async def desenhar_camada(dados: CamadaEntrada, usuario=Depends(usuario_atual), 
         imagem = await run_in_threadpool(camada_logo, dados.largura, dados.altura, logo, marca.posicao,
                                          marca.tamanho, marca.opacidade)
         imagem = await run_in_threadpool(posicionar, imagem, marca.x, marca.y, marca.rotacao)
+    elif dados.tipo == "figura":
+        figura = dados.figura
+        if figura is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Informe a figura.")
+        if figura.icone:
+            png = await run_in_threadpool(desenhar_icone, figura.icone)
+        else:
+            if not dados.projeto_id:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Informe o projeto da figura.")
+            try:
+                projeto_id = ObjectId(dados.projeto_id)
+            except InvalidId as e:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "A imagem desta figura não está mais no projeto.") from e
+            caminho = storage.caminho_local(chave_figura(usuario["organizacao_id"], projeto_id, figura.id))
+            if not caminho.is_file():
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "A imagem desta figura não está mais no projeto.")
+            png = await run_in_threadpool(caminho.read_bytes)
+        imagem = await run_in_threadpool(
+            camada_figura, dados.largura, dados.altura, png, figura.tamanho, figura.opacidade,
+        )
+        imagem = await run_in_threadpool(posicionar, imagem, figura.x, figura.y, figura.rotacao)
     else:
         texto = dados.texto
         if texto is None:

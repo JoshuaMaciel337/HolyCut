@@ -76,3 +76,5 @@ INTERVALO_MONITOR_SEGUNDOS = int(os.environ.get("INTERVALO_MONITOR_SEGUNDOS", "6
 MODO_IA = os.environ.get("MODO_IA", "simulado")  # "simulado" ou "real"
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODELO = os.environ.get("OLLAMA_MODELO", "gemma3:4b")
+# Busca de imagens de apoio. Vazia: a tela avisa que a busca não está configurada.
+PIXABAY_API_KEY = os.environ.get("PIXABAY_API_KEY", "")

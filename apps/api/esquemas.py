@@ -255,6 +255,58 @@ class TextoEntrada(BaseModel):
     rotacao: float = Field(default=0, ge=-180, le=180, description="Graus, no sentido do relógio")
 
 
+class FiguraEntrada(BaseModel):
+    """PNG da igreja ou um ícone desenhado pelo HolyCut, no tempo do vídeo final."""
+    id: str = Field(pattern=r"^[0-9a-f]{8}$")
+    nome: str = Field(default="Imagem", max_length=40)
+    icone: Literal["cruz", "biblia", "chama", "estrela"] | None = None
+    inicio: float = Field(default=0, ge=0)
+    fim: float | None = Field(default=None, gt=0)
+    tamanho: float = Field(default=0.28, ge=0.08, le=0.8, description="Largura em fração da moldura")
+    opacidade: float = Field(default=1, ge=0.2, le=1)
+    x: float | None = Field(default=None, ge=0, le=1)
+    y: float | None = Field(default=None, ge=0, le=1)
+    rotacao: float = Field(default=0, ge=-180, le=180)
+    credito: str = Field(default="", max_length=120, description="Autor e a Pixabay, quando a imagem veio de lá")
+
+
+class ApoioEntrada(BaseModel):
+    """Vídeo da Pixabay que cobre o quadro num intervalo. O som continua o da pregação."""
+    id: str = Field(pattern=r"^[0-9a-f]{8}$")
+    nome: str = Field(default="Vídeo", max_length=40)
+    credito: str = Field(default="", max_length=120)
+    inicio: float = Field(default=0, ge=0)
+    fim: float | None = Field(default=None, gt=0)
+    pixabay_id: int = Field(ge=1)
+
+
+class BuscaBancoEntrada(BaseModel):
+    frase: str = Field(min_length=2, max_length=240)
+
+
+class UsarBancoEntrada(BaseModel):
+    versao: int = Field(ge=1)
+    tipo: Literal["imagem", "video"]
+    pixabay_id: int = Field(ge=1)
+    inicio: float = Field(default=0, ge=0)
+
+
+class ResultadoBancoSaida(BaseModel):
+    id: int
+    tipo: Literal["imagem", "video"]
+    nome: str
+    autor: str
+    pagina: str
+    miniatura: str
+    duracao: int | None = None
+
+
+class SugestaoBancoSaida(BaseModel):
+    usar: bool
+    consulta: str
+    tipo: Literal["imagem", "video"]
+
+
 class FundoEntrada(BaseModel):
     escurecer: float = Field(default=0.0, ge=0, le=0.8)
     desfoque: float = Field(default=0, ge=0, le=30)
@@ -330,12 +382,14 @@ class FiltroSaida(BaseModel):
 
 
 class CamadaEntrada(BaseModel):
-    """Uma camada para a prévia: o logo da igreja ou um texto, do tamanho da moldura."""
+    """Uma camada para a prévia: o logo, um texto ou uma figura, do tamanho da moldura."""
     largura: int = Field(ge=90, le=1920)
     altura: int = Field(ge=90, le=1920)
-    tipo: Literal["logo", "texto"]
+    tipo: Literal["logo", "texto", "figura"]
     marca: MarcaEntrada | None = None
     texto: TextoEntrada | None = None
+    figura: FiguraEntrada | None = None
+    projeto_id: str | None = Field(default=None, max_length=24, description="Para carregar o PNG enviado")
 
 
 class ParteEntrada(BaseModel):
@@ -374,7 +428,7 @@ class ProjetoCriarEntrada(BaseModel):
 
 class LegendaEntrada(BaseModel):
     ativa: bool = True
-    preset: Literal["clean", "karaoke", "destaque", "digno"] = "destaque"
+    preset: Literal["clean", "karaoke", "destaque", "digno", "flutuante"] = "destaque"
     palavras_por_bloco: int = Field(default=3, ge=1, le=8)
     posicao: Literal["base", "centro"] = "base"
     x: float | None = Field(default=None, ge=0, le=1, description="Centro arrastado na prévia")
@@ -421,7 +475,7 @@ class PalavraFalaSaida(BaseModel):
 
 class LegendaPreviaSaida(BaseModel):
     ativa: bool
-    preset: Literal["clean", "karaoke", "destaque", "digno"]
+    preset: Literal["clean", "karaoke", "destaque", "digno", "flutuante"]
     posicao: Literal["base", "centro"]
     palavras_por_bloco: int
     cor_destaque: str
@@ -429,6 +483,27 @@ class LegendaPreviaSaida(BaseModel):
     tem_transcricao: bool
     blocos: list[BlocoLegendaSaida]
     palavras: list[PalavraFalaSaida] = []
+
+
+class ZoomEfeitoEntrada(BaseModel):
+    inicio: float = Field(default=0, ge=0)
+    fim: float | None = Field(default=None, gt=0)
+    nivel: float = Field(default=1, ge=1, le=1.35)
+
+
+class SomEfeitoEntrada(BaseModel):
+    id: Literal["nenhum", "sopro", "toque"] = "nenhum"
+    inicio: float = Field(default=0, ge=0)
+
+
+class EfeitosEntrada(BaseModel):
+    brilho: float = Field(default=0, ge=-0.3, le=0.3)
+    tremor: float = Field(default=0, ge=0, le=1)
+    luz: float = Field(default=0, ge=0, le=0.8)
+    contorno: bool = False
+    transicao: Literal["corte", "escurecer", "fusao", "desfoque"] = "corte"
+    zoom: ZoomEfeitoEntrada | None = None
+    som: SomEfeitoEntrada = SomEfeitoEntrada()
 
 
 class ProjetoAtualizarEntrada(BaseModel):
@@ -441,9 +516,12 @@ class ProjetoAtualizarEntrada(BaseModel):
     audio: AudioProjetoEntrada | None = None
     marca: MarcaEntrada | None = None
     textos: list[TextoEntrada] | None = Field(default=None, max_length=6)
+    figuras: list[FiguraEntrada] | None = Field(default=None, max_length=8)
+    apoios: list[ApoioEntrada] | None = Field(default=None, max_length=4)
     fundo: FundoEntrada | None = None
     cor: CorEntrada | None = None
     musica: MusicaProjetoEntrada | None = None
+    efeitos: EfeitosEntrada | None = None
     legenda: LegendaEntrada | None = None
 
 
@@ -465,9 +543,12 @@ class ProjetoSaida(BaseModel):
     audio: AudioProjetoEntrada
     marca: MarcaEntrada = MarcaEntrada()
     textos: list[TextoEntrada] = []
+    figuras: list[FiguraEntrada] = []
+    apoios: list[ApoioEntrada] = []
     fundo: FundoEntrada = FundoEntrada()
     cor: CorEntrada = CorEntrada()
     musica: MusicaProjetoEntrada = MusicaProjetoEntrada()
+    efeitos: EfeitosEntrada = EfeitosEntrada()
     legenda: LegendaEntrada = LegendaEntrada()
     modelo_id: str | None = None
     publicacao: PublicacaoSaida | None = None

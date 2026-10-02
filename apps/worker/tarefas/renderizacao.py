@@ -18,7 +18,10 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from PIL import Image
 
+from core.modelos.banco import chave_apoio
+from core.modelos.efeitos import efeitos_do_projeto
 from core.modelos.fala import palavras_visiveis
+from core.modelos.figura import chave_figura
 from core.modelos.identidade import chave_logo, identidade_padrao
 from core.modelos.job import ErroDefinitivo
 from core.modelos.legenda import gerar_ass, legenda_do_projeto, montar_blocos, palavras_da_transcricao
@@ -35,9 +38,14 @@ from core.modelos.projeto import (
     calcular_recorte,
     chave_exportacao,
 )
-from core.modelos.rosto import comandos_de_recorte, instante_no_final
+from core.modelos.rosto import (
+    caixa_contorno,
+    comandos_de_contorno,
+    comandos_de_recorte,
+    instante_no_final,
+)
 from core.utils import storage
-from core.utils.arte import camada_logo, camada_texto, para_png, posicionar
+from core.utils.arte import camada_figura, camada_logo, camada_texto, desenhar_icone, para_png, posicionar
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg
 from core.utils.mongo import agora
 from core.utils.render import (
@@ -49,6 +57,7 @@ from core.utils.render import (
     opcao_filtro_em_arquivo,
 )
 from core.utils.silencios import cortes_do_projeto, partes_com_trechos
+from core.utils.sons import sintetizar
 
 # -----------------------------------------------
 # CONFIGURAÇÕES
@@ -73,9 +82,9 @@ def marcar_exportacao_com_erro(db, job: dict, mensagem: str):
         }})
 
 
-def desenhar_camadas(db, organizacao_id, config: dict, largura: int, altura: int,
+def desenhar_camadas(db, organizacao_id, projeto_id, config: dict, largura: int, altura: int,
                      duracao: float) -> list[tuple[Image.Image, float, float]]:
-    """(imagem, início, fim) do logo e de cada texto, no tempo do vídeo final."""
+    """(imagem, início, fim) do logo, de cada texto e de cada figura, no tempo do vídeo final."""
     organizacao = db.organizacoes.find_one({"_id": organizacao_id}, {"nome": 1, "identidade": 1}) or {}
     identidade = {**identidade_padrao(organizacao.get("nome", "")), **(organizacao.get("identidade") or {})}
     camadas = []
@@ -99,6 +108,25 @@ def desenhar_camadas(db, organizacao_id, config: dict, largura: int, altura: int
                               float(texto.get("tamanho") or 1.0))
         imagem = posicionar(imagem, texto.get("x"), texto.get("y"), texto.get("rotacao") or 0)
         camadas.append((imagem, inicio_texto, fim_texto))
+    for figura in config.get("figuras") or []:
+        inicio_figura = min(float(figura.get("inicio") or 0), duracao)
+        fim_figura = min(float(figura.get("fim") or duracao), duracao)
+        if fim_figura <= inicio_figura:
+            continue
+        if figura.get("icone"):
+            png = desenhar_icone(figura["icone"])
+        else:
+            arquivo = storage.caminho_local(chave_figura(organizacao_id, projeto_id, figura["id"]))
+            if not arquivo.is_file():
+                logging.warning(
+                    f"[{organizacao_id}] A figura {figura['id']} não tem imagem. Ela fica de fora do vídeo.",
+                )
+                continue
+            png = arquivo.read_bytes()
+        imagem = camada_figura(largura, altura, png, float(figura.get("tamanho") or 0.28),
+                               float(figura.get("opacidade") or 1))
+        imagem = posicionar(imagem, figura.get("x"), figura.get("y"), figura.get("rotacao") or 0)
+        camadas.append((imagem, inicio_figura, fim_figura))
     return camadas
 
 
@@ -155,9 +183,10 @@ def exportar_imagem(db, exportacao: dict, config: dict, original, partes: list, 
     indice, relativo = localizar_no_video([trechos for _, trechos in partes], posicao)
     origem = partes[indice][0]["inicio"] + relativo
 
-    reportar(10, "Desenhando o logo e os textos")
-    visiveis = [imagem for imagem, inicio, fim in desenhar_camadas(db, organizacao_id, config, largura, altura, duracao)
-                if inicio <= posicao < fim]
+    reportar(10, "Desenhando o logo, os textos e as figuras")
+    visiveis = [imagem for imagem, inicio, fim in desenhar_camadas(
+        db, organizacao_id, exportacao["projeto_id"], config, largura, altura, duracao,
+    ) if inicio <= posicao < fim]
     entradas = []
     for indice, imagem in enumerate(visiveis):
         nome = f"camada_{indice}.png"
@@ -269,13 +298,26 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
                                caminho, reportar)
 
     # Logo e textos: uma imagem PNG por camada, sobreposta só no intervalo dela
-    reportar(4, "Desenhando o logo e os textos")
-    camadas = desenhar_camadas(db, organizacao_id, config, largura, altura, duracao)
+    reportar(4, "Desenhando o logo, os textos e as figuras")
+    camadas = desenhar_camadas(db, organizacao_id, exportacao["projeto_id"], config, largura, altura, duracao)
     entradas_camadas = []
     for indice, (imagem, _inicio, _fim) in enumerate(camadas):
         nome = f"camada_{indice}.png"
         storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, nome), para_png(imagem))
         entradas_camadas += ["-loop", "1", "-framerate", str(FPS), "-t", f"{duracao:.3f}", "-i", str(caminho(nome))]
+
+    entradas_apoios, apoios_filtro = [], []
+    for apoio in config.get("apoios") or []:
+        inicio_apoio = min(float(apoio.get("inicio") or 0), duracao)
+        fim_apoio = min(float(apoio.get("fim") or duracao), duracao)
+        if fim_apoio <= inicio_apoio:
+            continue
+        arquivo = storage.caminho_local(chave_apoio(organizacao_id, exportacao["projeto_id"], apoio["id"]))
+        if not arquivo.is_file():
+            logging.warning(f"[{organizacao_id}] O apoio {apoio['id']} não tem vídeo. Ele fica de fora.")
+            continue
+        entradas_apoios += ["-i", str(arquivo)]
+        apoios_filtro.append((len(partes) + len(apoios_filtro), inicio_apoio, fim_apoio))
 
     # Música da biblioteca, em loop a partir do ponto escolhido, depois das camadas nas entradas do FFmpeg
     faixa = musica_do_projeto(db, organizacao_id, config.get("musica"))
@@ -283,7 +325,7 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     if faixa:
         caminho_faixa, ajustes = faixa
         entradas_musica = ["-stream_loop", "-1", "-ss", f"{ajustes['inicio']:.3f}", "-i", str(caminho_faixa)]
-        musica = {"entrada": len(partes) + len(camadas), "volume": ajustes["volume"],
+        musica = {"entrada": len(partes) + len(apoios_filtro) + len(camadas), "volume": ajustes["volume"],
                   "abaixar_na_fala": ajustes["abaixar_na_fala"]}
     # A faixa limpa entra depois da música. As camadas continuam no índice len(partes).
     entradas_limpo, audio_limpo = [], None
@@ -294,10 +336,19 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         if not caminho_wav.is_file():
             raise ErroDefinitivo("O áudio limpo não foi encontrado no servidor.")
         entradas_limpo = ["-i", str(caminho_wav)]
-        indice_wav = len(partes) + len(camadas) + (1 if musica else 0)
+        indice_wav = len(partes) + len(apoios_filtro) + len(camadas) + (1 if musica else 0)
         audio_limpo = (indice_wav, [(parte["inicio"], parte["fim"]) for parte, _ in partes])
+    pedido_efeitos = efeitos_do_projeto(config)
+    pedido_som = pedido_efeitos["som"]
+    entradas_som, som = [], None
+    if pedido_som["id"] != "nenhum":
+        storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, "efeito.wav"),
+                             sintetizar(pedido_som["id"]))
+        entradas_som = ["-i", str(caminho("efeito.wav"))]
+        som = {"entrada": len(partes) + len(apoios_filtro) + len(camadas) + (1 if musica else 0)
+               + (1 if audio_limpo else 0), "inicio": pedido_som["inicio"]}
     tem_voz = bool(midia.get("audio")) or audio_limpo is not None
-    tem_saida_de_audio = tem_voz or musica is not None
+    tem_saida_de_audio = tem_voz or musica is not None or som is not None
 
     reportar(4, "Preparando a legenda")
     caminho_legenda = preparar_legenda(db, organizacao_id, exportacao_id, midia, config, partes, cortes,
@@ -307,12 +358,44 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, "rosto.txt"),
                              comandos_de_recorte(mapeados_rosto).encode())
         comandos_rosto = str(caminho("rosto.txt"))
+    comandos_contorno, caixa = None, None
+    if pedido_efeitos["contorno"]:
+        trilha = db.rostos.find_one({"midia_id": midia["_id"], "organizacao_id": organizacao_id}) or {}
+        partes_abs = [(parte["inicio"], parte["fim"]) for parte, _ in partes]
+        seguir = bool(enquadramento.get("seguir_rosto"))
+        caixas = []
+        for quadro in trilha.get("quadros") or []:
+            saida_t = instante_no_final(partes_abs, grupos, quadro["t"])
+            if saida_t is None:
+                continue
+            if seguir:
+                recorte_agora = calcular_recorte(
+                    midia["video"]["largura"], midia["video"]["altura"], config["proporcao"],
+                    quadro["x"], quadro["y"], quadro.get("zoom") or 1.0,
+                )
+            else:
+                recorte_agora = recorte
+            caixas.append((saida_t, *caixa_contorno(
+                quadro["x"], quadro["y"], recorte_agora, largura, altura,
+                midia["video"]["largura"], midia["video"]["altura"],
+            )))
+        caixas.sort()
+        if caixas:
+            caixa = caixas[0][1:]
+            if len(caixas) > 1:
+                storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, "contorno.txt"),
+                                     comandos_de_contorno(caixas).encode())
+                comandos_contorno = str(caminho("contorno.txt"))
+        else:
+            logging.warning(f"{rotulo} Contorno pedido sem trilha de rosto. Ele fica de fora.")
     filtro = montar_filtro(grupos, recorte, largura, altura, tem_audio=tem_voz,
                            normalizar=(config.get("audio") or {}).get("normalizar", True),
                            camadas=[(inicio_camada, fim_camada) for _, inicio_camada, fim_camada in camadas],
                            fundo=config.get("fundo"), cor=config.get("cor"), musica=musica, legenda=caminho_legenda,
                            audio_limpo=audio_limpo, comandos_rosto=comandos_rosto,
-                           rotacao=float((config.get("enquadramento") or {}).get("rotacao") or 0))
+                           rotacao=float((config.get("enquadramento") or {}).get("rotacao") or 0),
+                           apoios=apoios_filtro, efeitos=pedido_efeitos,
+                           som=som, comandos_contorno=comandos_contorno, caixa_contorno=caixa)
     storage.salvar_bytes(chave_exportacao(organizacao_id, exportacao_id, ARQUIVO_FILTRO), filtro.encode())
     saida = caminho(ARQUIVO_VIDEO_EXPORTADO)
     # A gravação entra uma vez por parte, já a partir do início dela
@@ -322,9 +405,11 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
                             "-i", str(original)]
     argumentos = [
         *entradas_partes,
+        *entradas_apoios,
         *entradas_camadas,
         *entradas_musica,
         *entradas_limpo,
+        *entradas_som,
         *opcao_filtro_em_arquivo(str(caminho(ARQUIVO_FILTRO))),
         "-map", "[v]", *(["-map", "[a]"] if tem_saida_de_audio else []),
         *(["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", CRF_X264, "-profile:v", "high"]
@@ -349,6 +434,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         temporarios.append(ARQUIVO_LEGENDA)
     if comandos_rosto:
         temporarios.append("rosto.txt")
+    if comandos_contorno:
+        temporarios.append("contorno.txt")
     for nome in temporarios:
         storage.remover(chave_exportacao(organizacao_id, exportacao_id, nome))
 

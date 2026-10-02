@@ -26,6 +26,16 @@ type Props = {
   filtroCor?: string;
   /** Giro do vídeo em graus, no sentido do relógio. Gira o quadro já recortado, como o render. */
   rotacao?: number;
+  /** Zoom e tremor do quadro já enquadrado, na mesma conta do render. As camadas ficam paradas. */
+  transformExtra?: string;
+  /** 1 no corte seco. Cai a 0 na emenda quando a transição escurece. */
+  opacidade?: number;
+  /** Sigma do desfoque nas pontas, em pixels do vídeo final. 0 fora da emenda. */
+  desfoqueTransicao?: number;
+  /** 0 a 0,8. Mistura uma cópia borrada em tela, como o blend do render. */
+  luz?: number;
+  /** Frações do quadro final. O mesmo retângulo do drawbox. */
+  contorno?: { x: number; y: number; w: number; h: number } | null;
 };
 
 function limitar(valor: number, [minimo, maximo]: [number, number]): number {
@@ -33,7 +43,7 @@ function limitar(valor: number, [minimo, maximo]: [number, number]): number {
 }
 
 /** Mostra só o que vai para o vídeo final. Arrastar a imagem muda o enquadramento. */
-export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children, fundo, filtroCor, rotacao = 0 }: Props) {
+export function PreviaEnquadrada({ player, src, poster, largura, altura, proporcao, enquadramento, aoMudar, alturaMaxima = 620, children, fundo, filtroCor, rotacao = 0, transformExtra = "", opacidade = 1, desfoqueTransicao = 0, luz = 0, contorno = null }: Props) {
   const recipiente = useRef<HTMLDivElement>(null);
   const inicio = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   const [disponivel, setDisponivel] = useState(0);
@@ -69,7 +79,13 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
         className="relative mx-auto touch-none overflow-hidden rounded-[1.75rem] bg-black shadow-[0_30px_80px_rgba(0,0,0,.5)] ring-4 ring-[#1c1f29] [container-type:size]"
         style={{ width: quadroLargura, height: quadroAltura }}
       >
-        <div className="absolute inset-0 overflow-hidden" style={rotacao ? { transform: `rotate(${rotacao}deg)` } : undefined}>
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{
+            transform: [rotacao ? `rotate(${rotacao}deg)` : "", transformExtra].filter(Boolean).join(" ") || undefined,
+            opacity: opacidade,
+          }}
+        >
         <video
           ref={player}
           src={src}
@@ -84,11 +100,43 @@ export function PreviaEnquadrada({ player, src, poster, largura, altura, proporc
             top: `${(-recorte.y / recorte.altura) * 100}%`,
             // O desfoque do render é em pixels do vídeo final; aqui, na escala da moldura
             filter:
-              [filtroCor, fundo?.desfoque ? `blur(${(fundo.desfoque * quadroLargura) / alvo.largura}px)` : ""].filter(Boolean).join(" ") ||
-              undefined,
+              [
+                filtroCor,
+                fundo?.desfoque ? `blur(${(fundo.desfoque * quadroLargura) / alvo.largura}px)` : "",
+                desfoqueTransicao > 0 ? `blur(${(desfoqueTransicao * quadroLargura) / alvo.largura}px)` : "",
+              ].filter(Boolean).join(" ") || undefined,
           }}
         />
+        {luz > 0.01 ? (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backdropFilter: `blur(${(18 * quadroLargura) / alvo.largura}px)`,
+              mixBlendMode: "screen",
+              opacity: Math.min(luz, 0.8),
+            }}
+          />
+        ) : null}
         </div>
+        {contorno ? (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              transform: [rotacao ? `rotate(${rotacao}deg)` : "", transformExtra].filter(Boolean).join(" ") || undefined,
+            }}
+          >
+            <div
+              className="absolute box-border border-white/90"
+              style={{
+                left: `${contorno.x * 100}%`,
+                top: `${contorno.y * 100}%`,
+                width: `${contorno.w * 100}%`,
+                height: `${contorno.h * 100}%`,
+                borderWidth: "0.556cqw",
+              }}
+            />
+          </div>
+        ) : null}
         {fundo?.escurecer ? <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: fundo.escurecer }} /> : null}
         <div
           className="absolute inset-0 cursor-grab active:cursor-grabbing"

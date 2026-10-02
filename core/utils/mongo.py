@@ -21,6 +21,10 @@ INDICES = {
         ([("email", 1)], {"unique": True}),
         ([("organizacao_id", 1)], {}),
     ],
+    "cache_pixabay": [
+        ([("chave", 1)], {"unique": True}),
+        ([("expira_em", 1)], {"expireAfterSeconds": 0}),
+    ],
     "jobs": [
         ([("status", 1), ("tipo", 1), ("prioridade", -1), ("criado_em", 1)], {"name": "fila_busca"}),
         ([("organizacao_id", 1), ("criado_em", -1)], {}),

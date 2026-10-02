@@ -193,6 +193,7 @@ def test_projeto_e_exportacao_guardam_a_configuracao():
     assert projeto["silencios"] == {"intensidade": "media"}
     assert projeto["audio"] == {"normalizar": True, "limpeza": False}
     assert projeto["musica"] == {"id": None, "volume": 0.25, "abaixar_na_fala": True, "inicio": 0.0}
+    assert projeto["apoios"] == []
     with pytest.raises(ValueError):
         montar_projeto("org1", midia, "u1", proporcao="3:2")
 
@@ -214,3 +215,14 @@ def test_girar_o_video_entra_depois_do_recorte():
     assert "scale=1080:1920" in filtro and "rotate=1.570796:ow=1080:oh=1920:c=black" in filtro
     assert filtro.index("crop=") < filtro.index("rotate=")
     assert "rotate" not in montar_filtro_imagem(recorte, 1080, 1920)
+
+
+def test_video_de_apoio_cobre_o_quadro_e_nao_muda_o_filtro_quando_nao_ha():
+    recorte = calcular_recorte(1920, 1080, "9:16")
+    base = montar_filtro([[(0.0, 4.0)]], recorte, 1080, 1920, tem_audio=True)
+    assert montar_filtro([[(0.0, 4.0)]], recorte, 1080, 1920, tem_audio=True, apoios=[]) == base
+    com = montar_filtro([[(0.0, 8.0)]], recorte, 1080, 1920, tem_audio=True,
+                        camadas=[(0.0, 8.0)], apoios=[(1, 2.0, 6.0)])
+    assert "scale=1080:1920:force_original_aspect_ratio=increase" in com
+    assert "overlay=0:0:eof_action=pass:enable='between(t,2.000,6.000)'" in com
+    assert "[baseA0][2:v]overlay=0:0" in com

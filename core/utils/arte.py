@@ -1,5 +1,5 @@
 # -----------------------------------------------
-# HolyCut — arte sobre o vídeo: logo da igreja, textos e templates
+# HolyCut — arte sobre o vídeo: logo da igreja, textos, figuras e templates
 #
 # Cada elemento vira uma camada PNG transparente do tamanho do vídeo.
 # A mesma camada aparece na prévia do navegador e entra no vídeo final
@@ -7,6 +7,7 @@
 # Fontes: as da marca, em brand/fontes (licença OFL, pode queimar no vídeo).
 # -----------------------------------------------
 import io
+import math
 from functools import lru_cache
 
 import numpy as np
@@ -94,6 +95,64 @@ def camada_logo(largura: int, altura: int, logo_png: bytes, posicao: str = "topo
     x = margem if posicao.endswith("esquerda") else largura - margem - logo.width
     y = margem if posicao.startswith("topo") else altura - margem - logo.height
     camada.alpha_composite(logo, (x, y))
+    return camada
+
+
+# -----------------------------------------------
+# FIGURAS (PNG enviado ou ícone desenhado aqui, sem arquivo de terceiros)
+# -----------------------------------------------
+BRANCO = (255, 255, 255, 255)
+
+
+def _estrela(cx: float, cy: float, externo: float, interno: float) -> list[tuple[float, float]]:
+    pontos = []
+    for indice in range(10):
+        raio = externo if indice % 2 == 0 else interno
+        angulo = -math.pi / 2 + indice * math.pi / 5
+        pontos.append((cx + raio * math.cos(angulo), cy + raio * math.sin(angulo)))
+    return pontos
+
+
+@lru_cache(maxsize=8)
+def desenhar_icone(nome: str) -> bytes:
+    """PNG quadrado do ícone. Cruz, bíblia, chama e estrela são desenhos do HolyCut."""
+    lado = 512
+    imagem = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    desenho = ImageDraw.Draw(imagem)
+    if nome == "cruz":
+        desenho.rounded_rectangle((196, 36, 316, 476), radius=28, fill=BRANCO)
+        desenho.rounded_rectangle((56, 150, 456, 270), radius=28, fill=BRANCO)
+    elif nome == "biblia":
+        desenho.rounded_rectangle((56, 48, 456, 464), radius=36, fill=(24, 18, 32, 230))
+        desenho.rounded_rectangle((88, 80, 424, 432), radius=20, fill=BRANCO)
+        desenho.line((256, 108, 256, 404), fill=(24, 18, 32, 200), width=10)
+        desenho.rounded_rectangle((148, 176, 196, 300), radius=8, fill=(24, 18, 32, 220))
+        desenho.rounded_rectangle((124, 214, 220, 262), radius=8, fill=(24, 18, 32, 220))
+    elif nome == "chama":
+        desenho.polygon([(256, 28), (430, 250), (372, 430), (256, 478), (140, 430), (82, 250)], fill=BRANCO)
+        desenho.ellipse((168, 240, 344, 470), fill=BRANCO)
+    elif nome == "estrela":
+        desenho.polygon(_estrela(256, 256, 220, 88), fill=BRANCO)
+    else:
+        raise ValueError(f"Ícone desconhecido: {nome}")
+    return para_png(imagem)
+
+
+def camada_figura(largura: int, altura: int, png: bytes, tamanho: float = 0.28,
+                  opacidade: float = 1.0) -> Image.Image:
+    """Cola a figura no centro da moldura. A largura dela é `tamanho` vezes a largura do vídeo."""
+    camada = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+    figura = Image.open(io.BytesIO(png)).convert("RGBA")
+    alvo = max(int(largura * min(max(tamanho, 0.08), 0.8)), 8)
+    nova_altura = max(int(figura.height * alvo / figura.width), 1)
+    if nova_altura > altura:
+        nova_altura = altura
+        alvo = max(int(figura.width * nova_altura / figura.height), 1)
+    figura = figura.resize((alvo, nova_altura), Image.Resampling.LANCZOS)
+    if opacidade < 1:
+        alfa = figura.getchannel("A").point(lambda valor: int(valor * max(opacidade, 0)))
+        figura.putalpha(alfa)
+    camada.alpha_composite(figura, ((largura - figura.width) // 2, (altura - figura.height) // 2))
     return camada
 
 

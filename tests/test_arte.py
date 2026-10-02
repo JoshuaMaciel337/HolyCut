@@ -7,9 +7,11 @@ from PIL import Image, ImageFont
 from core.modelos.identidade import marca_padrao, normalizar_instagram
 from core.utils.arte import (
     ErroImagem,
+    camada_figura,
     camada_logo,
     camada_texto,
     carregar_fonte,
+    desenhar_icone,
     preparar_logo,
     quebrar_linhas,
 )
@@ -159,3 +161,19 @@ def test_posicionar_leva_o_elemento_para_o_ponto_e_gira():
     assert (x1 - x0, y1 - y0) == (20, 40) and ((x0 + x1) / 2, (y0 + y1) / 2) == (100, 50)
     # Na borda, o que passa da moldura só fica de fora (não quebra)
     assert posicionar(camada, 1.0, 0.0).getbbox() == (180, 0, 200, 10)
+
+
+def test_icones_e_figura_no_centro_com_a_largura_pedida():
+    for nome in ("cruz", "biblia", "chama", "estrela"):
+        icone = Image.open(io.BytesIO(desenhar_icone(nome)))
+        assert icone.size == (512, 512)
+        assert icone.getbbox() is not None
+    quadrado = Image.new("RGBA", (80, 40), (255, 255, 255, 255))
+    bruto = io.BytesIO()
+    quadrado.save(bruto, format="PNG")
+    camada = camada_figura(1080, 1920, bruto.getvalue(), 0.28, 1)
+    caixa = camada.getbbox()
+    assert caixa is not None
+    assert caixa[2] - caixa[0] == int(1080 * 0.28)
+    assert abs((caixa[0] + caixa[2]) / 2 - 540) <= 1
+    assert abs((caixa[1] + caixa[3]) / 2 - 960) <= 1

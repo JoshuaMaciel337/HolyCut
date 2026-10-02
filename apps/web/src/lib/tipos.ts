@@ -292,6 +292,54 @@ export type TextoProjeto = {
   rotacao?: number;
 };
 
+export type IconeFigura = "cruz" | "biblia" | "chama" | "estrela";
+
+export type FiguraProjeto = {
+  id: string;
+  nome: string;
+  /** null: a imagem foi enviada pela igreja. */
+  icone: IconeFigura | null;
+  /** Segundos no vídeo final. */
+  inicio: number;
+  /** null: até o fim do vídeo. */
+  fim: number | null;
+  /** Largura em fração da moldura, de 0,08 a 0,8. */
+  tamanho: number;
+  opacidade: number;
+  /** Centro arrastado na prévia (0 a 1 da moldura). */
+  x?: number | null;
+  y?: number | null;
+  /** Graus, no sentido do relógio. */
+  rotacao?: number;
+  /** Autor e a Pixabay, quando a imagem veio de lá. */
+  credito?: string;
+};
+
+export type ApoioProjeto = {
+  id: string;
+  nome: string;
+  credito: string;
+  inicio: number;
+  fim: number | null;
+  pixabay_id: number;
+};
+
+export type ResultadoBanco = {
+  id: number;
+  tipo: "imagem" | "video";
+  nome: string;
+  autor: string;
+  pagina: string;
+  miniatura: string;
+  duracao: number | null;
+};
+
+export type SugestaoBanco = {
+  usar: boolean;
+  consulta: string;
+  tipo: "imagem" | "video";
+};
+
 export type Fundo = {
   /** 0 a 0,8: quanto de preto por cima do vídeo. */
   escurecer: number;
@@ -355,6 +403,20 @@ export type MusicaProjeto = {
   inicio: number;
 };
 
+export type EfeitosProjeto = {
+  /** -0,3 a 0,3. Zero deixa o quadro como está. */
+  brilho: number;
+  /** 0 a 1. */
+  tremor: number;
+  /** 0 a 0,8. Zero não mistura a cópia borrada. */
+  luz: number;
+  /** Retângulo em volta do rosto. Precisa da trilha do rosto. */
+  contorno: boolean;
+  transicao: "corte" | "escurecer" | "fusao" | "desfoque";
+  zoom: { inicio: number; fim: number | null; nivel: number } | null;
+  som: { id: "nenhum" | "sopro" | "toque"; inicio: number };
+};
+
 export type Modelo = {
   id: string;
   nome: string;
@@ -373,7 +435,7 @@ export type Parte = {
   fim: number;
 };
 
-export type PresetLegenda = "clean" | "karaoke" | "destaque" | "digno";
+export type PresetLegenda = "clean" | "karaoke" | "destaque" | "digno" | "flutuante";
 export type PosicaoLegenda = "base" | "centro";
 
 export type NivelVicio = "leve" | "media" | "forte";
@@ -448,9 +510,12 @@ export type Projeto = {
   audio: { normalizar: boolean; limpeza: boolean };
   marca: Marca;
   textos: TextoProjeto[];
+  figuras: FiguraProjeto[];
+  apoios: ApoioProjeto[];
   fundo: Fundo;
   cor: Cor;
   musica: MusicaProjeto;
+  efeitos: EfeitosProjeto;
   legenda: Legenda;
   publicacao?: { legenda: string; hashtags: string[]; gerado_por_ia: boolean } | null;
   versao: number;

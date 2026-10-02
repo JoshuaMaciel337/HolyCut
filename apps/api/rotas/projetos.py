@@ -7,7 +7,7 @@ import zipfile
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pymongo import ReturnDocument
 from starlette.concurrency import run_in_threadpool
 
@@ -26,7 +26,10 @@ from api.rotas.exportacoes import apagar_exportacoes, nome_de_arquivo
 from api.rotas.identidade import carregar_identidade
 from api.rotas.modelos import buscar_modelo
 from api.rotas.musicas import buscar_musica
+from core.config import LOGO_MAX_BYTES
+from core.modelos.banco import pasta_apoios
 from core.modelos.fala import cortes_da_fala, fundir_cortes, palavras_para_edicao, palavras_visiveis
+from core.modelos.figura import ICONES, MAX_FIGURAS, NOMES_ICONES, chave_figura, nova_figura, pasta_figuras
 from core.modelos.job import montar_job
 from core.modelos.legenda import COR_DOURADA, legenda_do_projeto, montar_blocos, palavras_da_transcricao
 from core.modelos.midia import ARQUIVO_AUDIO_LIMPO, STATUS_PRONTA
@@ -39,6 +42,9 @@ from core.modelos.pacote_edicao import (
     taxa_de_quadros,
 )
 from core.modelos.projeto import DURACAO_MINIMA_TRECHO, montar_exportacao, montar_projeto, partes_do_projeto
+from core.modelos.publicacao import textos_do_corte
+from core.utils import storage
+from core.utils.arte import ErroImagem, preparar_logo
 from core.utils.mongo import agora
 from core.utils.silencios import cortes_da_gravacao, cortes_do_projeto, partes_com_trechos
 
@@ -104,6 +110,37 @@ async def ver_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depend
     return projeto_para_saida(await buscar_projeto(db, projeto_id, usuario))
 
 
+@router.post("/{projeto_id}/publicacao", response_model=ProjetoSaida)
+async def refazer_publicacao(projeto_id: str, versao: int = Query(ge=1),
+                             usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Título e legenda do post a partir da fala que ficou neste corte. O que não foi dito não entra."""
+    projeto = await buscar_projeto(db, projeto_id, usuario)
+    transcricao = await db.transcricoes.find_one({
+        "midia_id": projeto["midia_id"], "organizacao_id": usuario["organizacao_id"],
+    })
+    visiveis = palavras_visiveis(palavras_da_transcricao(transcricao), legenda_do_projeto(projeto))
+    no_corte = [palavra for palavra in visiveis
+                if any(float(parte["inicio"]) <= float(palavra["inicio"]) < float(parte["fim"])
+                       for parte in projeto.get("partes") or [])]
+    textos = await run_in_threadpool(textos_do_corte, no_corte)
+    if textos is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "Não há uma frase dita neste corte para virar título.")
+    resultado = await db.projetos.find_one_and_update(
+        {"_id": projeto["_id"], "versao": versao},
+        {"$set": {
+            "nome": textos["titulo"],
+            "publicacao": {"legenda": textos["legenda"], "hashtags": textos["hashtags"], "gerado_por_ia": True},
+            "atualizado_em": agora(),
+        }, "$inc": {"versao": 1}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if resultado is None:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Este projeto foi alterado em outra aba ou por outra pessoa. Recarregue a página.")
+    return projeto_para_saida(resultado)
+
+
 @router.get("/{projeto_id}/legenda", response_model=LegendaPreviaSaida)
 async def ver_legenda(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Blocos da legenda no tempo do vídeo final. A prévia e o render usam esta mesma conta."""
@@ -148,6 +185,27 @@ async def atualizar_projeto(projeto_id: str, dados: ProjetoAtualizarEntrada,
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O texto precisa terminar depois de começar.")
     if dados.textos is not None and len({texto.id for texto in dados.textos}) != len(dados.textos):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Dois textos com o mesmo identificador.")
+    if dados.figuras is not None:
+        if len({figura.id for figura in dados.figuras}) != len(dados.figuras):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas figuras com o mesmo identificador.")
+        conhecidas = {figura["id"] for figura in projeto.get("figuras") or []}
+        for figura in dados.figuras:
+            if figura.fim is not None and figura.fim <= figura.inicio:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                    "A figura precisa terminar depois de começar.")
+            if figura.id not in conhecidas:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A figura não está neste projeto.")
+    if dados.apoios is not None:
+        if len({apoio.id for apoio in dados.apoios}) != len(dados.apoios):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                "Dois vídeos de apoio com o mesmo identificador.")
+        conhecidos = {apoio["id"] for apoio in projeto.get("apoios") or []}
+        for apoio in dados.apoios:
+            if apoio.fim is not None and apoio.fim <= apoio.inicio:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                    "O vídeo de apoio precisa terminar depois de começar.")
+            if apoio.id not in conhecidos:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O vídeo de apoio não está neste projeto.")
     if dados.musica is not None and dados.musica.id is not None:
         await buscar_musica(db, dados.musica.id, usuario)
     if not campos:
@@ -171,7 +229,54 @@ async def atualizar_projeto(projeto_id: str, dados: ProjetoAtualizarEntrada,
 async def excluir_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     projeto = await buscar_projeto(db, projeto_id, usuario)
     await apagar_exportacoes(db, {"projeto_id": projeto["_id"]})
+    await run_in_threadpool(storage.remover_pasta, pasta_figuras(usuario["organizacao_id"], projeto["_id"]))
+    await run_in_threadpool(storage.remover_pasta, pasta_apoios(usuario["organizacao_id"], projeto["_id"]))
     await db.projetos.delete_one({"_id": projeto["_id"]})
+
+
+@router.post("/{projeto_id}/figuras", response_model=ProjetoSaida, status_code=status.HTTP_201_CREATED)
+async def adicionar_figura(projeto_id: str, request: Request, versao: int = Query(ge=1),
+                           icone: str | None = Query(default=None),
+                           nome: str | None = Query(default=None, max_length=80),
+                           usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Acrescenta um ícone pronto ou um PNG, JPG ou WEBP. A versão evita gravar por cima de outra aba."""
+    if icone is not None and icone not in ICONES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Escolha cruz, bíblia, chama ou estrela.")
+    projeto = await buscar_projeto(db, projeto_id, usuario)
+    if len(projeto.get("figuras") or []) >= MAX_FIGURAS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Dá para colocar até 8 figuras no vídeo.")
+    rotulo = (nome or "").replace("\\", "/").split("/")[-1]
+    if "." in rotulo:
+        rotulo = rotulo.rsplit(".", 1)[0]
+    rotulo = rotulo.strip()[:40]
+    figura = nova_figura(icone, rotulo or (NOMES_ICONES[icone] if icone else "Imagem"))
+    chave = None
+    if icone is None:
+        conteudo = bytearray()
+        async for pedaco in request.stream():
+            conteudo += pedaco
+            if len(conteudo) > LOGO_MAX_BYTES:
+                raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "A imagem pode ter no máximo 5 MB.")
+        if not conteudo:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Envie uma imagem PNG, JPG ou WEBP.")
+        try:
+            png = await run_in_threadpool(preparar_logo, bytes(conteudo))
+        except ErroImagem as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+        chave = chave_figura(usuario["organizacao_id"], projeto["_id"], figura["id"])
+        if not await run_in_threadpool(storage.salvar_bytes, chave, png):
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Não foi possível salvar a imagem.")
+    resultado = await db.projetos.find_one_and_update(
+        {"_id": projeto["_id"], "versao": versao},
+        {"$push": {"figuras": figura}, "$inc": {"versao": 1}, "$set": {"atualizado_em": agora()}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if resultado is None:
+        if chave:
+            await run_in_threadpool(storage.remover, chave)
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Este projeto foi alterado em outra aba ou por outra pessoa. Recarregue a página.")
+    return projeto_para_saida(resultado)
 
 
 @router.post("/{projeto_id}/exportar", response_model=ExportacaoSaida, status_code=status.HTTP_201_CREATED)

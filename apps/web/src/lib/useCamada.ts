@@ -2,14 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { Marca, TextoProjeto } from "@/lib/tipos";
+import type { FiguraProjeto, Marca, TextoProjeto } from "@/lib/tipos";
 
 export type PedidoCamada = {
   largura: number;
   altura: number;
-  tipo: "logo" | "texto";
+  tipo: "logo" | "texto" | "figura";
   marca?: Marca;
   texto?: TextoProjeto;
+  figura?: FiguraProjeto;
+  /** Para a API achar o PNG enviado. */
+  projeto_id?: string;
 };
 
 const ESPERA_MS = 250;

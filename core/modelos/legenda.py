@@ -11,11 +11,15 @@ import re
 from core.modelos.fala import VICIOS, edicoes_validas, ids_validos
 from core.utils.render import planejar_trechos
 
-PRESETS = ("clean", "karaoke", "destaque", "digno")
+PRESETS = ("clean", "karaoke", "destaque", "digno", "flutuante")
 POSICOES = ("base", "centro")
 COR_DOURADA = "#FFD24D"   # o dourado do preset Digno; os outros usam a cor da igreja
 PALAVRAS_PADRAO = 3
 PAUSA_NOVO_BLOCO = 0.45   # um intervalo maior que isso entre palavras abre outro bloco
+# A palavra flutuante sobe esta fração da moldura e some nas pontas do tempo dela.
+SUBIDA_FLUTUANTE = 0.04
+ENTRADA_FLUTUANTE = 0.15
+SAIDA_FLUTUANTE = 0.20
 LEGENDA_PADRAO = {
     "ativa": True, "preset": "destaque", "palavras_por_bloco": PALAVRAS_PADRAO, "posicao": "base",
     "vicios": None, "edicoes": {}, "apagadas": [], "mantidas": [],
@@ -196,8 +200,30 @@ def _evento(inicio: float, fim: float, texto: str) -> str:
     return f"Dialogue: 0,{tempo_ass(inicio)},{tempo_ass(fim)},Legenda,,0,0,0,,{texto}"
 
 
-def _eventos_do_bloco(bloco: dict, preset: str, cor_igreja: str, tamanho: int) -> list[str]:
+def _evento_flutuante(palavra: dict, cor: str, tamanho: int, largura: int, altura: int,
+                      posicao: str, x: float | None, y: float | None) -> str:
+    """Uma palavra só, grande, subindo e sumindo. O brilho é o contorno borrado."""
+    centro_x = int(round((0.5 if x is None else x) * largura))
+    if y is None:
+        centro_y = int(round((0.5 if posicao == "centro" else 0.78) * altura))
+    else:
+        centro_y = int(round(y * altura))
+    subida = int(round(altura * SUBIDA_FLUTUANTE))
+    duracao = max(float(palavra["fim"]) - float(palavra["inicio"]), 0.08)
+    entra = int(round(min(duracao * ENTRADA_FLUTUANTE, 0.25) * 1000))
+    sai = int(round(min(duracao * SAIDA_FLUTUANTE, 0.3) * 1000))
+    estilo = (f"{{\\an5\\move({centro_x},{centro_y + subida},{centro_x},{centro_y - subida})"
+              f"\\fad({entra},{sai})\\fs{int(tamanho * 1.8)}\\blur3\\bord2\\3c{cor_ass(cor)}}}")
+    return _evento(palavra["inicio"], palavra["fim"], estilo + _escapar(palavra["texto"]))
+
+
+def _eventos_do_bloco(bloco: dict, preset: str, cor_igreja: str, tamanho: int,
+                      largura: int = 1080, altura: int = 1920, posicao: str = "base",
+                      x: float | None = None, y: float | None = None) -> list[str]:
     palavras = bloco["palavras"]
+    if preset == "flutuante":
+        return [_evento_flutuante(palavra, cor_igreja, tamanho, largura, altura, posicao, x, y)
+                for palavra in palavras]
     if preset != "karaoke":
         return [_evento(bloco["inicio"], bloco["fim"], _colorir(palavras, None, cor_igreja, preset, tamanho))]
     eventos = []
@@ -213,7 +239,8 @@ def gerar_ass(blocos: list[dict], preset: str, cor_destaque: str, largura: int, 
     """
     Arquivo ASS queimado no vídeo. Clean é o bloco inteiro em branco; Karaokê acende só a
     palavra do momento; Destaque pinta a mais longa na cor da igreja; Digno escreve essa
-    palavra em Caveat, dourada. As fontes são as da marca, em /app/brand/fontes.
+    palavra em Caveat, dourada. Flutuante mostra uma palavra por vez, grande, subindo, com um brilho.
+    As fontes são as da marca, em /app/brand/fontes.
     """
     if not blocos:
         return ""
@@ -225,8 +252,10 @@ def gerar_ass(blocos: list[dict], preset: str, cor_destaque: str, largura: int, 
     alinhamento = 2 if posicao == "base" else 5
     estilo = (f"Style: Legenda,Montserrat,{tamanho},&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,"
               f"-1,0,0,0,100,100,0,0,1,{contorno},0,{alinhamento},80,80,{margem},1")
-    eventos = [evento for bloco in blocos for evento in _eventos_do_bloco(bloco, preset, cor_destaque, tamanho)]
-    if x is not None or y is not None:
+    eventos = [evento for bloco in blocos
+               for evento in _eventos_do_bloco(
+                   bloco, preset, cor_destaque, tamanho, largura, altura, posicao, x, y)]
+    if preset != "flutuante" and (x is not None or y is not None):
         # Arrastada na prévia: cada linha vai centrada no ponto escolhido (\an5\pos), como na prévia
         centro_x = int(round((0.5 if x is None else x) * largura))
         centro_y = int(round((0.5 if y is None else y) * altura))

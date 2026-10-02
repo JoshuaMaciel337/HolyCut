@@ -39,8 +39,8 @@ DESFOQUE_MAXIMO = 30
 
 # Campos do projeto que definem o vídeo. A exportação guarda uma cópia deles,
 # então editar o projeto depois não muda um vídeo já exportado.
-CAMPOS_DO_VIDEO = ("proporcao", "partes", "silencios", "enquadramento", "audio", "marca", "textos", "fundo", "cor",
-                   "musica", "legenda")
+CAMPOS_DO_VIDEO = ("proporcao", "partes", "silencios", "enquadramento", "audio", "marca", "textos", "figuras",
+                   "apoios", "fundo", "cor", "musica", "legenda", "efeitos")
 
 
 def partes_do_projeto(projeto_ou_config: dict) -> list[dict]:
@@ -103,6 +103,10 @@ def montar_projeto(organizacao_id, midia: dict, criado_por, nome: str | None = N
         "audio": {"normalizar": True, "limpeza": False},
         "marca": visual.get("marca") or marca_padrao(identidade),
         "textos": visual.get("textos", []),
+        "figuras": [],
+        "apoios": [],
+        "efeitos": {"brilho": 0.0, "tremor": 0.0, "luz": 0.0, "contorno": False, "transicao": "corte",
+                    "zoom": None, "som": {"id": "nenhum", "inicio": 0.0}},
         "fundo": {**FUNDO_PADRAO, **visual.get("fundo", {})},
         "cor": {**COR_PADRAO, **visual.get("cor", {})},
         "musica": dict(MUSICA_DO_PROJETO_PADRAO),

@@ -46,7 +46,7 @@ Também ficam de fora, depois da pesquisa de mercado:
 
 1. **Projeto é dado, vídeo é resultado.** Transcrição, cortes, enquadramento e estilo ficam num JSON no MongoDB. O FFmpeg só renderiza na exportação. Editar uma palavra da legenda não exige transcrever de novo.
 2. **Nada destrutivo.** O arquivo original e a transcrição original nunca são alterados. Edições são guardadas como camadas por cima.
-3. **Tudo local, sem custo por uso.** Modelos abertos rodando na própria GPU. Serviço externo só quando for opcional, como o banco de imagens do Pexels.
+3. **Tudo local, sem custo por uso.** Modelos abertos rodando na própria GPU. Serviço externo só quando for opcional, como o banco de imagens da Pixabay.
 4. **Workers puxam trabalho.** Os workers de GPU buscam jobs no MongoDB. Assim um worker pode rodar no servidor, num PC com GPU da igreja ou numa GPU alugada por hora, sem mudar código.
 5. **Multi-igreja desde o primeiro dia.** Todo documento pertence a uma organização. Isso evita reescrever tudo quando virar SaaS.
 6. **Fiel ao que foi pregado.** A IA só organiza o que o pastor disse; ela não gera sermão nem "melhora" a mensagem. Títulos, ganchos, resumos, guias e legendas de post saem da fala real. Quando a IA não tem confiança no que extraiu, ela omite em vez de inventar. Todo texto automático aparece marcado como gerado por IA, para a equipe revisar, e a transcrição não corrige o português do pregador.
@@ -171,7 +171,7 @@ O padrão da equipe proíbe tecnologias fora da lista sem aprovação. Um app we
 | Rosto para reenquadrar | MediaPipe Face Detection | Apache 2.0 | **Evitar YOLO da Ultralytics**, que é AGPL |
 | LLM (cortes, títulos, legendas de post) | Ollama com Qwen3 ou Gemma 3 | Apache / termos Gemma | Usar saída estruturada com JSON Schema, que o Ollama suporta |
 | Visão (opcional, HolyMoments) | Modelo de visão via Ollama, como Qwen2.5-VL ou Gemma 3 | Idem | Pontua quadros-chave: mãos levantadas, plateia, luz |
-| Imagens de apoio (B-roll) | API do Pexels | Uso comercial liberado | Única dependência externa, e opcional |
+| Imagens de apoio (B-roll) | API da Pixabay | Uso comercial dentro de um trabalho maior | Única dependência externa, e opcional |
 
 ### Hardware
 
@@ -615,7 +615,7 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
 ### Fase 3 — Produto completo (4 a 6 semanas)
 
 - [x] Linha do tempo completa com arrastar, dividir e reordenar (o projeto tem partes em qualquer ordem, que podem se repetir; o render emenda as partes sem perder a sincronia, medido com clarão e bipe)
-- [ ] B-roll pelo Pexels, com busca feita pelo LLM a partir da frase
+- [x] B-roll da Pixabay (foto e vídeo, uso comercial dentro do vídeo da igreja). A busca pode sair da frase dita, pelo Gemma; se o modelo não responder, a busca é a própria frase. A foto vira figura, com o autor e a Pixabay no crédito, e dura 5 s a partir do ponto da prévia. O vídeo cobre o quadro nesse intervalo (até 8 s) e o som continua o da pregação. A chave fica só no servidor, a miniatura só aparece na lista, e o arquivo é baixado para o armazenamento da igreja.
 - [x] Fluxo de aprovação: o editor manda e o pastor ou líder aprova pelo celular (por um link de 7 dias, sem conta: aprova ou pede ajuste com comentário, e o editor vê a resposta sozinho)
 - [x] Agente de pasta monitorada: um script no PC da mídia envia sozinho a gravação do OBS quando o culto termina (`apps/agente`, baixado pelo site em .zip; usa uma chave de envio que só serve para enviar e pode ser revogada)
 - [ ] Publicação direta no YouTube, no horário escolhido para cada corte e com aprovação antes se a igreja quiser, e depois Instagram e TikTok
@@ -630,9 +630,9 @@ O Nitro 5 sobe com `docker compose --profile gpu` e o diagnóstico da GPU passou
   - [x] 2. Mexer direto na prévia: arrastar, aumentar e girar a legenda, os textos e o logo, e girar o vídeo (a posição vai para o render, medida contra a prévia)
     - [x] Textos e logo: clicar seleciona, arrastar move, a alça laranja aumenta e a roxa gira. Medido: a faixa do texto no vídeo exportado cai a até 2 px da caixa da prévia
     - [x] A legenda automática (arrastar e aumentar; vai para o ASS com `\an5\pos`) e girar o vídeo (botões de 90° e ajuste fino; o render gira o quadro já recortado, com cantos pretos). Comparado quadro a quadro com a prévia
-  - [ ] 3. Camadas: imagens, PNG, ícones e figurinhas por cima do vídeo, com entrada e saída na linha do tempo
-  - [ ] 4. Efeitos de vídeo (zoom, tremor, brilho, transições entre as partes) e efeitos sonoros com licença
-  - [ ] 5. Voltar para a IA depois de reeditar (refazer legenda, títulos e legenda do post a partir do corte novo) ou seguir para exportar
+  - [x] 3. Camadas: imagens, PNG, ícones e figurinhas por cima do vídeo, com entrada e saída na linha do tempo. Até 8 figuras: cruz, bíblia, chama e estrela (desenhos do HolyCut) ou um PNG, JPG ou WEBP da igreja. Arrastar, aumentar e girar na prévia; a mesma imagem entra no vídeo, só no trecho escolhido
+  - [x] 4. Efeitos de vídeo e sons próprios. Brilho (ganho na mesma matriz da prévia), tremor e zoom num trecho, com o logo e os textos parados. Entre as partes, corte seco, escurecer, desfoque ou fusão, sempre em 0,2 s e sem encurtar a linha do tempo. Luz é uma cópia borrada somada em tela. O contorno é um retângulo em volta do rosto, a partir da trilha já medida. A legenda Flutuante mostra uma palavra por vez, subindo. Sopro e toque são sintetizados pelo HolyCut, sem amostra de terceiro, e entram no mesmo instante na prévia e no render
+  - [x] 5. Depois de reeditar, a legenda queimada já acompanha as palavras que ficaram. O botão "Refazer título e legenda do post" pede ao Gemma uma frase deste corte; só entra se as palavras foram ditas, senão a tela avisa. Dá para exportar sem esse passo
 - [ ] **Edição automática com estilos:** a IA edita sozinha seguindo um estilo da biblioteca (por exemplo, "Reel dinâmico" ou "Devocional calmo": ritmo dos cortes, zoom, legenda, filtro, música e posição do logo), e o resultado é um projeto comum, que a pessoa reabre e muda. A liberdade é só na edição, nunca no conteúdo: nada de fala ou título que o pastor não disse. Aprender o estilo a partir de um vídeo de exemplo fica para depois
 - [ ] Abertura, encerramento e chamada no modelo, e a fonte própria da igreja
 - [ ] Tela dividida com o pregador e o telão

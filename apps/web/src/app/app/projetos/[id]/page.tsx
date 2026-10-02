@@ -10,6 +10,7 @@ import {
   FileText,
   Layers,
   Music,
+  Sticker,
   SwatchBook,
   Type,
   BookmarkPlus,
@@ -20,6 +21,7 @@ import {
   Clapperboard,
   FileArchive,
   ImageIcon,
+  Images,
   LoaderCircle,
   Pause,
   Play,
@@ -27,12 +29,14 @@ import {
   RotateCcw,
   RotateCw,
   Scissors,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ApoioNaPrevia } from "@/componentes/ApoioNaPrevia";
 import { CamadaSobreposta, type MudancaCamada } from "@/componentes/CamadaSobreposta";
 import { FormaDeOnda } from "@/componentes/FormaDeOnda";
 import { LegendaNaPrevia } from "@/componentes/LegendaNaPrevia";
@@ -40,8 +44,11 @@ import { LinhaDoTempo } from "@/componentes/LinhaDoTempo";
 import { ListaExportacoes } from "@/componentes/ListaExportacoes";
 import { MusicaNaPrevia } from "@/componentes/MusicaNaPrevia";
 import { PainelAudio } from "@/componentes/PainelAudio";
+import { PainelBanco } from "@/componentes/PainelBanco";
 import { PainelCor } from "@/componentes/PainelCor";
+import { PainelEfeitos } from "@/componentes/PainelEfeitos";
 import { PainelFala } from "@/componentes/PainelFala";
+import { PainelFiguras } from "@/componentes/PainelFiguras";
 import { PainelFundo } from "@/componentes/PainelFundo";
 import { PainelLegenda } from "@/componentes/PainelLegenda";
 import { PainelMarca } from "@/componentes/PainelMarca";
@@ -49,8 +56,9 @@ import { PainelMusica } from "@/componentes/PainelMusica";
 import { type OpcaoCorte, PainelSilencios } from "@/componentes/PainelSilencios";
 import { PainelTextos } from "@/componentes/PainelTextos";
 import { PreviaEnquadrada } from "@/componentes/PreviaEnquadrada";
+import { SomNaPrevia } from "@/componentes/SomNaPrevia";
 import { chamarApi, ErroApi } from "@/lib/api";
-import { quadroEm } from "@/lib/rosto";
+import { caixaContorno } from "@/lib/contorno";
 import { useEventosJobs } from "@/lib/eventos";
 import { cortesDaFala, fundirCortes } from "@/lib/fala";
 import { cssDoFiltro, FiltroSvg, useFiltros } from "@/lib/filtros";
@@ -66,10 +74,20 @@ import {
   novoIdDeParte,
   posicaoNaParte,
 } from "@/lib/partes";
-import { PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
-import type { BlocoLegenda, Exportacao, FormaDeOnda as DadosFormaDeOnda, Identidade, Job, Limpeza, Midia, Musica, PalavraFala, Parte, PreviaLegenda, Projeto, Proporcao, QuadroRosto, Rosto, Silencios } from "@/lib/tipos";
+import { quadroEm } from "@/lib/rosto";
+import { calcularRecorte, PROPORCOES, ZOOM_MAXIMO } from "@/lib/recorte";
+import type { ApoioProjeto, BlocoLegenda, EfeitosProjeto, Exportacao, FormaDeOnda as DadosFormaDeOnda, IconeFigura, Identidade, Job, Limpeza, Midia, Musica, PalavraFala, Parte, PreviaLegenda, Projeto, Proporcao, QuadroRosto, Rosto, Silencios } from "@/lib/tipos";
 
 const ESPERA_SALVAR_MS = 700;
+const EFEITOS_VAZIOS: EfeitosProjeto = {
+  brilho: 0,
+  tremor: 0,
+  luz: 0,
+  contorno: false,
+  transicao: "corte",
+  zoom: null,
+  som: { id: "nenhum", inicio: 0 },
+};
 // Pico da forma de onda (em % da escala cheia) a partir do qual a prévia considera que há voz
 const PICO_DE_FALA = 4;
 type Edicao = Pick<
@@ -81,15 +99,18 @@ type Edicao = Pick<
   | "enquadramento"
   | "marca"
   | "textos"
+  | "figuras"
+  | "apoios"
   | "fundo"
   | "cor"
   | "musica"
+  | "efeitos"
   | "legenda"
   | "audio"
 >;
 type EstadoSalvar = "salvo" | "salvando" | "erro";
 
-type Ferramenta = "fala" | "formato" | "legenda" | "textos" | "musica" | "cor" | "fundo" | "marca" | "audio" | "exportar";
+type Ferramenta = "fala" | "formato" | "legenda" | "textos" | "figuras" | "banco" | "efeitos" | "musica" | "cor" | "fundo" | "marca" | "audio" | "exportar";
 
 // A barra de ferramentas do editor. A fala só aparece na barra do celular: no computador ela fica fixa à esquerda.
 const FERRAMENTAS: { id: Ferramenta; rotulo: string; icone: typeof Crop; soCelular?: boolean }[] = [
@@ -97,6 +118,9 @@ const FERRAMENTAS: { id: Ferramenta; rotulo: string; icone: typeof Crop; soCelul
   { id: "formato", rotulo: "Formato", icone: Crop },
   { id: "legenda", rotulo: "Legenda", icone: Captions },
   { id: "textos", rotulo: "Texto", icone: Type },
+  { id: "figuras", rotulo: "Figura", icone: Sticker },
+  { id: "banco", rotulo: "Banco", icone: Images },
+  { id: "efeitos", rotulo: "Efeitos", icone: Sparkles },
   { id: "musica", rotulo: "Música", icone: Music },
   { id: "cor", rotulo: "Filtros", icone: SwatchBook },
   { id: "fundo", rotulo: "Fundo", icone: Layers },
@@ -121,6 +145,9 @@ export default function PaginaProjeto() {
   const [folhaAberta, setFolhaAberta] = useState(false);
   // O elemento selecionado na prévia: "logo" ou o id de um texto
   const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [enviandoFigura, setEnviandoFigura] = useState(false);
+  const [usandoBanco, setUsandoBanco] = useState(false);
+  const [refazendoTexto, setRefazendoTexto] = useState(false);
   const [tempo, setTempo] = useState(0);
   const [tocando, setTocando] = useState(false);
   const [exportando, setExportando] = useState(false);
@@ -142,6 +169,7 @@ export default function PaginaProjeto() {
 
   // Salvamento: em fila, um de cada vez, sempre com a versão mais nova que o servidor devolveu
   const versao = useRef(0);
+  const posicaoFinalRef = useRef(0);
   const fila = useRef<Promise<boolean>>(Promise.resolve(true));
   const espera = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const edicaoAtual = useRef<Edicao | null>(null);
@@ -170,7 +198,10 @@ export default function PaginaProjeto() {
           fundo: carregado.fundo,
           cor: carregado.cor,
           musica: carregado.musica,
+          efeitos: { ...EFEITOS_VAZIOS, ...carregado.efeitos, som: { ...EFEITOS_VAZIOS.som, ...carregado.efeitos?.som } },
           textos: carregado.textos,
+          figuras: carregado.figuras ?? [],
+          apoios: carregado.apoios ?? [],
           legenda: carregado.legenda,
           audio: { normalizar: carregado.audio.normalizar, limpeza: carregado.audio.limpeza ?? false },
         };
@@ -272,6 +303,123 @@ export default function PaginaProjeto() {
     [salvar],
   );
 
+  const colocarFigura = useCallback(
+    async (pedido: { icone?: IconeFigura; arquivo?: File }) => {
+      clearTimeout(espera.current);
+      const atual = edicaoAtual.current;
+      if (atual) {
+        const ok = await salvar(atual);
+        if (!ok) return;
+      }
+      setEnviandoFigura(true);
+      setErro("");
+      try {
+        let salvo: Projeto;
+        if (pedido.icone) {
+          salvo = await chamarApi<Projeto>(`/projetos/${id}/figuras?versao=${versao.current}&icone=${pedido.icone}`, { metodo: "POST" });
+        } else if (pedido.arquivo) {
+          const resposta = await fetch(`/api/projetos/${id}/figuras?versao=${versao.current}&nome=${encodeURIComponent(pedido.arquivo.name)}`, {
+            method: "POST",
+            body: pedido.arquivo,
+            headers: { "Content-Type": pedido.arquivo.type || "application/octet-stream" },
+            credentials: "same-origin",
+          });
+          const dados = await resposta.json().catch(() => null);
+          if (!resposta.ok) {
+            const detalhe = typeof dados?.detail === "string" ? dados.detail : "Não foi possível enviar a imagem.";
+            throw new ErroApi(resposta.status, detalhe);
+          }
+          salvo = dados as Projeto;
+        } else {
+          return;
+        }
+        versao.current = salvo.versao;
+        setProjeto(salvo);
+        const baseEdicao = edicaoAtual.current;
+        if (baseEdicao) {
+          const nova = { ...baseEdicao, figuras: salvo.figuras ?? [] };
+          edicaoAtual.current = nova;
+          setEdicao(nova);
+        }
+        setEstadoSalvar("salvo");
+        setSelecionado(salvo.figuras?.at(-1)?.id ?? null);
+        setFerramenta("figuras");
+        setFolhaAberta(true);
+      } catch (e) {
+        setErro(e instanceof ErroApi ? e.message : "Não foi possível colocar a figura.");
+      } finally {
+        setEnviandoFigura(false);
+      }
+    },
+    [id, salvar],
+  );
+
+  const usarBanco = useCallback(
+    async (tipo: "imagem" | "video", pixabayId: number) => {
+      clearTimeout(espera.current);
+      const atual = edicaoAtual.current;
+      if (atual) {
+        const ok = await salvar(atual);
+        if (!ok) return;
+      }
+      setUsandoBanco(true);
+      setErro("");
+      try {
+        const salvo = await chamarApi<Projeto>(`/projetos/${id}/banco`, {
+          metodo: "POST",
+          corpo: { versao: versao.current, tipo, pixabay_id: pixabayId, inicio: Math.round(posicaoFinalRef.current * 10) / 10 },
+        });
+        versao.current = salvo.versao;
+        setProjeto(salvo);
+        const baseEdicao = edicaoAtual.current;
+        if (baseEdicao) {
+          const nova = { ...baseEdicao, figuras: salvo.figuras ?? [], apoios: salvo.apoios ?? [] };
+          edicaoAtual.current = nova;
+          setEdicao(nova);
+        }
+        setEstadoSalvar("salvo");
+        if (tipo === "imagem") {
+          setSelecionado(salvo.figuras?.at(-1)?.id ?? null);
+          setFerramenta("figuras");
+        }
+        setFolhaAberta(true);
+      } catch (e) {
+        setErro(e instanceof ErroApi ? e.message : "Não foi possível usar o arquivo da Pixabay.");
+      } finally {
+        setUsandoBanco(false);
+      }
+    },
+    [id, salvar],
+  );
+
+  const refazerTextos = useCallback(async () => {
+    clearTimeout(espera.current);
+    const atual = edicaoAtual.current;
+    if (atual) {
+      const ok = await salvar(atual);
+      if (!ok) return;
+    }
+    setRefazendoTexto(true);
+    setErro("");
+    try {
+      const salvo = await chamarApi<Projeto>(`/projetos/${id}/publicacao?versao=${versao.current}`, { metodo: "POST" });
+      versao.current = salvo.versao;
+      setProjeto(salvo);
+      const baseEdicao = edicaoAtual.current;
+      if (baseEdicao) {
+        const nova = { ...baseEdicao, nome: salvo.nome };
+        edicaoAtual.current = nova;
+        setEdicao(nova);
+      }
+      setEstadoSalvar("salvo");
+      setAviso("Título e legenda do post atualizados com uma frase dita neste corte. Gerado por IA.");
+    } catch (e) {
+      setErro(e instanceof ErroApi ? e.message : "Não foi possível atualizar os textos.");
+    } finally {
+      setRefazendoTexto(false);
+    }
+  }, [id, salvar]);
+
   const legendaEdicao = edicao?.legenda;
   const cortesFala = useMemo(
     () => (legendaEdicao ? cortesDaFala(palavrasFala, legendaEdicao) : []),
@@ -293,6 +441,7 @@ export default function PaginaProjeto() {
     ? duracoes.slice(0, indice).reduce((soma, duracao) => soma + duracao, 0) +
       posicaoNaParte(parteAtual, cortesPorParte[indice] ?? [], tempo)
     : 0;
+  posicaoFinalRef.current = posicaoFinal;
 
   const irParaParte = useCallback((novo: number) => {
     indiceRef.current = novo;
@@ -643,6 +792,14 @@ export default function PaginaProjeto() {
     editar({
       marca: { ...edicao.marca, x, y, tamanho: Math.min(Math.max(edicao.marca.tamanho * fator, 0.06), 0.4), rotacao: girar(edicao.marca.rotacao, giro) },
     });
+  const moverFigura = (idFigura: string, { x, y, fator, giro }: MudancaCamada) =>
+    editar({
+      figuras: edicao.figuras.map((figura) =>
+        figura.id === idFigura
+          ? { ...figura, x, y, tamanho: Math.min(Math.max(figura.tamanho * fator, 0.08), 0.8), rotacao: girar(figura.rotacao, giro) }
+          : figura,
+      ),
+    });
   const selecionar = (qual: string, ferramentaDele: Ferramenta) => {
     setSelecionado(qual);
     setFerramenta(ferramentaDele);
@@ -805,9 +962,48 @@ export default function PaginaProjeto() {
         posicaoFinal={posicaoFinal}
       />
       );
+    case "figuras":
+      return (
+      <PainelFiguras
+        figuras={edicao.figuras}
+        aoMudar={(figuras) => editar({ figuras })}
+        duracaoFinal={duracaoFinal}
+        posicaoFinal={posicaoFinal}
+        enviando={enviandoFigura}
+        aoAdicionarIcone={(icone) => void colocarFigura({ icone })}
+        aoEnviarArquivo={(arquivo) => void colocarFigura({ arquivo })}
+        aoFalhar={setErro}
+      />
+      );
+    case "banco":
+      return (
+      <PainelBanco
+        frase={palavrasFala
+          .filter((palavra) => palavra.fim >= tempo - 3 && palavra.inicio <= tempo + 1)
+          .map((palavra) => palavra.texto)
+          .join(" ")
+          .slice(0, 240)}
+        posicaoFinal={posicaoFinal}
+        apoios={edicao.apoios}
+        aoMudar={(apoios: ApoioProjeto[]) => editar({ apoios })}
+        usando={usandoBanco}
+        aoUsar={(tipo, pixabayId) => void usarBanco(tipo, pixabayId)}
+        aoFalhar={setErro}
+      />
+      );
     case "musica":
       return (
       <PainelMusica musica={edicao.musica} musicas={musicas} aoMudar={(musica) => editar({ musica })} />
+      );
+    case "efeitos":
+      return (
+      <PainelEfeitos
+        efeitos={edicao.efeitos}
+        aoMudar={(efeitos) => editar({ efeitos })}
+        posicaoFinal={posicaoFinal}
+        duracaoFinal={duracaoFinal}
+        temRosto={trilhaRosto.length > 0}
+      />
       );
     case "cor":
       return (
@@ -868,7 +1064,12 @@ export default function PaginaProjeto() {
           <p className="mt-3 text-sm text-suave">
             Legenda do post: {projeto.publicacao.legenda} {projeto.publicacao.hashtags.join(" ")}. Gerado por IA.
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-3 text-sm text-suave">A legenda queimada já acompanha as palavras que ficaram neste corte.</p>
+        )}
+        <button type="button" onClick={() => void refazerTextos()} disabled={refazendoTexto} className="botao-contorno mt-3">
+          {refazendoTexto ? "Lendo a fala deste corte..." : "Refazer título e legenda do post"}
+        </button>
         <button type="button" onClick={salvarComoModelo} className="mt-4 inline-flex items-center gap-1.5 text-sm text-suave hover:text-texto">
           <BookmarkPlus className="size-4" aria-hidden /> Salvar o visual como modelo
         </button>
@@ -880,6 +1081,48 @@ export default function PaginaProjeto() {
       );
     }
   };
+
+  const efeitos = edicao.efeitos ?? EFEITOS_VAZIOS;
+  const ganhoBrilho = 1 + Math.min(Math.max(efeitos.brilho ?? 0, -0.3), 0.3);
+  const zoomLigado = Boolean(
+    efeitos.zoom && efeitos.zoom.nivel > 1 && posicaoFinal >= efeitos.zoom.inicio && (efeitos.zoom.fim === null || posicaoFinal < efeitos.zoom.fim),
+  );
+  const amplitude = 1.2 * (efeitos.tremor ?? 0);
+  const transformExtra = [
+    zoomLigado && efeitos.zoom ? `scale(${efeitos.zoom.nivel})` : "",
+    efeitos.tremor > 0
+      ? `translate(${(-amplitude * Math.sin(2 * Math.PI * 7 * posicaoFinal)).toFixed(3)}%, ${(-amplitude * Math.sin(2 * Math.PI * 11 * posicaoFinal)).toFixed(3)}%)`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  let opacidadeQuadro = 1;
+  let desfoqueTransicao = 0;
+  const transicaoSuave = efeitos.transicao === "escurecer" || efeitos.transicao === "fusao";
+  const transicaoDesfoque = efeitos.transicao === "desfoque" || efeitos.transicao === "fusao";
+  if ((transicaoSuave || transicaoDesfoque) && duracoes.length > 1) {
+    let acumulado = 0;
+    for (let indiceParte = 0; indiceParte < duracoes.length - 1; indiceParte += 1) {
+      acumulado += duracoes[indiceParte];
+      const distancia = Math.abs(posicaoFinal - acumulado);
+      if (distancia < 0.2) {
+        if (transicaoSuave) opacidadeQuadro = Math.min(opacidadeQuadro, distancia / 0.2);
+        if (transicaoDesfoque) desfoqueTransicao = 14;
+      }
+    }
+  }
+  const quadroDoRosto = quadroEm(trilhaRosto, tempo);
+  const caixaDoContorno = efeitos.contorno && quadroDoRosto
+    ? caixaContorno(
+        quadroDoRosto.x,
+        quadroDoRosto.y,
+        calcularRecorte(midia.video.largura, midia.video.altura, edicao.proporcao, enquadramentoPrevia.x, enquadramentoPrevia.y, enquadramentoPrevia.zoom),
+        alvo.largura,
+        alvo.altura,
+        midia.video.largura,
+        midia.video.altura,
+      )
+    : null;
 
   return (
     <main className="mx-auto max-w-[1600px] px-3 pb-28 pt-4 sm:px-6 lg:pb-8">
@@ -943,6 +1186,16 @@ export default function PaginaProjeto() {
           onPointerDown={() => setSelecionado(null)}
         >
           <FiltroSvg id="cor-previa" filtro={filtroEscolhido} intensidade={edicao.cor.intensidade} />
+          {Math.abs(ganhoBrilho - 1) > 0.001 ? (
+            <svg className="absolute size-0" aria-hidden>
+              <filter id="brilho-previa" colorInterpolationFilters="sRGB">
+                <feColorMatrix
+                  type="matrix"
+                  values={`${ganhoBrilho} 0 0 0 0  0 ${ganhoBrilho} 0 0 0  0 0 ${ganhoBrilho} 0 0  0 0 0 1 0`}
+                />
+              </filter>
+            </svg>
+          ) : null}
           <PreviaEnquadrada
             player={player}
             src={srcPrevia}
@@ -954,8 +1207,24 @@ export default function PaginaProjeto() {
             aoMudar={(enquadramento) => editar({ enquadramento: { ...edicao.enquadramento, ...enquadramento } })}
             fundo={edicao.fundo}
             rotacao={edicao.enquadramento.rotacao ?? 0}
-            filtroCor={cssDoFiltro("cor-previa", filtroEscolhido, edicao.cor.intensidade)}
+            transformExtra={transformExtra}
+            opacidade={opacidadeQuadro}
+            desfoqueTransicao={desfoqueTransicao}
+            luz={efeitos.luz ?? 0}
+            contorno={caixaDoContorno}
+            filtroCor={[cssDoFiltro("cor-previa", filtroEscolhido, edicao.cor.intensidade), Math.abs(ganhoBrilho - 1) > 0.001 ? "url(#brilho-previa)" : ""]
+              .filter(Boolean)
+              .join(" ")}
           >
+            {edicao.apoios.map((apoio) => (
+              <ApoioNaPrevia
+                key={apoio.id}
+                src={`/api/projetos/${projeto.id}/apoios/${apoio.id}`}
+                inicio={apoio.inicio}
+                fim={apoio.fim}
+                posicaoFinal={posicaoFinal}
+              />
+            ))}
             {identidade?.logo && edicao.marca.logo ? (
               <CamadaSobreposta
                 pedido={{ largura: alvo.largura, altura: alvo.altura, tipo: "logo", marca: edicao.marca }}
@@ -976,6 +1245,24 @@ export default function PaginaProjeto() {
                   }}
                 />
               ))}
+            {edicao.figuras.map((figura) => (
+              <CamadaSobreposta
+                key={figura.id}
+                pedido={{
+                  largura: alvo.largura,
+                  altura: alvo.altura,
+                  tipo: "figura",
+                  figura,
+                  projeto_id: figura.icone ? undefined : projeto.id,
+                }}
+                visivel={posicaoFinal >= figura.inicio && (figura.fim === null || posicaoFinal < figura.fim)}
+                edicao={{
+                  selecionada: selecionado === figura.id,
+                  aoSelecionar: () => selecionar(figura.id, "figuras"),
+                  aoMudar: (mudanca) => moverFigura(figura.id, mudanca),
+                }}
+              />
+            ))}
             <LegendaNaPrevia
               blocos={blocosLegenda}
               instante={posicaoFinal}
@@ -998,6 +1285,9 @@ export default function PaginaProjeto() {
               tocando={tocando}
               falando={falando}
             />
+          ) : null}
+          {efeitos.som?.id && efeitos.som.id !== "nenhum" ? (
+            <SomNaPrevia src={`/api/efeitos/${efeitos.som.id}`} inicio={efeitos.som.inicio} posicaoFinal={posicaoFinal} tocando={tocando} />
           ) : null}
           <div className="flex items-center gap-3">
             <button type="button" onClick={alternarReproducao} className="botao-cta size-12 p-0" aria-label={tocando ? "Pausar" : "Tocar o trecho"}>

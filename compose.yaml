@@ -50,6 +50,8 @@ services:
       SESSAO_DIAS: ${SESSAO_DIAS:-7}
       COOKIE_SEGURO: ${COOKIE_SEGURO:-false}
       MODO_IA: ${MODO_IA:-simulado}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      PIXABAY_API_KEY: ${PIXABAY_API_KEY:-}
       UPLOAD_MAX_GB: ${UPLOAD_MAX_GB:-20}
       ESPACO_MINIMO_LIVRE_GB: ${ESPACO_MINIMO_LIVRE_GB:-2}
     volumes: ["${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"]

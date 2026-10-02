@@ -9,6 +9,7 @@ const PRESETS: { valor: PresetLegenda; rotulo: string; descricao: string }[] = [
   { valor: "karaoke", rotulo: "Karaokê", descricao: "A palavra do momento acende na cor da igreja." },
   { valor: "destaque", rotulo: "Destaque", descricao: "A palavra mais longa fica na cor da igreja." },
   { valor: "digno", rotulo: "Digno", descricao: "Essa palavra sai em letra manuscrita, dourada." },
+  { valor: "flutuante", rotulo: "Flutuante", descricao: "Uma palavra por vez, grande, subindo." },
 ];
 
 const POSICOES: { valor: PosicaoLegenda; rotulo: string }[] = [

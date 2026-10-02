@@ -18,6 +18,17 @@ import subprocess
 from functools import lru_cache
 
 from core.config import FFMPEG
+from core.modelos.efeitos import (
+    FADE_TRANSICAO,
+    FREQUENCIA_TREMOR_X,
+    FREQUENCIA_TREMOR_Y,
+    SIGMA_LUZ,
+    SIGMA_TRANSICAO,
+    VOLUME_SOM,
+    amplitude_tremor,
+    ganho_brilho,
+)
+from core.modelos.rosto import ESPESSURA_CONTORNO
 from core.utils.cores import filtro_ffmpeg
 
 FPS = 30
@@ -78,7 +89,9 @@ def expressao_selecao(trechos: list[tuple[float, float]]) -> str:
 
 
 def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor: dict | None = None,
-               comandos: str | None = None, rotacao: float = 0.0) -> str:
+               comandos: str | None = None, rotacao: float = 0.0, efeitos: dict | None = None,
+               comandos_contorno: str | None = None,
+               caixa_contorno: tuple[int, int, int, int] | None = None) -> str:
     """
     Recorta, redimensiona, aplica o filtro de cor e o fundo (desfoque e escurecimento), antes das
     camadas de arte. É a mesma ordem da prévia: filtro de cor, blur e preto translúcido por cima.
@@ -91,22 +104,60 @@ def _enquadrar(recorte: dict, largura: int, altura: int, fundo: dict | None, cor
     if rotacao:
         # Gira o quadro já recortado, em volta do centro, como a prévia: os cantos ficam pretos
         cadeia += f",rotate={math.radians(float(rotacao)):.6f}:ow={largura}:oh={altura}:c=black"
+    if caixa_contorno:
+        esquerda, topo, caixa_largura, caixa_altura = caixa_contorno
+        if comandos_contorno:
+            caminho_contorno = comandos_contorno.replace("\\", "/").replace(":", r"\:")
+            cadeia += f",sendcmd=filename={caminho_contorno}"
+        cadeia += (f",drawbox=x={esquerda}:y={topo}:w={caixa_largura}:h={caixa_altura}"
+                   f":t={ESPESSURA_CONTORNO}:color=white@0.9")
     fundo, cor = fundo or {}, cor or {}
+    efeitos = efeitos or {}
     desfoque, escurecer = float(fundo.get("desfoque") or 0), float(fundo.get("escurecer") or 0)
     filtro_cor = filtro_ffmpeg(cor.get("filtro") or "natural", float(cor.get("intensidade", 1.0)))
-    if desfoque <= 0 and escurecer <= 0 and not filtro_cor:
+    amp = amplitude_tremor(largura, float(efeitos.get("tremor") or 0))
+    if amp:
+        cadeia += (f",crop=iw-{2 * amp}:ih-{2 * amp}"
+                   f":{amp}+{amp}*sin(2*PI*{FREQUENCIA_TREMOR_X}*t)"
+                   f":{amp}+{amp}*sin(2*PI*{FREQUENCIA_TREMOR_Y}*t),"
+                   f"scale={largura}:{altura}:flags=lanczos")
+    ganho = ganho_brilho(float(efeitos.get("brilho") or 0))
+    if desfoque <= 0 and escurecer <= 0 and not filtro_cor and abs(ganho - 1) < 0.001:
         return cadeia
     # Em RGB, como o navegador faz na prévia. O drawbox escurecia no espaço YUV e tirava a
     # saturação: o amarelo virava bege (medido comparando com a prévia).
     cadeia += ",format=gbrp"
     if filtro_cor:
         cadeia += f",{filtro_cor}"
+    if abs(ganho - 1) >= 0.001:
+        cadeia += f",colorchannelmixer=rr={ganho:.3f}:gg={ganho:.3f}:bb={ganho:.3f}"
     if desfoque > 0:
         cadeia += f",gblur=sigma={desfoque:.1f}"
     if escurecer > 0:
         fator = 1 - escurecer
         cadeia += f",colorchannelmixer=rr={fator:.3f}:gg={fator:.3f}:bb={fator:.3f}"
     return cadeia
+
+
+def _blocos_apoio(apoios: list[tuple[int, float, float]], largura: int, altura: int,
+                  duracao: float) -> tuple[str, str]:
+    """
+    Cobre o quadro com cada vídeo de apoio no intervalo dele (o som continua o da pregação).
+    O clipe começa junto com o intervalo, e o vídeo principal segue quando o clipe acaba.
+    """
+    linhas, anterior = [], "base0"
+    for indice, (entrada, inicio, fim) in enumerate(apoios):
+        linhas.append(
+            f"[{entrada}:v]scale={largura}:{altura}:force_original_aspect_ratio=increase,"
+            f"crop={largura}:{altura},fps={FPS},setpts=PTS-STARTPTS+{inicio:.3f}/TB[av{indice}]"
+        )
+        saida = f"baseA{indice}"
+        linhas.append(
+            f"[{anterior}][av{indice}]overlay=0:0:eof_action=pass:"
+            f"enable='between(t,{inicio:.3f},{min(fim, duracao):.3f})'[{saida}]"
+        )
+        anterior = saida
+    return ";\n".join(linhas), anterior
 
 
 def _sobrepor(camadas: list[tuple[float, float]] | None, duracao: float | None, primeira_entrada: int = 1) -> str:
@@ -128,6 +179,50 @@ def _sobrepor(camadas: list[tuple[float, float]] | None, duracao: float | None, 
 
 def _selecionar_video(entrada: int, trechos: list[tuple[float, float]]) -> str:
     return f"[{entrada}:v]setpts=PTS-STARTPTS,fps={FPS},select='{expressao_selecao(trechos)}',setpts=N/{FPS}/TB"
+
+
+def _expr_borda(duracao: float, entrar: bool, sair: bool) -> str:
+    """1 nas pontas de 0,2 s. Fica entre aspas no filtro, como o enable do zoom."""
+    partes = []
+    if entrar:
+        partes.append(f"lt(T,{FADE_TRANSICAO:.3f})")
+    if sair and duracao > FADE_TRANSICAO:
+        partes.append(f"gt(T,{max(duracao - FADE_TRANSICAO, 0):.3f})")
+    if not partes:
+        return ""
+    return f"if(gt({'+'.join(partes)},0),B,A)"
+
+
+def _desfoque_borda(cadeia: str, rotulo: str, duracao: float, entrar: bool, sair: bool, indice: int) -> str:
+    """Desfoca só a ponta da parte. A duração continua a mesma: não há sobreposição."""
+    expr = _expr_borda(duracao, entrar, sair)
+    if not expr:
+        return f"{cadeia}[{rotulo}]"
+    return (
+        f"{cadeia}[pb{indice}];\n"
+        f"[pb{indice}]split[n{indice}][s{indice}];\n"
+        f"[s{indice}]gblur=sigma={SIGMA_TRANSICAO}[g{indice}];\n"
+        f"[n{indice}][g{indice}]blend=all_expr='{expr}'[{rotulo}]"
+    )
+
+
+def _fade(cadeia: str, duracao: float, entrar: bool, sair: bool, video: bool) -> str:
+    """Escurece (e abaixa o som) nas pontas da parte, para a emenda não ser um corte seco."""
+    if not entrar and not sair:
+        return cadeia
+    nome = "fade" if video else "afade"
+    extra = ""
+    if entrar:
+        extra += f",{nome}=t=in:st=0:d={FADE_TRANSICAO:.3f}"
+    if sair and duracao > FADE_TRANSICAO:
+        extra += f",{nome}=t=out:st={max(duracao - FADE_TRANSICAO, 0):.3f}:d={FADE_TRANSICAO:.3f}"
+    return cadeia + extra
+
+
+def _trilha_som(som: dict, duracao: float) -> str:
+    atraso = max(int(round(float(som["inicio"]) * 1000)), 0)
+    return (f"[{som['entrada']}:a]aresample={TAXA_AUDIO},aformat=channel_layouts=stereo,"
+            f"adelay={atraso}|{atraso},volume={VOLUME_SOM:.2f},atrim=0:{duracao:.3f}")
 
 
 def _cadeia_audio(trechos: list[tuple[float, float]]) -> str:
@@ -165,7 +260,11 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
                   camadas: list[tuple[float, float]] | None = None, fundo: dict | None = None,
                   cor: dict | None = None, musica: dict | None = None, legenda: str | None = None,
                   audio_limpo: tuple[int, list[tuple[float, float]]] | None = None,
-                  comandos_rosto: str | None = None, rotacao: float = 0.0) -> str:
+                  comandos_rosto: str | None = None, rotacao: float = 0.0,
+                  apoios: list[tuple[int, float, float]] | None = None,
+                  efeitos: dict | None = None, som: dict | None = None,
+                  comandos_contorno: str | None = None,
+                  caixa_contorno: tuple[int, int, int, int] | None = None) -> str:
     """
     Grafo de filtros completo, com as saídas [v] e [a].
     partes: os trechos mantidos de cada parte do vídeo, na ordem final. A parte k é a entrada k do
@@ -173,7 +272,8 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
     se emendam com concat. Cada parte tem vídeo e áudio com a mesma duração, em quadros inteiros,
     então a sincronia não escorrega nas emendas.
     camadas: (início, fim) de cada imagem PNG sobreposta, no tempo do vídeo final. As camadas vêm
-    logo depois das partes nas entradas do FFmpeg.
+    logo depois das partes e dos vídeos de apoio nas entradas do FFmpeg.
+    apoios: (entrada do FFmpeg, início, fim) de cada vídeo da Pixabay, por baixo do logo e dos textos.
     musica: {"entrada": índice da faixa no FFmpeg, "volume": 0 a 1, "abaixar_na_fala": bool}.
     legenda: caminho do arquivo ASS, queimado por cima de tudo. A prévia usa os mesmos blocos.
     audio_limpo: (índice da faixa no FFmpeg, intervalo absoluto de cada parte na gravação).
@@ -184,6 +284,11 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
     if audio_limpo is not None:
         tem_audio = True
     duracao = round(sum(duracao_dos_trechos(trechos) for trechos in partes), 3)
+    tipo = (efeitos or {}).get("transicao") or "corte"
+    if tipo not in ("escurecer", "fusao", "desfoque") or len(partes) <= 1:
+        tipo = "corte"
+    escurece = tipo in ("escurecer", "fusao")
+    desfoca = tipo in ("desfoque", "fusao")
     grafo = []
     if len(partes) == 1:
         fonte_video = f"{_selecionar_video(0, partes[0])},"
@@ -197,32 +302,109 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
         if audio_limpo is not None:
             grafo.append(f"[{audio_limpo[0]}:a]asplit={len(partes)}" + "".join(f"[c{i}]" for i in range(len(partes))))
         for indice, trechos in enumerate(partes):
-            grafo.append(f"{_selecionar_video(indice, trechos)}[p{indice}v]")
+            duracao_parte = duracao_dos_trechos(trechos)
+            entrar, sair = indice > 0, indice < len(partes) - 1
+            video = _selecionar_video(indice, trechos)
+            audio = None
+            if escurece:
+                video = _fade(video, duracao_parte, entrar, sair, video=True)
+            if desfoca:
+                grafo.append(_desfoque_borda(video, f"p{indice}v", duracao_parte, entrar, sair, indice))
+            else:
+                grafo.append(f"{video}[p{indice}v]")
             emenda += f"[p{indice}v]"
             if tem_audio:
                 if audio_limpo is None:
-                    grafo.append(f"{_selecionar_audio(indice, trechos)}[p{indice}a]")
+                    audio = _selecionar_audio(indice, trechos)
                 else:
                     inicio, fim = audio_limpo[1][indice]
-                    grafo.append(f"{_audio_limpo(f'[c{indice}]', trechos, inicio, fim)}[p{indice}a]")
+                    audio = _audio_limpo(f"[c{indice}]", trechos, inicio, fim)
+                if escurece:
+                    audio = _fade(audio, duracao_parte, entrar, sair, video=False)
+                grafo.append(f"{audio}[p{indice}a]")
                 emenda += f"[p{indice}a]"
         grafo.append(f"{emenda}concat=n={len(partes)}:v=1:a={1 if tem_audio else 0}[pv]{'[pa]' if tem_audio else ''}")
         fonte_video, voz = "[pv]", "[pa]anull"
-    grafo.append(f"{fonte_video}{_enquadrar(recorte, largura, altura, fundo, cor, comandos_rosto, rotacao)}"
-                 f"{_sobrepor(camadas, duracao, primeira_entrada=len(partes))}")
-    if not tem_audio and not musica:
-        return _com_legenda(grafo, legenda)
-
+    cadeia = _enquadrar(
+        recorte, largura, altura, fundo, cor, comandos_rosto, rotacao, efeitos,
+        comandos_contorno, caixa_contorno,
+    )
+    enquadramento = f"{fonte_video}{cadeia}"
+    luz = float((efeitos or {}).get("luz") or 0)
+    if luz > 0.01:
+        # Uma cópia borrada, somada em tela. Com luz 0 o grafo continua o de antes.
+        enquadramento = (
+            f"{enquadramento}[baseL];\n"
+            f"[baseL]split[l0][l1];\n"
+            f"[l1]gblur=sigma={SIGMA_LUZ}[l2];\n"
+            f"[l0][l2]blend=all_mode=screen:all_opacity={min(luz, 0.8):.2f}"
+        )
+    zoom = ((efeitos or {}).get("zoom") or {}) if efeitos else {}
+    nivel = float(zoom.get("nivel") or 1) if zoom else 1
+    inicio_zoom = float(zoom.get("inicio") or 0) if zoom else 0
+    fim_zoom = duracao if zoom.get("fim") is None else float(zoom.get("fim"))
+    tem_zoom = bool(zoom) and nivel > 1.001 and fim_zoom > inicio_zoom
+    sufixo = _sobrepor(camadas, duracao, primeira_entrada=len(partes) + len(apoios or []))
+    if tem_zoom:
+        escala_l = int(round(largura * nivel))
+        escala_a = int(round(altura * nivel))
+        escala_l -= escala_l % 2
+        escala_a -= escala_a % 2
+        bloco_zoom = (
+            f"[base0]split[z0][z1];\n"
+            f"[z1]scale={escala_l}:{escala_a}:flags=lanczos,"
+            f"crop={largura}:{altura}:(in_w-{largura})/2:(in_h-{altura})/2[z2];\n"
+            f"[z0][z2]overlay=0:0:eof_action=pass:"
+            f"enable='between(t,{inicio_zoom:.3f},{min(fim_zoom, duracao):.3f})'[baseZ]"
+        )
+        if not apoios and not camadas:
+            grafo.append(f"{enquadramento}[base0];\n{bloco_zoom};\n[baseZ]format=yuv420p[v]")
+        elif not apoios:
+            resto = sufixo[len("[base0]"):].replace("[base0]", "[baseZ]", 1)
+            grafo.append(f"{enquadramento}[base0];\n{bloco_zoom}{resto}")
+        else:
+            blocos, ultimo = _blocos_apoio(apoios, largura, altura, duracao)
+            blocos = blocos.replace("[base0]", "[baseZ]", 1)
+            if camadas:
+                resto = sufixo[len("[base0]"):].replace("[base0]", f"[{ultimo}]", 1)
+                grafo.append(f"{enquadramento}[base0];\n{bloco_zoom};\n{blocos}{resto}")
+            else:
+                grafo.append(f"{enquadramento}[base0];\n{bloco_zoom};\n{blocos};\n[{ultimo}]format=yuv420p[v]")
+    elif not apoios:
+        grafo.append(f"{enquadramento}{sufixo}")
+    else:
+        blocos, ultimo = _blocos_apoio(apoios, largura, altura, duracao)
+        if camadas:
+            resto = sufixo[len("[base0]"):].replace("[base0]", f"[{ultimo}]", 1)
+            grafo.append(f"{enquadramento}[base0];\n{blocos}{resto}")
+        else:
+            grafo.append(f"{enquadramento}[base0];\n{blocos};\n[{ultimo}]format=yuv420p[v]")
     acabamento = f"loudnorm=I={LUFS_ALVO}:TP={PICO_MAXIMO_DB}:LRA=11,aresample={TAXA_AUDIO}," if normalizar else ""
     acabamento += (f"afade=t=in:d={FADE_ENTRADA},"
                    f"afade=t=out:st={max(duracao - FADE_SAIDA, 0):.3f}:d={FADE_SAIDA}[a]")
+
+    def fechar(linhas: list[str]) -> str:
+        if not som:
+            return _com_legenda(linhas, legenda)
+        ajustadas = [linha[:-3] + "[a0]" if linha.endswith("[a]") else linha for linha in linhas]
+        if any(linha.endswith("[a0]") for linha in ajustadas):
+            ajustadas += [f"{_trilha_som(som, duracao)}[sfx]",
+                          "[a0][sfx]amix=inputs=2:duration=first:normalize=0[a]"]
+        else:
+            ajustadas.append(f"{_trilha_som(som, duracao)},{acabamento}")
+        return _com_legenda(ajustadas, legenda)
+
+    if not tem_audio and not musica and not som:
+        return _com_legenda(grafo, legenda)
     if not musica:
-        return _com_legenda([*grafo, f"{voz},{acabamento}"], legenda)
+        if not tem_audio:
+            return fechar(grafo)
+        return fechar([*grafo, f"{voz},{acabamento}"])
 
     faixa = (f"[{musica['entrada']}:a]aresample={TAXA_AUDIO},aformat=channel_layouts=stereo,"
              f"atrim=0:{duracao:.3f},asetpts=PTS-STARTPTS,volume={float(musica['volume']):.3f}")
     if not tem_audio:
-        return _com_legenda([*grafo, f"{faixa},{acabamento}"], legenda)
+        return fechar([*grafo, f"{faixa},{acabamento}"])
     if musica.get("abaixar_na_fala", True):
         # A voz vira a "chave" do compressor: quando alguém fala, a música abaixa sozinha
         grafo += [f"{voz},aformat=channel_layouts=stereo,asplit=2[voz][chave]", f"{faixa}[musica0]",
@@ -231,7 +413,7 @@ def montar_filtro(partes: list[list[tuple[float, float]]], recorte: dict, largur
     else:
         grafo += [f"{voz},aformat=channel_layouts=stereo[voz]", f"{faixa}[musica]"]
     grafo.append(f"[voz][musica]amix=inputs=2:duration=first:normalize=0,{acabamento}")
-    return _com_legenda(grafo, legenda)
+    return fechar(grafo)
 
 
 def montar_filtro_imagem(recorte: dict, largura: int, altura: int, quantidade_camadas: int = 0,
